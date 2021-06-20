@@ -1,7 +1,7 @@
 {
   "name": "expressiontab",
-  "version": "1.0.0",
-  "description": "Expression New Tab page for Google Chrome Browser",
+  "version": "0.0.0",
+  "description": "Expression New Tab-page for Google Chrome Browser. Spead-dial page extension",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
