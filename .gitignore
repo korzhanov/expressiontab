@@ -1,3 +1,9 @@
+/node_modules/
+/dist/
+/.vscode/
+/.history/
+.DS_Store
+
 # Logs
 logs
 *.log
