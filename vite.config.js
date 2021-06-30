@@ -13,6 +13,7 @@ import {
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  mode: 'development', // production
   plugins: [svelte({
       emitCss:false,
       // entryFileNames: `[name].[ext]`,
@@ -31,6 +32,8 @@ export default defineConfig({
     },
     // alias: [{ find: '@', replacement: '/src' }],
   },
+  minify: false,
+  emptyOutDir: false,
   build: {
     cssCodeSplit: true,
     // assetsDir: 'assets',
@@ -38,7 +41,7 @@ export default defineConfig({
 
       // input: 'src/manifest.json',
       input: {
-        manifest: 'src/manifest.json',
+        manifest: resolve(__dirname, "src/manifest.json"),
         // css: 'src/assests/main.css',
         // newtab: 'src/newtab/index.html',
       },

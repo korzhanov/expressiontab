@@ -1,53 +1,90 @@
 <script lang="ts">
+  import { onMount } from "svelte";
+  import { fade } from 'svelte/transition';
   import logo from "../assets/svelte.png";
-  import '../lib/TailwindCSS.svelte'
+  import "../lib/TailwindCSS.svelte";
   // import css from "../assets/main.css";
   import Anchores from "../lib/Anchores.svelte";
-  import Counter from "../lib/Counter.svelte";
+  // import Counter from "../lib/Counter.svelte";
   import Timer from "../lib/Timer.svelte";
-// import chrome from vite-plugin-chrome-extension;
+  // import chrome from vite-plugin-chrome-extension;
 
-//   chrome.scripting.insertCSS({
-//   // target: { tabId: tab.id },
-//   files: ["assets/main.css"]
-// });
+  //   chrome.scripting.insertCSS({
+  //   // target: { tabId: tab.id },
+  //   files: ["assets/main.css"]
+  // });
+  let imgsrc: string = "";
+
+  onMount(() => {
+    imgsrc = localStorage.getItem("background") || "../assets/expression-drops-xfactorial-com-copyright.jpg";
+  });
 </script>
 
-<main>
+<main transition:fade>
   <!-- <img src={logo} alt="Svelte Logo" /> -->
- 
+  <bg />
+  <overlay />
+
   <Timer />
-  <Counter />
+  <!-- <Counter /> -->
   <Anchores />
 </main>
 
 <style lang="postcss">
   :root {
-    font-family: "Lato", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-      Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+    font-family: "Lato", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
   }
 
   main {
     text-align: center;
-    padding: 1vh;
     margin: 0 auto;
-    background-repeat: no-repeat;
-    background-size: cover;
-    background-position: center;
+    /* padding: 1vh; */
+    min-height: 100vh;
+    transition: all 0.5s ease;
+    /* background: #222;
     background-image: linear-gradient(
         180deg,
         rgba(0, 0, 0, 0.25) 0,
         rgba(0, 0, 0, 0.25)
       ),
-      url("https://source.unsplash.com/random/?mountains,expression,lake,cloud,night,city");
-    min-height: 100vh;
-    transition: all 0.5s ease;
+      url("https://source.unsplash.com/random/?mountains,expression,lake,cloud,night,city"); */
   }
 
   img {
     height: 16rem;
     width: 16rem;
   }
+
+  bg {
+    background-image: 
+    url("/assets/expression-drops-xfactorial-com-copyright.jpg")
+    /* ,url("./assets/expression-drops-xfactorial-com-copyright.jpg") */
+    /* ,url("../assets/expression-drops-xfactorial-com-copyright.jpg") */
+    ,url("https://source.unsplash.com/random/?mountains,lake,cloud,night"); 
+     /* ,expression,city */
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center;
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    min-height: 100vh;
+    z-index: -2;
+  }
+
+  overlay {
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: 0;
+    bottom: 0;
+    overflow: hidden;
+    background: linear-gradient(
+180deg
+,rgba(0,0,0,.25) 0,rgba(0,0,0,.25));
+    z-index:-1;
+}
   html {
     line-height: 1.15;
     -ms-text-size-adjust: 100%;

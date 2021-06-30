@@ -11,6 +11,9 @@ preprocess: sveltePreprocess({
     },
     postcss: true,
   }),
+  css: css => {
+    css.write('builds/expressiontab/bundle.css')
+  },
 }
 
 // import {sveltePreprocess} from 'svelte-preprocess'

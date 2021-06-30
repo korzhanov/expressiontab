@@ -1,16 +1,26 @@
-<script>
-    import { onMount } from 'svelte';
+<script lang="ts">
+    import { onMount, onDestroy } from 'svelte';
     // 
-    let date = new Date();
-    $: hour = ('0' + date.getHours()).slice(-2);
-    $: min = ('0' + date.getMinutes()).slice(-2);
-    $: sec = ('0' + date.getSeconds()).slice(-2);
-    
+    // let date:any = new Date();
+    let date:any = 0;
+    let interval:any;
+    $: hour = ('0' + ((date / (1000 * 60 * 60) % 24)|0)).slice(-2);
+    $: min = ('0' + ((date / 1000 / 60 % 60)|0)).slice(-2);
+    $: sec = ('0' + ((date/ 1000 % 60)|0)).slice(-2);
+    $: msec = ('0' +((date/100)|0)).slice(-2);
+   
     onMount( () => {
-      const interval = setInterval(() => {
-        date = new Date();
+      interval = setInterval(() => {
+        let dateNow:any = new Date();
+        let tomorrow:any = new Date(dateNow.getFullYear(), dateNow.getMonth(), dateNow.getDate() + 1);
+        date = new Date(tomorrow - dateNow);
       }, 1000);
     });
+    onDestroy( () => {
+      clearInterval(interval);
+    });
+
+
    </script>
 
 <section class="clock-and-greeting">
@@ -24,7 +34,9 @@
     </div> -->
 
     <div class="time-display">
-        <p><span>{hour}</span>:<span>{min}</span>:<span>{sec}</span></p>
+        <p><span>{hour}</span>:<span>{min}</span>:<span>{sec}</span>
+            <!-- <span>:{msec}</span> -->
+        </p>
     </div>
 
     <!-- <div class="toggle-pomodoro">
@@ -41,8 +53,8 @@
     .clock-and-greeting {
         height: 75%;
         flex-direction: column;        
-        font-family: Monoton, Lato, sans-serif;
-        /* font-family:  Lato, sans-serif; */
+        /* font-family: Monoton, Lato, sans-serif; */
+        font-family:  Lato, sans-serif;
        
     }
     .clock-and-greeting,
@@ -66,7 +78,7 @@
         text-shadow: 0 0 20px #0000009d;
     }
     .time-display p:hover {
-        transform: scale(1.1);
+        transform: scale(1.03);
         transition: all 0.3s ease;
         text-shadow: 0 0 50px #0000009d;
 
