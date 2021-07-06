@@ -20,7 +20,7 @@
   });
 </script>
 
-<main transition:fade>
+<main in:fade out:fade>
   <!-- <img src={logo} alt="Svelte Logo" /> -->
   <bg />
   <overlay />
