@@ -1,27 +1,23 @@
 <script lang="ts">
-    import { onMount, onDestroy } from 'svelte';
-    // 
-    // let date:any = new Date();
-    let date:any = 0;
-    let interval:any;
-    $: hour = ('0' + ((date / (1000 * 60 * 60) % 24)|0)).slice(-2);
-    $: min = ('0' + ((date / 1000 / 60 % 60)|0)).slice(-2);
-    $: sec = ('0' + ((date/ 1000 % 60)|0)).slice(-2);
-    $: msec = ('0' +((date/100)|0)).slice(-2);
-   
-    onMount( () => {
-      interval = setInterval(() => {
-        let dateNow:any = new Date();
-        let tomorrow:any = new Date(dateNow.getFullYear(), dateNow.getMonth(), dateNow.getDate() + 1);
-        date = new Date(tomorrow - dateNow);
-      }, 1000);
-    });
-    onDestroy( () => {
-      clearInterval(interval);
-    });
+    import { onMount, onDestroy } from "svelte";
+    import { fly } from "svelte/transition";
 
+    //
+    let date: any = new Date();
+    let interval: any;
+    $: hour = ("0" + (23 - date.getHours())).slice(-2);
+    $: min = ("0" + (59 - date.getMinutes())).slice(-2);
+    $: sec = ("0" + (59 - date.getSeconds())).slice(-2);
 
-   </script>
+    onMount(() => {
+        interval = setInterval(() => {
+            date = new Date();
+        }, 1000);
+    });
+    onDestroy(() => {
+        clearInterval(interval);
+    });
+</script>
 
 <section class="clock-and-greeting">
     <!-- <div class="user-greeting">
@@ -34,9 +30,13 @@
     </div> -->
 
     <div class="time-display">
-        <p><span>{hour}</span>:<span>{min}</span>:<span>{sec}</span>
+        <p>
+            {#key hour}<span in:fly={{ y: -20 }} >{hour}</span>{/key}:
+            {#key min}<span in:fly={{ y: -20 }} >{min}</span>{/key}:
+            {#key sec}<span in:fly={{ y: -20 }} >{sec}</span> {/key}
             <!-- <span>:{msec}</span> -->
         </p>
+       
     </div>
 
     <!-- <div class="toggle-pomodoro">
@@ -49,13 +49,11 @@
 </section>
 
 <style lang="postcss">
-    
     .clock-and-greeting {
         height: 75%;
-        flex-direction: column;        
+        flex-direction: column;
         /* font-family: Monoton, Lato, sans-serif; */
-        font-family:  Lato, sans-serif;
-       
+        font-family: Lato, sans-serif;
     }
     .clock-and-greeting,
     .user-greeting {
@@ -65,26 +63,24 @@
     .time-display {
         display: flex;
         justify-content: center;
-        font-weight: 400;
+        font-weight: 300;
         color: #fff;
-        font-size: 8em;
-        
+        font-size: 12vw;
     }
     .time-display,
     .time-display p {
         padding: 0;
         margin: 0;
-        transition: all 0.3s ease;
-        text-shadow: 0 0 20px #0000009d;
+        /* transition: all 0.3s ease; */
+        text-shadow: 0 0 50px #0000009d;
     }
     .time-display p:hover {
-        transform: scale(1.03);
+        /* transform: scale(1.03); */
         transition: all 0.3s ease;
-        text-shadow: 0 0 50px #0000009d;
-
+        /* text-shadow: 0 0 50px #0000009d; */
     }
     .time-display p span {
-        width:1.5em;
+        width: 1.5em;
         display: inline-block;
         transition: all 0.3s ease;
     }
