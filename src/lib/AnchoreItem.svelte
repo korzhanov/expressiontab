@@ -1,12 +1,15 @@
 <script lang="ts">
-    import { fly } from 'svelte/transition';
-    export let dateAdded: number = new Date();
+    import TailwindCSS from "./TailwindCSS.svelte";
+    import { fly } from "svelte/transition";
+    export let dateAdded: any = new Date();
     export let dateGroupModified: number = new Date();
     export let lastVisitTime: number = new Date();
     export let id: number = 0;
     export let index: number = 0;
+    export let titleVisible: boolean = false;
     export let parentId: number = 0;
     export let visitCount: number = 0;
+    export let isBookmark: boolean = visitCount < 1;
     export let typedCount: number = 0;
     export let title: string = "";
     export let url: string = "";
@@ -20,18 +23,18 @@
     ];
     let host = "localhost";
     try {
-        host = new URL(url).host;
+        host = new URL(url).host.split(":")[0] || "localhost";
     } catch (e) {
         console.log("No favicon for url: ", url);
     }
 
-    let img_data: string = localStorage.getItem("favicon_" + host)||"";
+    let img_data: string = localStorage.getItem("favicon_" + host) || "";
     let src: string =
         "https://s2.googleusercontent.com/s2/favicons?domain_url=" + host;
     if (img_data.length == 0) {
         let imgpromise = getBase64Image("favicon_" + host, src);
         // console.log(imgpromise.then());
-    } else{
+    } else {
         src = img_data;
     }
     async function getBase64Image(key: string, imgScr: string) {
@@ -67,27 +70,31 @@
     // Чтобы получить значок для URL-адреса, используйте:
     // https://s2.googleusercontent.com/s2/favicons?domain_url=https://www.stackoverflow.com
     // chrome://favicon2/?size=16&scale_factor=1x&page_url=https%3A%2F%2Fdocs.google.com%2Fforms%2Fd%2Fe%2F1FAIpQLSckRt0pts60MaYbNv73y5tiIMjLsfpuEdHwrsFXr9v6Bi21fg%2Fviewform&allow_google_server_fallback=0
-    function onAnchorClick(event) {
-        chrome.tabs.create({
-            selected: true,
-            url: event.srcElement.href
-        });
-        return false;
-    }
+    // function onAnchorClick(event) {
+    //     chrome.tabs.create({
+    //         selected: true,
+    //         url: event.srcElement.href
+    //     });
+    //     return false;
+    // }
+
+    //
 </script>
 
 <!-- {@debug url} -->
-{#if !new RegExp("^" + ignoreUrl.join("|")).test(url)}
-<!-- {@debug visitCount} -->
-    <anchor  in:fly="{{ y: 70, duration: 600 }}"
+<!-- {#if !new RegExp("^" + ignoreUrl.join("|")).test(url)} -->
+    <anchor
+        in:fly={{ y: -70, duration: 600 }}
         {title}
         class="rounded-full"
         style="
-        transform: scale({visitCount/1000+0.8});
+        margin: {visitCount / 1000 + 0.1}%;
+        transform: scale({visitCount / 1000 + 0.8});
         "
+        class:titleVisible
+        class:isBookmark
     >
-    
-    <!-- width:{Math.min((visitCount || 1) + 20,150)}px; 
+        <!-- width:{Math.min((visitCount || 1) + 20,150)}px; 
     height:{Math.min((visitCount || 1) + 20,150)}px; -->
         <!-- <anchor {title} class="w-{20*(visitCount||1)} h-{20*(visitCount||1)} rounded-full" > -->
         <!-- on:contextmenu|stopPropagation|preventDefault="{() => {
@@ -142,31 +149,29 @@
                     />
                 </g>
             </svg>
-            <!-- <picture> -->
-            <!-- <source srcset="../assets/svelte.png" media="(min-width: 600px)" /> -->
-
-            <!-- </picture> -->
-            <!-- {title} -->
+            <span><strong>{title}</strong> | {visitCount + " visits"}</span>
         </a>
     </anchor>
-{/if}
+<!-- {/if} -->
 
 <style lang="postcss">
     anchor {
         width: 30px;
         height: 30px;
-        border-radius: 50%;
+        border-radius: 50px;
+        /* border-radius: 50%; */
         /* max-width: 300px; */
         /* clear: both; */
         /* padding: 2%; */
-        margin:2px;
-        float: left;
+        margin: 2px;
+        /* float: left; */
         background-color: #fff;
         border: 10px solid transparent;
         text-overflow: ellipsis;
         overflow: hidden;
-        /* display: inline-block; */
+        display: inline-block;
         position: relative;
+        padding-right: 0px;
         /* display: inline-flex; */
         /* justify-content: center; */
         /* align-items: center; */
@@ -179,9 +184,24 @@
         background-size: cover;
         transition: all 0.3s ease; */
     }
-    anchor::odd {
+    /* anchor::nth-child(2n) {
         float: right;
         margin-left: 20px;
+    } */
+    anchor.isBookmark {
+        background-color: rgb(255, 242, 166);
+    }
+    .titleVisible {
+        display: block;
+        /* display: inline-flex; */
+        /* justify-content: center; */
+        /* align-items: center; */
+        width: auto;
+        padding: 10px;
+        margin: 10px !important;
+        border: 1px solid transparent;
+        transform: scale(1) !important;
+        transition: width 0.3s ease;
     }
     blur {
         /* filter: blur(10px); */
@@ -202,19 +222,41 @@
     }
 
     anchor a {
-        /* position: absolute;
-        text-overflow: ellipsis;
-        font-size: 10px;
-        line-height: 12px;
-        margin: auto;
-        height: 100%;
-        width: 100%;
-        display: block;
+        color: #222;
         text-decoration: none;
-        color: #555; */
-        /* opacity: 0; */
+        font-size: 13px;
+        line-height: 20px;
+        height: 100%;
+        display: flex;
+        flex-direction: row;
+        justify-content: flex-start;
+        align-items: center;
+        flex-wrap: nowrap;
+        align-content: flex-end;
+    }
+    a span {
+        display: block;
+        width: 0px;
+        overflow: hidden;
+        /* transition: width 0.3s ease; */
+        animation: width-grow 0.4s cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
     }
 
+    .titleVisible a span {
+        display: block;
+        width: auto;
+        /* transition: width 0.3s ease; */
+        animation: width-grow 0.4s cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
+    }
+
+    @-keyframes width-grow {
+        0% {
+            width: 0px;
+        }
+        100% {
+            width: auto;
+        }
+    }
     anchor:hover blur {
         /* -webkit-animation: flip-diagonal-1-fwd 0.4s
             cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
@@ -227,9 +269,8 @@
         /* position: relative; */
     }
     svg {
-        height: auto;
-        /* max-width: 66vmin; */
-        width: 100%;
+        height: 40px;
+        width: 40px;
     }
     .img-blur {
         /* filter: blur(10px); */
