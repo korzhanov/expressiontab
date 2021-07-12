@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { fade } from 'svelte/transition';
+  import { slimscroll } from "svelte-slimscroll";
+  import { fade } from "svelte/transition";
   import logo from "../assets/svelte.png";
   import "../lib/TailwindCSS.svelte";
   // import css from "../assets/main.css";
@@ -16,25 +17,59 @@
   let imgsrc: string = "";
 
   onMount(() => {
-    imgsrc = localStorage.getItem("background") || "../assets/expression-drops-xfactorial-com-copyright.jpg";
+    imgsrc =
+      localStorage.getItem("background") ||
+      "./assets/expression-drops-xfactorial-com-copyright.jpg";
   });
 </script>
 
-<main in:fade out:fade>
+<main
+  in:fade
+  out:fade
+  use:slimscroll={{
+    height: "100vh",
+    width: "100vw",
+    alwaysVisible: false,
+    disableFadeOut: false,
+    color: "grey"
+  }}
+>
   <!-- <img src={logo} alt="Svelte Logo" /> -->
   <bg />
   <overlay />
 
   <Timer />
   <!-- <Counter /> -->
+  <spacer />
   <Anchores />
 </main>
 
 <style lang="postcss">
   :root {
-    font-family: "Lato", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+    font-family: "Lato", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
   }
 
+  /* custom scrollbar */
+  /* ::scrollbar,::-webkit-scrollbar :global(body) {
+  width: 20px;
+}
+
+::scrollbar-track,::-webkit-scrollbar-track :global(body) {
+  background-color: transparent;
+}
+
+::scrollbar-thumb,::-webkit-scrollbar-thumb :global(body) {
+  background-color: #d6dee1;
+  border-radius: 20px;
+  border: 6px solid transparent;
+  background-clip: content-box;
+}
+
+::scrollbar-thumb:hover, ::-webkit-scrollbar-thumb:hover :global(body) {
+  background-color: #a8bbbf;
+} */
+  /* end custom scrollbar */
   main {
     text-align: center;
     margin: 0 auto;
@@ -49,6 +84,20 @@
       ),
       url("https://source.unsplash.com/random/?mountains,expression,lake,cloud,night,city"); */
   }
+  spacer {
+    background: linear-gradient( 
+180deg
+ , rgba(20, 20, 20, 0), rgba(20, 20, 20, 1) );
+    height: 38vh;
+    transition: height 0.3s ease-in-out 1s;
+    display: block;
+    width: 100%;
+    position: relative;
+  }
+  main:hover spacer {
+    height: 10vh;
+    transition: height 0.6s ease-in-out 1s;
+  }
 
   img {
     height: 16rem;
@@ -56,12 +105,11 @@
   }
 
   bg {
-    background-image: 
-    url("/assets/expression-drops-xfactorial-com-copyright.jpg")
-    /* ,url("./assets/expression-drops-xfactorial-com-copyright.jpg") */
-    /* ,url("../assets/expression-drops-xfactorial-com-copyright.jpg") */
-    ,url("https://source.unsplash.com/random/?mountains,lake,cloud,night"); 
-     /* ,expression,city */
+    background-image: url("../assets/expression-drops-xfactorial-com-copyright.jpg")
+        /* ,url("./assets/expression-drops-xfactorial-com-copyright.jpg") */
+        /* ,url("../assets/expression-drops-xfactorial-com-copyright.jpg") */,
+      url("https://source.unsplash.com/random/1600x900/?mountains,water,cloud,night");
+    /* ,expression,city */
     background-repeat: no-repeat;
     background-size: cover;
     background-position: center;
@@ -81,10 +129,12 @@
     bottom: 0;
     overflow: hidden;
     background: linear-gradient(
-180deg
-,rgba(0,0,0,.25) 0,rgba(0,0,0,.25));
-    z-index:-1;
-}
+      180deg,
+      rgba(0, 0, 0, 0.25) 0,
+      rgba(0, 0, 0, 0.25)
+    );
+    z-index: -1;
+  }
   html {
     line-height: 1.15;
     -ms-text-size-adjust: 100%;
