@@ -3,6 +3,7 @@
   import { slimscroll } from "svelte-slimscroll";
   import { fade } from "svelte/transition";
   import logo from "../assets/svelte.png";
+  import firstbg from "../assets/expression-drops-xfactorial-com-copyright.jpg";
   import "../lib/TailwindCSS.svelte";
   // import css from "../assets/main.css";
   import Anchores from "../lib/Anchores.svelte";
@@ -14,13 +15,42 @@
   //   // target: { tabId: tab.id },
   //   files: ["assets/main.css"]
   // });
-  let imgsrc: string = "";
+  let imgsrc: string = "https://source.unsplash.com/random/1600x900/?mountains,water,cloud,night";
+  let background = localStorage.getItem("background");  
+  // let background = new Image();  
+  // background.src = imgsrc;
 
   onMount(() => {
-    imgsrc =
-      localStorage.getItem("background") ||
-      "./assets/expression-drops-xfactorial-com-copyright.jpg";
-  });
+    // getBase64Image("background",imgsrc); 
+  });  
+    async function getBase64Image(key: string, imgScr: string) {
+        performance.mark("start_img");
+        
+        var img = new Image();
+        img.onload = function() {
+            let canvas = document.createElement("canvas");
+            canvas.width = img.width;
+            canvas.height = img.height;
+            let ctx: any = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0);
+            try {
+                let dataURL = canvas.toDataURL("image/jpg");
+                localStorage.setItem(key, dataURL);
+                performance.mark("end_img");
+                performance.measure("img saved to localStorage","start_img","end_img");
+
+                return dataURL;
+            } catch (e) {
+                console.log(e);
+            }
+        };
+        try {
+            img.src = imgScr;
+        } catch (e) {
+            console.log(e);
+        }
+    }
+
 </script>
 
 <main
@@ -35,16 +65,45 @@
   }}
 >
   <!-- <img src={logo} alt="Svelte Logo" /> -->
-  <bg />
+  
+  <bg 
+  in:fade
+  out:fade
+  style="background-image: 
+  url('{firstbg}')
+  ;"
+  />
+  <!-- <bg 
+  in:fade
+  out:fade
+  style="background-image: 
+  url('{localImgSrc||imgsrc}')
+  ;"
+  /> -->
+  <!-- {@debug background} -->
+  <!-- {#await background then b}
+  {@debug background} -->
+  <bg 
+  in:fade
+  out:fade
+  style="background-image: 
+  url('{imgsrc}')
+  ;"
+  />
+  <!-- {/await} -->
+  <!-- <img src={imgsrc} alt=""> -->
   <overlay />
-
+ <spacer>
   <Timer />
   <!-- <Counter /> -->
-  <spacer />
+ </spacer>
   <Anchores />
 </main>
 
 <style lang="postcss">
+  * {
+  --brand-color: rgba(255,255,255,1);
+  }
   :root {
     font-family: "Lato", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
       Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
@@ -76,28 +135,41 @@
     /* padding: 1vh; */
     min-height: 100vh;
     transition: all 0.5s ease;
-    /* background: #222;
-    background-image: linear-gradient(
+    /* background: #222;     */
+    font-weight: 300;
+    /* background-image: linear-gradient(
         180deg,
         rgba(0, 0, 0, 0.25) 0,
         rgba(0, 0, 0, 0.25)
       ),
       url("https://source.unsplash.com/random/?mountains,expression,lake,cloud,night,city"); */
   }
+  /* main:hover spacer { */
+ 
   spacer {
     background: linear-gradient( 
 180deg
  , rgba(20, 20, 20, 0), rgba(20, 20, 20, 1) );
-    height: 38vh;
+    height: 92vh;
     transition: height 0.3s ease-in-out 1s;
-    display: block;
+    display: flex;
     width: 100%;
     position: relative;
-  }
-  main:hover spacer {
-    height: 10vh;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-content: space-around;
+    justify-content: space-around;
+    align-items: center;
+}
+ spacer:hover  {
+    height: 87vh;
     transition: height 0.6s ease-in-out 1s;
-  }
+  } 
+
+  /* anchores:hover+spacer, filterbar:hover+spacer {
+    height: 30vh;
+    transition: height 0.6s ease-in-out 1s;
+  } */
 
   img {
     height: 16rem;
@@ -105,10 +177,10 @@
   }
 
   bg {
-    background-image: url("../assets/expression-drops-xfactorial-com-copyright.jpg")
+    /* background-image: url("../assets/expression-drops-xfactorial-com-copyright.jpg") */
         /* ,url("./assets/expression-drops-xfactorial-com-copyright.jpg") */
-        /* ,url("../assets/expression-drops-xfactorial-com-copyright.jpg") */,
-      url("https://source.unsplash.com/random/1600x900/?mountains,water,cloud,night");
+        /* ,url("../assets/expression-drops-xfactorial-com-copyright.jpg") */
+      /*, url("https://source.unsplash.com/random/1600x900/?mountains,water,cloud,night"); */
     /* ,expression,city */
     background-repeat: no-repeat;
     background-size: cover;
