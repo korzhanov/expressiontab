@@ -147,49 +147,49 @@
 </script>
 
 <svelte-virtual-list-viewport
-    bind:this={viewport}
-    bind:offsetHeight={viewport_height}
-    bind:offsetWidth={viewport_width}
-    on:scroll={handle_scroll}
-    style="height: {height};"
+	bind:this={viewport}
+	bind:offsetHeight={viewport_height}
+	bind:offsetWidth={viewport_width}
+	on:scroll={handle_scroll}
+	style="height: {height};"
 >
-    <svelte-virtual-list-contents
-        bind:this={contents}
-        style="padding-top: {top}px; padding-bottom: {bottom}px;"
-    >
-        {#each visible as row (row.index)}
-            <svelte-virtual-list-row>
-                <slot item={row.data}>Missing template</slot>
-            </svelte-virtual-list-row>
-        {/each}
-    </svelte-virtual-list-contents>
+	<svelte-virtual-list-contents
+		bind:this={contents}
+		style="padding-top: {top}px; padding-bottom: {bottom}px;"
+	>
+		{#each visible as row (row.index)}
+			<svelte-virtual-list-row>
+				<slot item={row.data}>Missing template</slot>
+			</svelte-virtual-list-row>
+		{/each}
+	</svelte-virtual-list-contents>
 </svelte-virtual-list-viewport>
 
 <style>
-    svelte-virtual-list-viewport {
-        position: relative;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-        display: block;
-    }
-    svelte-virtual-list-contents {
-        display: flex;
+	svelte-virtual-list-viewport {
+		position: relative;
+		overflow-y: auto;
+		-webkit-overflow-scrolling: touch;
+		display: block;
+	}
+	svelte-virtual-list-contents {
+		display: flex;
 
-        justify-content: flex-start;
-        align-items: flex-start;
-        /* flex-flow: wrap; */
-        flex-wrap: wrap;
-        align-content: space-around;
+		justify-content: flex-start;
+		align-items: flex-start;
+		/* flex-flow: wrap; */
+		flex-wrap: wrap;
+		align-content: space-around;
 
-        padding: 15px;
-        gap: 5px;
-    }
-    svelte-virtual-list-row {
-    }
-    /* svelte-virtual-list-contents, svelte-virtual-list-row { */
-    /* display: block; */
-    /* } */
-    svelte-virtual-list-row {
-        overflow: hidden;
-    }
+		padding: 15px;
+		gap: 5px;
+	}
+	svelte-virtual-list-row {
+	}
+	/* svelte-virtual-list-contents, svelte-virtual-list-row { */
+	/* display: block; */
+	/* } */
+	svelte-virtual-list-row {
+		overflow: hidden;
+	}
 </style>

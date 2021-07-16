@@ -15,42 +15,46 @@
   //   // target: { tabId: tab.id },
   //   files: ["assets/main.css"]
   // });
-  let imgsrc: string = "https://source.unsplash.com/random/1600x900/?mountains,water,cloud,night";
-  let background = localStorage.getItem("background");  
-  // let background = new Image();  
+  let imgsrc: string =
+    "https://source.unsplash.com/random/1600x900/?mountains,water,cloud,night";
+  let background = localStorage.getItem("background");
+  // let background = new Image();
   // background.src = imgsrc;
 
   onMount(() => {
-    // getBase64Image("background",imgsrc); 
-  });  
-    async function getBase64Image(key: string, imgScr: string) {
-        performance.mark("start_img");
-        
-        var img = new Image();
-        img.onload = function() {
-            let canvas = document.createElement("canvas");
-            canvas.width = img.width;
-            canvas.height = img.height;
-            let ctx: any = canvas.getContext("2d");
-            ctx.drawImage(img, 0, 0);
-            try {
-                let dataURL = canvas.toDataURL("image/jpg");
-                localStorage.setItem(key, dataURL);
-                performance.mark("end_img");
-                performance.measure("img saved to localStorage","start_img","end_img");
+    // getBase64Image("background",imgsrc);
+  });
+  async function getBase64Image(key: string, imgScr: string) {
+    performance.mark("start_img");
 
-                return dataURL;
-            } catch (e) {
-                console.log(e);
-            }
-        };
-        try {
-            img.src = imgScr;
-        } catch (e) {
-            console.log(e);
-        }
+    var img = new Image();
+    img.onload = function() {
+      let canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      let ctx: any = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      try {
+        let dataURL = canvas.toDataURL("image/jpg");
+        localStorage.setItem(key, dataURL);
+        performance.mark("end_img");
+        performance.measure(
+          "img saved to localStorage",
+          "start_img",
+          "end_img"
+        );
+
+        return dataURL;
+      } catch (e) {
+        console.log(e);
+      }
+    };
+    try {
+      img.src = imgScr;
+    } catch (e) {
+      console.log(e);
     }
-
+  }
 </script>
 
 <main
@@ -65,11 +69,11 @@
   }}
 >
   <!-- <img src={logo} alt="Svelte Logo" /> -->
-  
-  <bg 
-  in:fade
-  out:fade
-  style="background-image: 
+
+  <bg
+    in:fade
+    out:fade
+    style="background-image: 
   url('{firstbg}')
   ;"
   />
@@ -83,26 +87,26 @@
   <!-- {@debug background} -->
   <!-- {#await background then b}
   {@debug background} -->
-  <bg 
-  in:fade
-  out:fade
-  style="background-image: 
+  <bg
+    in:fade
+    out:fade
+    style="background-image: 
   url('{imgsrc}')
   ;"
   />
   <!-- {/await} -->
   <!-- <img src={imgsrc} alt=""> -->
   <overlay />
- <spacer>
-  <Timer />
-  <!-- <Counter /> -->
- </spacer>
+  <spacer>
+    <Timer />
+    <!-- <Counter /> -->
+  </spacer>
   <Anchores />
 </main>
 
 <style lang="postcss">
   * {
-  --brand-color: rgba(255,255,255,1);
+    --brand-color: rgba(255, 255, 255, 1);
   }
   :root {
     font-family: "Lato", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
@@ -145,11 +149,13 @@
       url("https://source.unsplash.com/random/?mountains,expression,lake,cloud,night,city"); */
   }
   /* main:hover spacer { */
- 
+
   spacer {
-    background: linear-gradient( 
-180deg
- , rgba(20, 20, 20, 0), rgba(20, 20, 20, 1) );
+    background: linear-gradient(
+      180deg,
+      rgba(20, 20, 20, 0),
+      rgba(20, 20, 20, 1)
+    );
     height: 92vh;
     transition: height 0.3s ease-in-out 1s;
     display: flex;
@@ -160,27 +166,27 @@
     align-content: space-around;
     justify-content: space-around;
     align-items: center;
-}
- spacer:hover  {
+  }
+  spacer:hover {
     height: 87vh;
     transition: height 0.6s ease-in-out 1s;
-  } 
+  }
 
   /* anchores:hover+spacer, filterbar:hover+spacer {
     height: 30vh;
     transition: height 0.6s ease-in-out 1s;
   } */
 
-  img {
+  /* img {
     height: 16rem;
     width: 16rem;
-  }
+  } */
 
   bg {
     /* background-image: url("../assets/expression-drops-xfactorial-com-copyright.jpg") */
-        /* ,url("./assets/expression-drops-xfactorial-com-copyright.jpg") */
-        /* ,url("../assets/expression-drops-xfactorial-com-copyright.jpg") */
-      /*, url("https://source.unsplash.com/random/1600x900/?mountains,water,cloud,night"); */
+    /* ,url("./assets/expression-drops-xfactorial-com-copyright.jpg") */
+    /* ,url("../assets/expression-drops-xfactorial-com-copyright.jpg") */
+    /*, url("https://source.unsplash.com/random/1600x900/?mountains,water,cloud,night"); */
     /* ,expression,city */
     background-repeat: no-repeat;
     background-size: cover;
@@ -207,7 +213,7 @@
     );
     z-index: -1;
   }
-  html {
+  /* html {
     line-height: 1.15;
     -ms-text-size-adjust: 100%;
     -webkit-text-size-adjust: 100%;
@@ -408,5 +414,5 @@
     p {
       max-width: none;
     }
-  }
+  } */
 </style>

@@ -13,7 +13,7 @@
    let searchTerm = "";
    // let bookmarkList: any = bookmarks.then((value) => value);
    let bookmarkList: any = [],
-      filteredListSliced: any = [];
+      filteredListSliced: Array<any> = [];
    let loader = 0;
    let titleVisible = false;
    let filteredList: any = bookmarkList;
@@ -35,42 +35,42 @@
    //    console.log("t", t);
    //    return t;
    // });
-$: {
-   const promise = Promise.all([
-      new Promise(resolve => {
-         chrome.history.search(
-            {
-               text: searchTerm,
-               startTime:
-                  new Date().getTime() -
-                  1000 * 60 * 60 * 24 * 7 * (searchTerm.length + 1),
-               maxResults: 2000
-            },
-            results => {
-               return resolve(results);
-            }
-         );
-      }),
-      chrome.bookmarks.search(searchTerm || "h")
-   ]);
-   const bookmarks = promise.then(([a, b]) => {
-      let c: any = [];
-      // a.sort((a1: any, a2: any) => { // сортировочка
-      //    return a2.visitCount - a1.visitCount;
-      // });
-      c = [...a, ...b];
-      // console.log("a",a);
-      // console.log("b",b);
-      // console.log("c",c);
-      // c.sort((c1: any, c2: any) => {
-      //    return c1.url - c2.url;
-      // });
-      bookmarkList = c;
-      return c;
-   });
-}
+   $: {
+      const promise = Promise.all([
+         new Promise(resolve => {
+            chrome.history.search(
+               {
+                  text: searchTerm,
+                  startTime:
+                     new Date().getTime() -
+                     1000 * 60 * 60 * 24 * 7 * (searchTerm.length + 1),
+                  maxResults: 2000
+               },
+               results => {
+                  return resolve(results);
+               }
+            );
+         }),
+         chrome.bookmarks.search(searchTerm || "h")
+      ]);
+      const bookmarks = promise.then(([a, b]) => {
+         let c: any = [];
+         // a.sort((a1: any, a2: any) => { // сортировочка
+         //    return a2.visitCount - a1.visitCount;
+         // });
+         c = [...a, ...b];
+         // console.log("a",a);
+         // console.log("b",b);
+         // console.log("c",c);
+         // c.sort((c1: any, c2: any) => {
+         //    return c1.url - c2.url;
+         // });
+         bookmarkList = c;
+         return c;
+      });
+   }
    // $: filteredList = bookmarkList;
-   $: filteredListSliced = bookmarkList.slice(0,visible);
+   $: filteredListSliced = bookmarkList.slice(0, visible);
    // $: if (searchTerm == "") {
    //    filteredListSliced = [...bookmarkList];
    //    // filteredList = [...bookmarkList];
@@ -118,7 +118,6 @@ $: {
    // } else {
    //    visible = 500;
    // }
-
 
    // $: if (
    //    Math.abs(Math.min(Math.ceil(visible), filteredList.length)) <
@@ -281,12 +280,12 @@ $: {
             > -->
       <!-- </icon-list>  -->
    </label>
-   <span> showing items {visible}
+   <span>
+      showing items {visible}
       of {bookmarkList.length}, {windowHeight} - {windowY} - {hh}</span
    >
 </filterBar>
-<anchores bind:clientHeight={hh} 
-class:titleVisible>
+<anchores bind:clientHeight={hh} class:titleVisible>
    <!-- {@debug bookmarkList} -->
    <!-- {@debug filteredListSliced} -->
    <!-- {#each bookmarkList as item (item)} -->
@@ -333,13 +332,12 @@ class:titleVisible>
       align-items: center;
       gap: 10px;
       padding: 0 32px;
-
    }
    filterBar * {
       opacity: 0;
       transition: opacity 0.3s ease;
    }
-   main:hover filterBar *{
+   main:hover filterBar * {
       opacity: 1;
       transition: opacity 0.3s ease 2s;
    }
@@ -393,11 +391,6 @@ class:titleVisible>
       );
    }
 
-   anchores svelte-virtual-list-contents {
-      /* display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
-      gap: 5px; */
-   }
    .lds-circle {
       display: inline-block;
       transform: translateZ(1px);
@@ -427,72 +420,67 @@ class:titleVisible>
          transform: rotateY(3600deg);
       }
    }
-   svelte-virtual-list-row {
-      /* width: 40px;
-      height: 40px; */
-   }
+
    :global(anchor) {
-    
-        /* float: left; */
-        /* border-radius: 50%; */
-        /* max-width: 300px; */
-        /* clear: both; */
-        /* padding: 2%; */
-        /* display: inline-flex; */
-        /* justify-content: center; */
-        /* align-items: center; */
-        /* background-color: #fff9;
+      /* float: left; */
+      /* border-radius: 50%; */
+      /* max-width: 300px; */
+      /* clear: both; */
+      /* padding: 2%; */
+      /* display: inline-flex; */
+      /* justify-content: center; */
+      /* align-items: center; */
+      /* background-color: #fff9;
         background-color: rgba(255, 255, 255, 0.5); */
-        /* -webkit-backdrop-filter: blur(10px);
+      /* -webkit-backdrop-filter: blur(10px);
         backdrop-filter: blur(10px); */
-        /* background-position: center center;
+      /* background-position: center center;
         background-repeat: no-repeat;
         background-size: cover;
         transition: all 0.3s ease; */
-        width: 50px;
-        height: 50px;
-        border-radius: 50px;
-        margin: 2px;
-        background-color: #fff;
-        border: 10px solid transparent;
-        text-overflow: ellipsis;
-        overflow: hidden;
-        display: block;
-        position: relative;
-        padding-right: 0px;
-        box-sizing: border-box;
-        animation: -global-width-grow-anchor 1s cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
-        transition: all 0.3s ease;
-    
+      width: 50px;
+      height: 50px;
+      border-radius: 50px;
+      margin: 2px;
+      background-color: #fff;
+      border: 10px solid transparent;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      display: block;
+      position: relative;
+      padding-right: 0px;
+      box-sizing: border-box;
+      animation: -global-width-grow-anchor 1s
+         cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
+      transition: all 0.3s ease;
    }
-   .titleVisible {      
+   .titleVisible {
       flex-direction: row;
       flex-wrap: wrap;
    }
-   
+
    .titleVisible :global(anchor) {
-        width: 100% !important;
-        padding: 10px !important;
-        margin: 10px !important;
-        border: 1px solid transparent !important;
-        transform: scale(1) !important;
-        /* display: block; */
-        animation: -global-width-grow-anchor 1s cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
+      width: 100% !important;
+      padding: 10px !important;
+      margin: 10px !important;
+      border: 1px solid transparent !important;
+      transform: scale(1) !important;
+      /* display: block; */
+      animation: -global-width-grow-anchor 1s
+         cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
    }
-   .titleVisible :global(anchor:nth-child(-n+10)) {
- transition: transform cubic-bezier(0.23, 1, 0.320, 1), width 0.5s ease;
-       
+   .titleVisible :global(anchor:nth-child(-n + 10)) {
+      transition: transform cubic-bezier(0.23, 1, 0.32, 1), width 0.5s ease;
    }
 
-    @keyframes -global-width-grow-anchor {
-        0% {
-            width: 50px;
-            /* display: inline-block; */
-        }
-        100% {
-            width: auto;
-            /* display: block; */
-        }
-    }
-  
+   @keyframes -global-width-grow-anchor {
+      0% {
+         width: 50px;
+         /* display: inline-block; */
+      }
+      100% {
+         width: auto;
+         /* display: block; */
+      }
+   }
 </style>

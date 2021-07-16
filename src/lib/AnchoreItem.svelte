@@ -198,7 +198,7 @@
     anchor.isBookmark {
         background-color: rgb(255, 242, 166);
     }
-    blur {
+    /* blur { */
         /* filter: blur(10px); */
         /* -webkit-backdrop-filter: blur(10px);
         backdrop-filter: blur(10px);
@@ -214,7 +214,7 @@
         background-repeat: no-repeat;
         background-size: cover;
         transition: all 0.3s ease; */
-    }
+    /* } */
 
     anchor a {
         color: #222;
@@ -258,12 +258,12 @@
         }
     }
    
-    anchor:hover blur {
+    /* anchor:hover blur { */
         /* -webkit-animation: flip-diagonal-1-fwd 0.4s
             cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
         animation: flip-diagonal-1-fwd 0.4s
             cubic-bezier(0.455, 0.03, 0.515, 0.955) both; */
-    }
+    /* } */
 
     anchor:hover a {
         opacity: 1;
@@ -273,17 +273,17 @@
         height: 40px;
         width: 40px;
     }
-    .img-blur {
+    /* .img-blur { */
         /* filter: blur(10px); */
         /* -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px); */
-        width: 100%;
-        height: 100%;
-        position: absolute;
-    }
-    .img-icon {
+        /* width: 100%; */
+        /* height: 100%; */
+        /* position: absolute; */
+    /* } */
+    /* .img-icon {
         z-index: 10;
-    }
+    } */
 
     @-webkit-keyframes flip-diagonal-1-fwd {
         0% {
