@@ -35,7 +35,7 @@
    //    console.log("t", t);
    //    return t;
    // });
-
+$: {
    const promise = Promise.all([
       new Promise(resolve => {
          chrome.history.search(
@@ -68,50 +68,58 @@
       bookmarkList = c;
       return c;
    });
-
+}
    // $: filteredList = bookmarkList;
-   $: if (searchTerm == "") {
-      filteredList = [...bookmarkList];
-      // filteredList = bookmarkList;
-   } else {
-      // console.log("bookmarkList", bookmarkList);
-      // console.log("filteredList", filteredList);
-      // $:
-      filteredList = bookmarkList;
-      // filteredList = bookmarkList.filter( // фильтрация
-      //    (item: { url: string | string[]; title: string | string[] }) =>
-      //       (!!item.url && item.url.indexOf(searchTerm) !== -1) ||
-      //       (!!item.title && item.title.indexOf(searchTerm) !== -1)
-      // );
-      // for (let i = 0; bookmarkList.length < i; i++) {
-      //    filteredList = [];
-      //    let item = bookmarkList[i];
-      //    if (
-      //       (!!item.url && item.url.indexOf(searchTerm) !== -1) ||
-      //       (!!item.title && item.title.indexOf(searchTerm) !== -1)
-      //    ) {
-      //       filteredList = [...filteredList, item];
-      //       // visible=Math.min(filteredList.length,500);
-      //    }
-      // }
-   }
+   $: filteredListSliced = bookmarkList.slice(0,visible);
+   // $: if (searchTerm == "") {
+   //    filteredListSliced = [...bookmarkList];
+   //    // filteredList = [...bookmarkList];
+   //    // filteredList = bookmarkList;
+   // } else {
+   //    // console.log("bookmarkList", bookmarkList);
+   //    // console.log("filteredList", filteredList);
+   //    // $:
+   //    filteredListSliced = bookmarkList;
+   //    // filteredList = bookmarkList;
+   //    // filteredList = bookmarkList.filter( // фильтрация
+   //    //    (item: { url: string | string[]; title: string | string[] }) =>
+   //    //       (!!item.url && item.url.indexOf(searchTerm) !== -1) ||
+   //    //       (!!item.title && item.title.indexOf(searchTerm) !== -1)
+   //    // );
+   //    // for (let i = 0; bookmarkList.length < i; i++) {
+   //    //    filteredList = [];
+   //    //    let item = bookmarkList[i];
+   //    //    if (
+   //    //       (!!item.url && item.url.indexOf(searchTerm) !== -1) ||
+   //    //       (!!item.title && item.title.indexOf(searchTerm) !== -1)
+   //    //    ) {
+   //    //       filteredList = [...filteredList, item];
+   //    //       // visible=Math.min(filteredList.length,500);
+   //    //    }
+   //    // }
+   // }
    // const visible = tweened(1, {
    //    duration: 300,
    //    easing: cubicOut
    // });
    // visible.set(400);
+
    let windowY: number = 0,
       hh: number = 0,
       oldwindowY: number = 0,
-      visible = 20,
+      visible = 500,
       windowHeight: number = 0,
       autoloader: any;
+
    // $: visible = filteredList?.length || 0;
-   $: if (titleVisible) {
-      visible = 20;
-   } else {
-      visible = 500;
-   }
+
+   // $: if (titleVisible) {
+   //    visible = 20;
+   // } else {
+   //    visible = 500;
+   // }
+
+
    // $: if (
    //    Math.abs(Math.min(Math.ceil(visible), filteredList.length)) <
    //    filteredListSliced.length
@@ -165,7 +173,7 @@
 <svelte:window bind:scrollY={windowY} bind:innerHeight={windowHeight} />
 <!-- <p>showing items {start}-{end}:{visible}</p> -->
 <filterBar class="text-white">
-   <input class="text-white" id="search" bind:value={searchTerm} />{searchTerm}
+   <input class="text-white" id="search" bind:value={searchTerm} />
    <label id="changeView">
       <input type="checkbox" bind:checked={titleVisible} />
       <icon>
@@ -273,21 +281,24 @@
             > -->
       <!-- </icon-list>  -->
    </label>
-   <span
-      >showing items {visible}
+   <span> showing items {visible}
       of {bookmarkList.length}, {windowHeight} - {windowY} - {hh}</span
    >
 </filterBar>
-<anchores bind:clientHeight={hh}>
+<anchores bind:clientHeight={hh} 
+class:titleVisible>
    <!-- {@debug bookmarkList} -->
+   <!-- {@debug filteredListSliced} -->
    <!-- {#each bookmarkList as item (item)} -->
    {#each filteredListSliced as item (item)}
-      <AnchoreItem {...item} {titleVisible} />
+      <!-- <AnchoreItem {...item} {titleVisible} /> -->
+      <AnchoreItem {...item} />
    {/each}
    <!-- <VirtualList items={filteredList} let:item bind:start bind:end>
             <AnchoreItem {...item} />
          </VirtualList> -->
    {#if { loader }}<loader><div class="lds-circle"><div /></div></loader>{/if}
+   <!-- <anchor></anchor> -->
 </anchores>
 
 <!-- <autoloader bind:this={autoloader}>{hh}</autoloader> -->
@@ -322,6 +333,15 @@
       align-items: center;
       gap: 10px;
       padding: 0 32px;
+
+   }
+   filterBar * {
+      opacity: 0;
+      transition: opacity 0.3s ease;
+   }
+   main:hover filterBar *{
+      opacity: 1;
+      transition: opacity 0.3s ease 2s;
    }
    /* filterBar:before {
       content: "";
@@ -338,11 +358,17 @@
       top: -100px;
    } */
    anchores {
-      display: block;
+      /* display: block; */
+      display: flex;
+      flex-wrap: wrap;
+      flex-direction: row;
+      justify-content: center;
+      align-content: flex-end;
+      align-items: center;
       position: relative;
       width: 100%;
       height: auto;
-      min-height: 500px;
+      /* min-height: 500px; */
       padding-top: 10px;
       /* bottom: 0;
       left: 0; */
@@ -405,4 +431,68 @@
       /* width: 40px;
       height: 40px; */
    }
+   :global(anchor) {
+    
+        /* float: left; */
+        /* border-radius: 50%; */
+        /* max-width: 300px; */
+        /* clear: both; */
+        /* padding: 2%; */
+        /* display: inline-flex; */
+        /* justify-content: center; */
+        /* align-items: center; */
+        /* background-color: #fff9;
+        background-color: rgba(255, 255, 255, 0.5); */
+        /* -webkit-backdrop-filter: blur(10px);
+        backdrop-filter: blur(10px); */
+        /* background-position: center center;
+        background-repeat: no-repeat;
+        background-size: cover;
+        transition: all 0.3s ease; */
+        width: 50px;
+        height: 50px;
+        border-radius: 50px;
+        margin: 2px;
+        background-color: #fff;
+        border: 10px solid transparent;
+        text-overflow: ellipsis;
+        overflow: hidden;
+        display: block;
+        position: relative;
+        padding-right: 0px;
+        box-sizing: border-box;
+        animation: -global-width-grow-anchor 1s cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
+        transition: all 0.3s ease;
+    
+   }
+   .titleVisible {      
+      flex-direction: row;
+      flex-wrap: wrap;
+   }
+   
+   .titleVisible :global(anchor) {
+        width: 100% !important;
+        padding: 10px !important;
+        margin: 10px !important;
+        border: 1px solid transparent !important;
+        transform: scale(1) !important;
+        /* display: block; */
+        animation: -global-width-grow-anchor 1s cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
+   }
+   .titleVisible :global(anchor:nth-child(-n+10)) {
+ transition: transform cubic-bezier(0.23, 1, 0.320, 1), width 0.5s ease;
+       
+   }
+
+    @keyframes -global-width-grow-anchor {
+        0% {
+            width: 50px;
+            /* display: inline-block; */
+        }
+        100% {
+            width: auto;
+            /* display: block; */
+        }
+    }
+  
 </style>
