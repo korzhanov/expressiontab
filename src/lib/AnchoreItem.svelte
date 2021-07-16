@@ -1,18 +1,19 @@
 <script lang="ts">
     import TailwindCSS from "./TailwindCSS.svelte";
     import { fly } from "svelte/transition";
-    export let dateAdded: any = new Date();
-    export let dateGroupModified: number = new Date();
-    export let lastVisitTime: number = new Date();
-    export let id: number = 0;
-    export let index: number = 0;
-    export let titleVisible: boolean = false;
-    export let parentId: number = 0;
+    let now = new Date();
+    // export let dateAdded: number  = now.getTime();
+    // export let dateGroupModified: number  = now.getTime();
+    // export let lastVisitTime: number = now.getTime();
+    // export let id: number = 0;
+    // export let index: number = 0;
+    export let parentId: number | null;
     export let visitCount: number = 0;
-    export let isBookmark: boolean = visitCount < 1;
-    export let typedCount: number = 0;
+    export let isBookmark: boolean = !!parentId;
+    // export let typedCount: number = 0;
     export let title: string = "";
     export let url: string = "";
+    // export let titleVisible: boolean = false;
     // export let radius: number = 20;
     let ignoreUrl = [
         "chrome:",
@@ -38,6 +39,8 @@
         src = img_data;
     }
     async function getBase64Image(key: string, imgScr: string) {
+        performance.mark("start_img");
+        
         var img = new Image();
         img.onload = function() {
             let canvas = document.createElement("canvas");
@@ -48,6 +51,9 @@
             try {
                 let dataURL = canvas.toDataURL("image/png");
                 localStorage.setItem(key, dataURL);
+                performance.mark("end_img");
+                performance.measure("img saved to localStorage","start_img","end_img");
+
                 return dataURL;
             } catch (e) {
                 console.log(e);
@@ -82,7 +88,8 @@
 </script>
 
 <!-- {@debug url} -->
-<!-- {#if !new RegExp("^" + ignoreUrl.join("|")).test(url)} -->
+<!-- {#if !new RegExp("^" + ignoreUrl.join("|")).test(url)}
+        class:titleVisible -->
     <anchor
         in:fly={{ y: -70, duration: 600 }}
         {title}
@@ -91,7 +98,6 @@
         margin: {visitCount / 1000 + 0.1}%;
         transform: scale({visitCount / 1000 + 0.8});
         "
-        class:titleVisible
         class:isBookmark
     >
         <!-- width:{Math.min((visitCount || 1) + 20,150)}px; 
@@ -149,29 +155,18 @@
                     />
                 </g>
             </svg>
-            <span><strong>{title}</strong> | {visitCount + " visits"}</span>
+            <span><strong>{title}</strong> | {isBookmark?("⭐"):(visitCount + " visits")}</span>
         </a>
     </anchor>
 <!-- {/if} -->
 
 <style lang="postcss">
     anchor {
-        width: 30px;
-        height: 30px;
-        border-radius: 50px;
+        /* float: left; */
         /* border-radius: 50%; */
         /* max-width: 300px; */
         /* clear: both; */
         /* padding: 2%; */
-        margin: 2px;
-        /* float: left; */
-        background-color: #fff;
-        border: 10px solid transparent;
-        text-overflow: ellipsis;
-        overflow: hidden;
-        display: inline-block;
-        position: relative;
-        padding-right: 0px;
         /* display: inline-flex; */
         /* justify-content: center; */
         /* align-items: center; */
@@ -183,6 +178,18 @@
         background-repeat: no-repeat;
         background-size: cover;
         transition: all 0.3s ease; */
+        /* width: 30px;
+        height: 30px;
+        border-radius: 50px;
+        margin: 2px;
+        background-color: #fff;
+        border: 10px solid transparent;
+        text-overflow: ellipsis;
+        overflow: hidden;
+        display: inline-block;
+        position: relative;
+        padding-right: 0px;
+        animation: -global-width-grow-anchor 1s cubic-bezier(0.455, 0.03, 0.515, 0.955) both; */
     }
     /* anchor::nth-child(2n) {
         float: right;
@@ -190,18 +197,6 @@
     } */
     anchor.isBookmark {
         background-color: rgb(255, 242, 166);
-    }
-    .titleVisible {
-        display: block;
-        /* display: inline-flex; */
-        /* justify-content: center; */
-        /* align-items: center; */
-        width: auto;
-        padding: 10px;
-        margin: 10px !important;
-        border: 1px solid transparent;
-        transform: scale(1) !important;
-        transition: width 0.3s ease;
     }
     blur {
         /* filter: blur(10px); */
@@ -234,22 +229,27 @@
         flex-wrap: nowrap;
         align-content: flex-end;
     }
-    a span {
+    anchor a span {
         display: block;
         width: 0px;
         overflow: hidden;
+        opacity: 0;
+
         /* transition: width 0.3s ease; */
-        animation: width-grow 0.4s cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
+        /* animation: width-grow 0.4s cubic-bezier(0.455, 0.03, 0.515, 0.955) both; */
     }
 
-    .titleVisible a span {
+    .titleVisible anchor a span {
         display: block;
+        min-width: 100px;
         width: auto;
-        /* transition: width 0.3s ease; */
-        animation: width-grow 0.4s cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
+        opacity: 1;
+        transition: width 0.3s ease, opacity 1s linear;
+        /* animation: width-grow 0.4s cubic-bezier(0.455, 0.03, 0.515, 0.955) both; */
     }
+    /* transition: width 0.3s ease; */
 
-    @-keyframes width-grow {
+    @keyframes width-grow {
         0% {
             width: 0px;
         }
@@ -257,6 +257,7 @@
             width: auto;
         }
     }
+   
     anchor:hover blur {
         /* -webkit-animation: flip-diagonal-1-fwd 0.4s
             cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
