@@ -1,12 +1,18 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { slimscroll } from "svelte-slimscroll";
+  import { onMount, onDestroy, tick } from "svelte";
+  import {
+    persist,
+    indexedDBStorage,
+    localStorage
+  } from "@macfja/svelte-persistent-store";
+  // import { slimscroll } from "svelte-slimscroll";
   import { fade } from "svelte/transition";
-  import logo from "../assets/svelte.png";
+  import { writable } from "svelte/store";
+  // import logo from "../assets/svelte.png";
   import firstbg from "../assets/expression-drops-xfactorial-com-copyright.jpg";
   import "../lib/TailwindCSS.svelte";
-  // import css from "../assets/main.css";
   import Anchores from "../lib/Anchores.svelte";
+  // import css from "../assets/main.css";
   // import Counter from "../lib/Counter.svelte";
   import Timer from "../lib/Timer.svelte";
   // import chrome from vite-plugin-chrome-extension;
@@ -16,87 +22,57 @@
   //   files: ["assets/main.css"]
   // });
   let imgsrc: string =
-    "https://source.unsplash.com/random/1600x900/?mountains,water,cloud,night";
-  let background = localStorage.getItem("background");
+    "https://source.unsplash.com/random/1920x1080/?mountains,water,cloud,night";
+  // let background = localStorage.getItem("background");
+  // const layout = persist(writable('2column'), indexedDBStorage(), 'myapp-layout')
+  let background = persist(writable(firstbg), localStorage(), "background");
+  let bg = $background;
   // let background = new Image();
   // background.src = imgsrc;
 
-  onMount(() => {
-    // getBase64Image("background",imgsrc);
-  });
-  async function getBase64Image(key: string, imgScr: string) {
-    performance.mark("start_img");
-
-    var img = new Image();
-    img.onload = function() {
-      let canvas = document.createElement("canvas");
-      canvas.width = img.width;
-      canvas.height = img.height;
-      let ctx: any = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0);
-      try {
-        let dataURL = canvas.toDataURL("image/jpg");
-        localStorage.setItem(key, dataURL);
-        performance.mark("end_img");
-        performance.measure(
-          "img saved to localStorage",
-          "start_img",
-          "end_img"
-        );
-
-        return dataURL;
-      } catch (e) {
-        console.log(e);
-      }
+  function toDataURL(urll: string, callback: any) {
+    var xhr = new XMLHttpRequest();
+    xhr.onload = function() {
+      var reader = new FileReader();
+      reader.onloadend = function() {
+        callback(reader.result);
+      };
+      reader.readAsDataURL(xhr.response);
     };
-    try {
-      img.src = imgScr;
-    } catch (e) {
-      console.log(e);
-    }
+    xhr.open("GET", urll);
+    xhr.responseType = "blob";
+    xhr.send();
   }
+
+  // setTimeout(function() {
+  //   $('.image img').css('opacity', '1')
+  //   var base = localStorage.getItem('nextImage');
+  //   if(base) $('.image img').attr('src', base)
+  // }, 1);
+  setTimeout(function() {
+    toDataURL(imgsrc, function(dataUrl: any) {
+      // console.log("RESULT:", dataUrl);
+      tick();
+      $background = dataUrl;
+    });
+  }, 60000);
+
 </script>
 
 <main
   in:fade
   out:fade
-  use:slimscroll={{
-    height: "100vh",
-    width: "100vw",
-    alwaysVisible: false,
-    disableFadeOut: false,
-    color: "grey"
-  }}
 >
-  <!-- <img src={logo} alt="Svelte Logo" /> -->
 
+  <!-- url('{$background || firstbg}') -->
+  <!-- url('{$background}'), url('{firstbg}') -->
   <bg
     in:fade
     out:fade
-    style="background-image: 
-  url('{firstbg}')
+    style="background-image: url('{$background}')
   ;"
   />
-  <!-- <bg 
-  in:fade
-  out:fade
-  style="background-image: 
-  url('{localImgSrc||imgsrc}')
-  ;"
-  /> -->
-  <!-- {@debug background} -->
-  <!-- {#await background then b}
-  {@debug background} -->
-  <bg
-    in:fade
-    out:fade
-    style="background-image: 
-  url('{imgsrc}')
-  ;"
-  />
-  <!-- {/await} -->
-  <!-- <img src={imgsrc} alt=""> -->
-  <overlay />
+  <overlay in:fade out:fade />
   <spacer>
     <Timer />
     <!-- <Counter /> -->
@@ -114,24 +90,7 @@
   }
 
   /* custom scrollbar */
-  /* ::scrollbar,::-webkit-scrollbar :global(body) {
-  width: 20px;
-}
 
-::scrollbar-track,::-webkit-scrollbar-track :global(body) {
-  background-color: transparent;
-}
-
-::scrollbar-thumb,::-webkit-scrollbar-thumb :global(body) {
-  background-color: #d6dee1;
-  border-radius: 20px;
-  border: 6px solid transparent;
-  background-clip: content-box;
-}
-
-::scrollbar-thumb:hover, ::-webkit-scrollbar-thumb:hover :global(body) {
-  background-color: #a8bbbf;
-} */
   /* end custom scrollbar */
   main {
     text-align: center;
@@ -167,7 +126,7 @@
     justify-content: space-around;
     align-items: center;
   }
-  spacer:hover {
+  main:hover spacer {
     height: 87vh;
     transition: height 0.6s ease-in-out 1s;
   }
@@ -183,9 +142,8 @@
   } */
 
   bg {
-    /* background-image: url("../assets/expression-drops-xfactorial-com-copyright.jpg") */
-    /* ,url("./assets/expression-drops-xfactorial-com-copyright.jpg") */
-    /* ,url("../assets/expression-drops-xfactorial-com-copyright.jpg") */
+    background-color: #222;
+    /* background-image: url("../assets/expression-drops-xfactorial-com-copyright.jpg"); */
     /*, url("https://source.unsplash.com/random/1600x900/?mountains,water,cloud,night"); */
     /* ,expression,city */
     background-repeat: no-repeat;
@@ -197,6 +155,7 @@
     width: 100%;
     min-height: 100vh;
     z-index: -2;
+    transition: all 0.3s ease;
   }
 
   overlay {
