@@ -14,8 +14,9 @@ import {
 // https://vitejs.dev/config/
 export default defineConfig({
   mode: 'development', // production
-  plugins: [svelte({
-      emitCss:false,
+  plugins: [
+    svelte({
+      emitCss: false,
       // entryFileNames: `[name].[ext]`,
       // cssHash: true
     }),
