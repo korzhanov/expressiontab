@@ -1,20 +1,34 @@
 <script lang="ts">
-    import TailwindCSS from "./TailwindCSS.svelte";
-    import { fly } from "svelte/transition";
+    import { onMount, onDestroy, tick, getContext, hasContext } from "svelte";
+    // import {
+    //     persist,
+    //     indexedDBStorage
+    //     // ,localStorage
+    // } from "@macfja/svelte-persistent-store";
+    // import { writable } from "svelte/store";
+    // import TailwindCSS from "./TailwindCSS.svelte";
+    import { fly, scale } from "svelte/transition";
+    import { quintOut } from "svelte/easing";
     let now = new Date();
-    // export let dateAdded: number  = now.getTime();
-    // export let dateGroupModified: number  = now.getTime();
-    // export let lastVisitTime: number = now.getTime();
-    // export let id: number = 0;
-    // export let index: number = 0;
-    export let parentId: number | null;
-    export let visitCount: number = 0;
+    export const dateAdded: number = now.getTime();
+    export const dateGroupModified: number = now.getTime();
+    export const lastVisitTime: number = now.getTime();
+    export const id: number = 0;
+    export const index: number = 0;
+    export const typedCount: number = 0;
+    export const parentId: number | null = null;
+    export const visitCount: number = 0;
+    export const hostVisitCount: number = 0;
+    let maxVisits: number = hostVisitCount || visitCount;
+    if (hasContext('maxVisits')) {
+		maxVisits = Math.max(getContext('maxVisits'), maxVisits);
+	}
+    export let weightVisits: number =
+        maxVisits / Math.max(hostVisitCount, visitCount)*400;
     export let isBookmark: boolean = !!parentId;
-    // export let typedCount: number = 0;
     export let title: string = "";
+
     export let url: string = "";
-    // export let titleVisible: boolean = false;
-    // export let radius: number = 20;
     let ignoreUrl = [
         "chrome:",
         "chrome-extension:",
@@ -22,51 +36,56 @@
         "file:",
         "data:"
     ];
-    let host = "localhost";
+    export let host = "localhost";
     try {
         host = new URL(url).host.split(":")[0] || "localhost";
     } catch (e) {
         console.log("No favicon for url: ", url);
     }
-
-    let img_data: string = localStorage.getItem("favicon_" + host) || "";
     let src: string =
         "https://s2.googleusercontent.com/s2/favicons?domain_url=" + host;
-    if (img_data.length == 0) {
-        let imgpromise = getBase64Image("favicon_" + host, src);
-        // console.log(imgpromise.then());
-    } else {
+    let img_data: string = localStorage.getItem("favicon_" + host) || "";
+    // let img_data = persist(writable(""), localStorage(), "favicon_" + host);
+
+    // getBase64Image("favicon_" + host, src);
+    // if ($img_data.length == 0) {
+    if (img_data.length > 0) {
         src = img_data;
     }
-    async function getBase64Image(key: string, imgScr: string) {
-        performance.mark("start_img");
-        
-        var img = new Image();
-        img.onload = function() {
-            let canvas = document.createElement("canvas");
-            canvas.width = img.width;
-            canvas.height = img.height;
-            let ctx: any = canvas.getContext("2d");
-            ctx.drawImage(img, 0, 0);
-            try {
-                let dataURL = canvas.toDataURL("image/png");
-                localStorage.setItem(key, dataURL);
-                performance.mark("end_img");
-                performance.measure("img saved to localStorage","start_img","end_img");
+    // if (img_data.length == 0) {
+    //     // let imgpromise = getBase64Image("favicon_" + host, src);
+    //     setTimeout(function() {
+    //         toDataURL(src, function(dataUrl: any) {
+    //             // console.log("RESULT:", dataUrl);
+    //             tick();
+    //             // $img_data = dataUrl;
+    //             console.log("new favicon saved from", host);
+    //             localStorage.setItem("favicon_" + host, dataUrl);
+    //             // img_data = dataUrl;
+    //         });
+    //     }, 15000);
+    //     // console.log(imgpromise.then());
+    // } else {
+    //     // src = $img_data;
+    //     src = img_data;
+    // }
 
-                return dataURL;
-            } catch (e) {
-                console.log(e);
-            }
-        };
-        try {
-            img.src = imgScr;
-        } catch (e) {
-            console.log(e);
-        }
-        // return dataURL.replace(/^data:image\/(png|jpg);base64,/, "");
-        // return dataURL;
-    }
+    // async function toDataURL(urll: string, callback: any) {
+    //     var xhr = new XMLHttpRequest();
+    //     xhr.onload = function() {
+    //         var reader = new FileReader();
+    //         reader.onloadend = function() {
+    //             callback(reader.result);
+    //         };
+    //         reader.readAsDataURL(xhr.response);
+    //     };
+    //     xhr.open("GET", urll);
+    //     xhr.responseType = "blob";
+    //     xhr.send();
+    // }
+    // onMount(() => {});
+    // onDestroy(() => {});
+
     // let src = "chrome://favicon/?size=16&scale_factor=1x&page_url=" + encodeURIComponent(url);
     // let src = "chrome://favicon2/?size=16&scale_factor=1x&page_url=" + encodeURI(url);
     // Чтобы получить значок для домена, используйте:
@@ -90,76 +109,83 @@
 <!-- {@debug url} -->
 <!-- {#if !new RegExp("^" + ignoreUrl.join("|")).test(url)}
         class:titleVisible -->
-    <anchor
-        in:fly={{ y: -70, duration: 600 }}
-        {title}
-        class="rounded-full"
-        style="
-        margin: {visitCount / 1000 + 0.1}%;
-        transform: scale({visitCount / 1000 + 0.8});
+<!-- transition:scale="{{duration: 500, delay: 500, opacity: 0.5, start: 0.5, easing: quintOut}}" -->
+
+<anchor
+    in:fly={{ x: -70, duration: 600 }}
+    out:fly={{ x: 70, duration: 300 }}
+    {title}
+    class="rounded-full"
+    style="
+        transform: scale({(weightVisits / 1000 + 1).toFixed(2)});
+        margin: 5px {weightVisits / 100 + 10}px;
+        z-index: -{weightVisits};
         "
-        class:isBookmark
-    >
-        <!-- width:{Math.min((visitCount || 1) + 20,150)}px; 
-    height:{Math.min((visitCount || 1) + 20,150)}px; -->
-        <!-- <anchor {title} class="w-{20*(visitCount||1)} h-{20*(visitCount||1)} rounded-full" > -->
-        <!-- on:contextmenu|stopPropagation|preventDefault="{() => {
-            adjusting = !adjusting;
-            if (adjusting) selected = circle;
-        }}" -->
-        <!-- <img
-            class="img-blur"
-            {src}
-        /> -->
-        <!-- <blur style="background-image: url({src});"  /> -->
-        <!-- <img class="img-icon" {src} alt={title} /> -->
-        <a href={url}>
-            <svg viewBox="0 0 100 100" width="100" height="100">
-                <title>{title}</title>
-                <defs>
-                    <circle
-                        id="circle"
-                        cx="50"
-                        cy="50"
-                        r="49"
-                        vector-effect="non-scaling-stroke"
-                    />
-                    <clipPath id="circle-clip">
-                        <use xlink:href="#circle" />
-                    </clipPath>
-                    <!-- <filter id="f1" x="0" y="0">
+    class:isBookmark
+>
+    <slot />
+    <a href={url}>
+        <anchoricon
+            style="
+        background-image: url('{src}');
+        "
+        />
+        <!-- <svg viewBox="0 0 100 100" width="100" height="100">
+            <title>{title}</title>
+            <defs>
+                <circle
+                    id="circle"
+                    cx="50"
+                    cy="50"
+                    r="49"
+                    vector-effect="non-scaling-stroke"
+                />
+                <clipPath id="circle-clip">
+                    <use xlink:href="#circle" />
+                </clipPath> -->
+        <!-- <filter id="f1" x="0" y="0">
                         <feGaussianBlur in="SourceGraphic" stdDeviation="15" />
                     </filter> -->
-                </defs>
-                <g clip-path="url(#circle-clip)">
-                    <!-- <image
+        <!-- </defs>
+            <g clip-path="url(#circle-clip)"> -->
+        <!-- <image
                         xlink:href={src}
                         filter="url(#f1)"
                         width="100%"
                         height="100%"
                     /> -->
-                    <use
-                        xlink:href="#circle"
-                        fill="none"
-                        stroke="#ffffff"
-                        stroke-width="0"
-                        opacity="1"
-                    />
-                    <image
-                        xlink:href={src}
-                        x="25%"
-                        y="25%"
-                        width="50%"
-                        height="50%"
-                        preserveAspectRatio="xMidYMid slice"
-                    />
-                </g>
-            </svg>
-            <span><strong>{title}</strong> | {isBookmark?("⭐"):(visitCount + " visits")}</span>
-        </a>
-    </anchor>
-<!-- {/if} -->
+        <!-- <use
+                    xlink:href="#circle"
+                    fill="none"
+                    stroke="#ffffff"
+                    stroke-width="0"
+                    opacity="1"
+                />
+                <image
+                    xlink:href={src}
+                    x="25%"
+                    y="25%"
+                    width="50%"
+                    height="50%"
+                    preserveAspectRatio="xMidYMid slice"
+                />
+            </g>
+        </svg> -->
+        <!-- <img
+            {src}
+            width="50px"
+            height="50px"
+            alt={host.slice(0, 1).toUpperCase()}
+        /> -->
+        <span
+            ><strong>{title}</strong> | {isBookmark
+                ? "⭐"
+                : visitCount + " visits"}</span
+        >
+    </a>
+</anchor>
 
+<!-- {/if} -->
 <style lang="postcss">
     anchor {
         /* float: left; */
@@ -196,11 +222,12 @@
         margin-left: 20px;
     } */
     anchor.isBookmark {
-        background-color: rgb(255, 242, 166);
+        /* background-color: rgb(255, 242, 166); */
+        background-color: #4c4e46;
     }
     /* blur { */
-        /* filter: blur(10px); */
-        /* -webkit-backdrop-filter: blur(10px);
+    /* filter: blur(10px); */
+    /* -webkit-backdrop-filter: blur(10px);
         backdrop-filter: blur(10px);
         width: 100%;
         height: 100%;
@@ -208,16 +235,16 @@
         
         background-color: #fff9;
         background-color: rgba(255, 255, 255, 0.5); */
-        /* -webkit-backdrop-filter: blur(10px);
+    /* -webkit-backdrop-filter: blur(10px);
         backdrop-filter: blur(10px); */
-        /* background-position: center center;
+    /* background-position: center center;
         background-repeat: no-repeat;
         background-size: cover;
         transition: all 0.3s ease; */
     /* } */
 
     anchor a {
-        color: #222;
+        color: rgb(221, 221, 221);
         text-decoration: none;
         font-size: 13px;
         line-height: 20px;
@@ -257,9 +284,9 @@
             width: auto;
         }
     }
-   
+
     /* anchor:hover blur { */
-        /* -webkit-animation: flip-diagonal-1-fwd 0.4s
+    /* -webkit-animation: flip-diagonal-1-fwd 0.4s
             cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
         animation: flip-diagonal-1-fwd 0.4s
             cubic-bezier(0.455, 0.03, 0.515, 0.955) both; */
@@ -273,18 +300,26 @@
         height: 40px;
         width: 40px;
     }
+    anchoricon {
+        height: 18px;
+        width: 18px;
+        margin: 6px;
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: contain;
+    }
     /* .img-blur { */
-        /* filter: blur(10px); */
-        /* -webkit-backdrop-filter: blur(10px);
+    /* filter: blur(10px); */
+    /* -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px); */
-        /* width: 100%; */
-        /* height: 100%; */
-        /* position: absolute; */
+    /* width: 100%; */
+    /* height: 100%; */
+    /* position: absolute; */
     /* } */
     /* .img-icon {
         z-index: 10;
     } */
-
+    /* 
     @-webkit-keyframes flip-diagonal-1-fwd {
         0% {
             -webkit-transform: translateZ(0) rotate3d(1, 1, 0, 0deg);
@@ -304,5 +339,5 @@
             -webkit-transform: translateZ(160px) rotate3d(1, 1, 0, 180deg);
             transform: translateZ(160px) rotate3d(1, 1, 0, 180deg);
         }
-    }
+    } */
 </style>

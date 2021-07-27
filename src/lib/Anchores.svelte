@@ -1,5 +1,6 @@
 <script lang="ts">
-   import { onMount, tick } from "svelte";
+   import { onMount, tick, setContext } from "svelte";
+   import { writable } from "svelte/store";
    import { tweened } from "svelte/motion";
    import { cubicOut, quintOut } from "svelte/easing";
    import { draw, fade } from "svelte/transition";
@@ -8,18 +9,30 @@
    import AnchoreList from "./AnchoreList.svelte";
    // import VirtualList from "@sveltejs/svelte-virtual-list";
    import VirtualList from "./VirtualList.svelte";
-   import AnchoreItem from "./AnchoreItem.svelte";
+   import HostItem from "./HostItem.svelte";
+   //  import {
+   //         persist,
+   //         indexedDBStorage
+   //         ,localStorage
+   //     } from "@macfja/svelte-persistent-store";
 
-   let searchTerm = "";
+   //   let searchTerm = persist(writable(""), localStorage(), "searchTerm");
+   let searchTerm = localStorage.getItem("searchTerm") || "";
+   $: if (searchTerm != "") {
+      localStorage.setItem("searchTerm", searchTerm);
+   }
+   // let searchTerm = "";
    // let bookmarkList: any = bookmarks.then((value) => value);
-   let bookmarkList: any = [],
+   let historyList: Array<any> = [],
+      bookmarkList: Map<any,any> = new Map(),
       filteredListSliced: Array<any> = [];
+   // let maxVisits = 1;
    let loader = 0;
    let titleVisible = false;
-   let filteredList: any = bookmarkList;
+   // let filteredList: any = bookmarkList;
 
-   let start: number | undefined;
-   let end: number | undefined;
+   // let start: number | undefined;
+   // let end: number | undefined;
    // let historyTree: any = chrome.history.search(
    //    {
    //       text: "",
@@ -53,24 +66,83 @@
          }),
          chrome.bookmarks.search(searchTerm || "h")
       ]);
-      const bookmarks = promise.then(([a, b]) => {
+      // const bookmarks = promise.then(([a, b]) => {
+      const bookmarks = promise.then((s) => {
+         let a: any = s[0];
+         let b: any = s[1];
          let c: any = [];
          // a.sort((a1: any, a2: any) => { // сортировочка
          //    return a2.visitCount - a1.visitCount;
          // });
-         c = [...a, ...b];
+         // c = [...a, ...b];
+         let arr1Length = a.length;
+         let arr2Length = b.length;
+         a.length = arr1Length + arr2Length;
+         for (let i = 0; i < arr2Length; i++) {
+            a[arr1Length + i] = b[i];
+         }
+         b = [];
+         arr1Length = a.length;
+         // bookmarkList = new Map();
+         // let maxVisitsTmp = 1;
+         for (let i = 0; i < arr1Length; i++) {
+            let host = "localhost";
+
+            try {
+               host = new URL(a[i].url).host.split(":")[0] || "localhost";
+              
+            if (bookmarkList.has(host)) {
+               let bmitems = bookmarkList.get(host);
+               bmitems[0].hostVisitCount = bmitems[0].hostVisitCount + (a[i].visitCount || 1);
+               // maxVisitsTmp = Math.max(maxVisitsTmp, bmitems[0].hostVisitCount);
+               // console.log("bmitems[0].hostVisitCount");
+               // console.log(bmitems[0].hostVisitCount);
+               bookmarkList.set(host, [...bmitems, a[i]]);
+            } else {
+               // console.log("a[i].visitCount");
+               // console.log(a[i].visitCount);
+               a[i].hostVisitCount = a[i].visitCount || 1;
+               bookmarkList.set(host, [a[i]]);
+            }
+            } catch (e) {
+               // console.log("No favicon for url: ", a[i].url, a[i].title);
+               // console.log(a[i]);
+               // host = a[i].url;
+            }
+         }
          // console.log("a",a);
          // console.log("b",b);
          // console.log("c",c);
          // c.sort((c1: any, c2: any) => {
          //    return c1.url - c2.url;
          // });
-         bookmarkList = c;
-         return c;
+         // historyList = a;
+         // bookmarkList = b;
+         console.log("bookmarkList ready");
+         // maxVisits = maxVisitsTmp;
+         // setContext('maxVisits', maxVisitsTmp);
+         // console.log(bookmarkList);
+         // bookmarkList = a;
+
+         // return bookmarkList;
       });
    }
+
+   // async function toDataURL(urll: string, callback: any) {
+   //    var xhr = new XMLHttpRequest();
+   //    xhr.onload = function() {
+   //       var reader = new FileReader();
+   //       reader.onloadend = function() {
+   //          callback(reader.result);
+   //       };
+   //       reader.readAsDataURL(xhr.response);
+   //    };
+   //    xhr.open("GET", urll);
+   //    xhr.responseType = "blob";
+   //    xhr.send();
+   // }
    // $: filteredList = bookmarkList;
-   $: filteredListSliced = bookmarkList.slice(0, visible);
+   // $: filteredListSliced = bookmarkList.slice(0, visible);
    // $: if (searchTerm == "") {
    //    filteredListSliced = [...bookmarkList];
    //    // filteredList = [...bookmarkList];
@@ -106,9 +178,12 @@
 
    let windowY: number = 0,
       hh: number = 0,
+      ww: number = 0,
+      st: number = 0,
       oldwindowY: number = 0,
-      visible = 500,
+      visible = Math.ceil((hh * ww) / 50 / 50) || 200,
       windowHeight: number = 0,
+      windowWidth: number = 0,
       autoloader: any;
 
    // $: visible = filteredList?.length || 0;
@@ -137,39 +212,99 @@
    //       Math.abs(Math.min(Math.ceil(visible), filteredList.length))
    //    );
    // }
-   // $: hh = autoloader?.getBoundingClientRect().top;
-   // $: hh;
-   $: if (
-      hh - 300 < windowY + windowHeight &&
-      oldwindowY - windowY != 0
-      //  &&
-      // visible < filteredList.length
-   ) {
-      console.log("hh - 300,windowY + windowHeight");
-      console.log(hh - 300, windowY + windowHeight);
+   // $: autoloaderTop = autoloader?.getBoundingClientRect().top || 0;
+   // $:
+   // $: if (
+   //    // autoloaderTop < windowY + windowHeight
+   //    //  &&
+   //    oldwindowY - windowY != 0
+   //    //  &&
+   //    // visible < filteredList.length
+   // )
+   async function loadmore() {
+      // setContext('maxVisits', maxVisits);
+      let pixel_offset: number = 200;
+      // console.log("loadmore");
+      // console.log(
+      //    "window.innerHeight + window.scrollY",
+      //    window.innerHeight,
+      //    window.scrollY
+      // );
+      // console.log("document.body.offsetHeight", document.body.offsetHeight);
+      // if (listElm.scrollTop + listElm.clientHeight >= listElm.scrollHeight) {
 
-      // visible = Math.min(Math.ceil(visible + 20 + 1*(windowY-oldwindowY)),filteredList.length);
-      loader = 1;
-      visible = Math.abs(
-         Math.min(
-            Math.ceil(visible + 20 + 0.8 * (windowY - oldwindowY)),
-            filteredList.length
-         )
-      );
-      tick();
-      // visible += v;
-      console.log("windowY - oldwindowY");
-      console.log(windowY - oldwindowY);
-      oldwindowY = windowY;
-   } else {
-      loader = 0;
+      if (
+         window.innerHeight + window.scrollY >=
+         document.body.offsetHeight - pixel_offset
+      ) {
+         loader = 1;
+         // console.log("visible", visible);
+
+         let nowvisible = Math.ceil((hh * ww) / 50 / 50);
+         let incrementVisible = Math.ceil(windowWidth / 50) * 3;
+         // visible = Math.abs(
+         //    Math.min(nowvisible + incrementVisible, bookmarkList.length)
+         // );
+         visible = Math.abs(
+            Math.min(nowvisible + incrementVisible, bookmarkList.size)
+         );
+         //   filteredListSliced = bookmarkList.slice(0, visible);
+         filteredListSliced = Array.from(bookmarkList).slice(0, visible);
+         // console.log(filteredListSliced);
+         // console.log(bookmarkList.size);
+         await tick();
+         loader = 0;
+      }
    }
+   // $: {
+   //    // console.log("hh - 300,windowY + windowHeight");
+   //    // console.log(hh - 300, windowY + windowHeight);
+   //    // tick();
+   //    let nowvisible = Math.ceil((hh * ww) / 50 / 50);
+   //    let incrementVisible = Math.ceil((windowHeight * windowWidth) / 50 / 50);
 
-   onMount(() => {});
+   //    // visible = Math.min(Math.ceil(visible + 20 + 1*(windowY-oldwindowY)),filteredList.length);
+   //    // loader = 1;
+   //    // visible = Math.abs(
+   //    //    Math.min(
+   //    //       Math.ceil(visible + 20 + 0.8 * (windowY - oldwindowY)),
+   //    //       filteredList.length
+   //    //    )
+   //    // );
+   //    // visible = Math.abs(Math.min(nowvisible+incrementVisible, bookmarkList.length));
+   //    console.log("nowvisible+incrementVisible", nowvisible + incrementVisible);
+   //    console.log("autoloaderTop", autoloaderTop);
+   //    console.log("windowY + windowHeight", windowY + windowHeight);
+
+   //    if (autoloaderTop < windowY + windowHeight) {
+   //       // filteredListSliced = bookmarkList.slice(0, visible);
+   //       filteredListSliced = bookmarkList.slice(
+   //          0,
+   //          Math.abs(
+   //             Math.min(nowvisible + incrementVisible, bookmarkList.length)
+   //          )
+   //       );
+   //       loader = 0;
+   //    } else {
+   //       loader = 1;
+   //    }
+   //    // visible += v;
+   //    // console.log("windowY - oldwindowY");
+   //    // console.log(windowY - oldwindowY);
+   //    oldwindowY = windowY;
+   // }
+
+   onMount(() => {
+      loadmore();
+   });
 </script>
 
-<!-- {searchTerm} -->
-<svelte:window bind:scrollY={windowY} bind:innerHeight={windowHeight} />
+<svelte:window
+   on:scroll={loadmore}
+   bind:scrollY={windowY}
+   bind:innerHeight={windowHeight}
+   bind:innerWidth={windowWidth}
+/>
 <!-- <p>showing items {start}-{end}:{visible}</p> -->
 <filterBar class="text-white">
    <input class="text-white" id="search" bind:value={searchTerm} />
@@ -282,17 +417,27 @@
    </label>
    <span>
       showing items {visible}
-      of {bookmarkList.length}, {windowHeight} - {windowY} - {hh}</span
+      of {bookmarkList.size}, {windowHeight} - {windowY} - {hh}</span
    >
 </filterBar>
-<anchores bind:clientHeight={hh} class:titleVisible>
+<anchores bind:clientHeight={hh} bind:clientWidth={ww} class:titleVisible>
    <!-- {@debug bookmarkList} -->
    <!-- {@debug filteredListSliced} -->
    <!-- {#each bookmarkList as item (item)} -->
-   {#each filteredListSliced as item (item)}
-      <!-- <AnchoreItem {...item} {titleVisible} /> -->
+   <!-- {#each filteredListSliced as item (item)}
+     
       <AnchoreItem {...item} />
+   {/each}  -->
+   <!-- {#each historyList as item (item)} -->
+   <!-- {#each filteredListSliced as item (item)}
+      <AnchoreItem {...item} />
+   {/each} -->
+   {#each filteredListSliced as hostItem}
+      <HostItem {hostItem} />
    {/each}
+   <!-- {#each bookmarkList as item (item)}
+      <AnchoreItem {...item} />
+   {/each} -->
    <!-- <VirtualList items={filteredList} let:item bind:start bind:end>
             <AnchoreItem {...item} />
          </VirtualList> -->
@@ -307,6 +452,9 @@
       position: relative;
       border: 1px solid #4ed400;
    } */
+   loader {
+      clear: left;
+   }
    #search {
       background: rgba(2, 2, 2, 0.2);
       border: 0px;
@@ -368,6 +516,7 @@
       height: auto;
       /* min-height: 500px; */
       padding-top: 10px;
+      z-index: 1;
       /* bottom: 0;
       left: 0; */
       /* margin-bottom: 40px; */
@@ -442,7 +591,8 @@
       height: 50px;
       border-radius: 50px;
       margin: 2px;
-      background-color: #fff;
+      /* background-color: #fff; */
+      background-color: rgb(31, 30, 30, 0.65);
       border: 10px solid transparent;
       text-overflow: ellipsis;
       overflow: hidden;
