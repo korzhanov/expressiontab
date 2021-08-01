@@ -1,5 +1,12 @@
 <script lang="ts">
     import { onMount, onDestroy, tick, getContext, hasContext } from "svelte";
+    import Icon, {
+        Star,
+        Trash,
+        Pencil,
+        Duplicate,
+        ClipboardCopy
+    } from "svelte-hero-icons";
     // import {
     //     persist,
     //     indexedDBStorage
@@ -10,25 +17,48 @@
     import { fly, scale } from "svelte/transition";
     import { quintOut } from "svelte/easing";
     let now = new Date();
-    export const dateAdded: number = now.getTime();
-    export const dateGroupModified: number = now.getTime();
-    export const lastVisitTime: number = now.getTime();
-    export const id: number = 0;
-    export const index: number = 0;
-    export const typedCount: number = 0;
-    export const parentId: number | null = null;
-    export const visitCount: number = 0;
-    export const hostVisitCount: number = 0;
-    let maxVisits: number = hostVisitCount || visitCount;
-    if (hasContext('maxVisits')) {
-		maxVisits = Math.max(getContext('maxVisits'), maxVisits);
-	}
-    export let weightVisits: number =
-        maxVisits / Math.max(hostVisitCount, visitCount)*400;
+    export let dateAdded: number = now.getTime();
+    export let dateGroupModified: number = now.getTime();
+    export let lastVisitTime: number = now.getTime();
+    export let id: number = 0;
+    export let index: number = 0;
+    export let typedCount: number = 0;
+    export let parentId: number | null;
     export let isBookmark: boolean = !!parentId;
-    export let title: string = "";
+    export let visitCount: number = 1;
+    export let hostVisitCount: any = 0;
+    let multiButton: boolean = false;
+    let maxVisits: number = localStorage.getItem("maxVisits") || 500;
+    // if (hasContext('maxVisits')) {
+    // 	maxVisits = Math.max(getContext('maxVisits'), maxVisits);
+    // }
+    // let weightVisits: number = Math.ceil(
+    //     ((Math.max(hostVisitCount, visitCount)||maxVisits)));
 
+    //     x = 50px
+    // r =
+
+    // visits<=10 = 40px = x0.8
+    // visits<=20 = 50px = x1
+    // visits>20 = 50px = x1
+    // visits=  R*50px = xR
+    // visits>=maxVisits = 300px = x3
+    // maxVisits=300
+    // visits=weight
+
+    // let weight = maxVisits%300;
+
+    let weightVisits: number = Math.max(
+        (Math.max(hostVisitCount, visitCount) * 3) / maxVisits,
+        0.8
+    );
+    export let title: string = "";
     export let url: string = "";
+    // console.log(url);
+    // console.log(hostVisitCount);
+    // console.log(
+    //     `let weightVisits (${weightVisits}): number = Math.max(Math.max(hostVisitCount (${hostVisitCount}), visitCount (${visitCount}))*3/maxVisits (${maxVisits}), 0.8);`
+    // );
     let ignoreUrl = [
         "chrome:",
         "chrome-extension:",
@@ -37,11 +67,11 @@
         "data:"
     ];
     export let host = "localhost";
-    try {
-        host = new URL(url).host.split(":")[0] || "localhost";
-    } catch (e) {
-        console.log("No favicon for url: ", url);
-    }
+    // try {
+    //     host = new URL(url).host.split(":")[0] || "localhost";
+    // } catch (e) {
+    //     console.log("No favicon for url: ", url);
+    // }
     let src: string =
         "https://s2.googleusercontent.com/s2/favicons?domain_url=" + host;
     let img_data: string = localStorage.getItem("favicon_" + host) || "";
@@ -52,6 +82,12 @@
     if (img_data.length > 0) {
         src = img_data;
     }
+
+	// function remove(todo) {
+	// 	todos = todos.filter(t => t !== todo);
+	// }
+
+
     // if (img_data.length == 0) {
     //     // let imgpromise = getBase64Image("favicon_" + host, src);
     //     setTimeout(function() {
@@ -69,22 +105,6 @@
     //     // src = $img_data;
     //     src = img_data;
     // }
-
-    // async function toDataURL(urll: string, callback: any) {
-    //     var xhr = new XMLHttpRequest();
-    //     xhr.onload = function() {
-    //         var reader = new FileReader();
-    //         reader.onloadend = function() {
-    //             callback(reader.result);
-    //         };
-    //         reader.readAsDataURL(xhr.response);
-    //     };
-    //     xhr.open("GET", urll);
-    //     xhr.responseType = "blob";
-    //     xhr.send();
-    // }
-    // onMount(() => {});
-    // onDestroy(() => {});
 
     // let src = "chrome://favicon/?size=16&scale_factor=1x&page_url=" + encodeURIComponent(url);
     // let src = "chrome://favicon2/?size=16&scale_factor=1x&page_url=" + encodeURI(url);
@@ -107,21 +127,27 @@
 </script>
 
 <!-- {@debug url} -->
+<!-- {@debug weightVisits}
+{@debug maxVisits}
+{@debug visitCount}
+{@debug hostVisitCount} -->
 <!-- {#if !new RegExp("^" + ignoreUrl.join("|")).test(url)}
         class:titleVisible -->
 <!-- transition:scale="{{duration: 500, delay: 500, opacity: 0.5, start: 0.5, easing: quintOut}}" -->
 
 <anchor
-    in:fly={{ x: -70, duration: 600 }}
-    out:fly={{ x: 70, duration: 300 }}
+    in:fly={{ x: -90, duration: 300 }}
+    out:fly={{ x: 70, duration: 150 }}
     {title}
     class="rounded-full"
     style="
-        transform: scale({(weightVisits / 1000 + 1).toFixed(2)});
-        margin: 5px {weightVisits / 100 + 10}px;
-        z-index: -{weightVisits};
+        transform: scale({(weightVisits + 0.2).toFixed(2)});
+        margin: 5px {weightVisits * 1 + 10}px;
+        z-index: -{Math.ceil(weightVisits * 1000)};
         "
     class:isBookmark
+    on:mouseover={() => (multiButton = true)}
+    on:mouseleave={() => (multiButton = false)}
 >
     <slot />
     <a href={url}>
@@ -177,54 +203,72 @@
             height="50px"
             alt={host.slice(0, 1).toUpperCase()}
         /> -->
-        <span
-            ><strong>{title}</strong> | {isBookmark
+        <span>
+            <strong>{title}</strong> | {isBookmark
                 ? "⭐"
-                : visitCount + " visits"}</span
-        >
+                : visitCount + " visits"}
+        </span>
     </a>
+    {#if multiButton}
+        <div class:multiButton
+             >
+            <!-- in:fly={{ x: 5, duration: 300 }}
+            out:fly={{ x: 5, duration: 300 }} -->
+            <button class="fas fa-star" title="Bookmark">
+                <Icon src={Star} solid size="22" />
+            </button>
+            {#if isBookmark}
+                <button class="fas fa-comment" title="Edit">
+                    <Icon src={Pencil} solid size="22" />
+                </button>
+            {/if}
+            <button class="fas fa-share-alt" title="Copy url">
+                <Icon src={Duplicate} solid size="22" />
+            </button>
+            <button class="fas fa-trash" title="Delete">
+                <Icon src={Trash} solid size="22" />
+            </button>
+        </div>
+    {/if}
 </anchor>
 
 <!-- {/if} -->
-<style lang="postcss">
-    anchor {
-        /* float: left; */
-        /* border-radius: 50%; */
-        /* max-width: 300px; */
-        /* clear: both; */
-        /* padding: 2%; */
-        /* display: inline-flex; */
-        /* justify-content: center; */
-        /* align-items: center; */
-        /* background-color: #fff9;
-        background-color: rgba(255, 255, 255, 0.5); */
-        /* -webkit-backdrop-filter: blur(10px);
-        backdrop-filter: blur(10px); */
-        /* background-position: center center;
-        background-repeat: no-repeat;
-        background-size: cover;
-        transition: all 0.3s ease; */
-        /* width: 30px;
-        height: 30px;
-        border-radius: 50px;
-        margin: 2px;
-        background-color: #fff;
-        border: 10px solid transparent;
-        text-overflow: ellipsis;
-        overflow: hidden;
-        display: inline-block;
-        position: relative;
-        padding-right: 0px;
-        animation: -global-width-grow-anchor 1s cubic-bezier(0.455, 0.03, 0.515, 0.955) both; */
-    }
+<style lang="scss">
+    // anchor {
+    //     /* float: left; */
+    //     /* border-radius: 50%; */
+    //     /* max-width: 300px; */
+    //     /* clear: both; */
+    //     /* padding: 2%; */
+    //     /* display: inline-flex; */
+    //     /* justify-content: center; */
+    //     /* align-items: center; */
+    //     /* background-color: #fff9;
+    //     background-color: rgba(255, 255, 255, 0.5); */
+    //     /* -webkit-backdrop-filter: blur(10px);
+    //     backdrop-filter: blur(10px); */
+    //     /* background-position: center center;
+    //     background-repeat: no-repeat;
+    //     background-size: cover;
+    //     transition: all 0.3s ease; */
+    //     /* width: 30px;
+    //     height: 30px;
+    //     border-radius: 50px;
+    //     margin: 2px;
+    //     background-color: #fff;
+    //     border: 10px solid transparent;
+    //     text-overflow: ellipsis;
+    //     overflow: hidden;
+    //     display: inline-block;
+    //     position: relative;
+    //     padding-right: 0px;
+    //     animation: -global-width-grow-anchor 1s cubic-bezier(0.455, 0.03, 0.515, 0.955) both; */
+    // }
     /* anchor::nth-child(2n) {
         float: right;
         margin-left: 20px;
     } */
-    anchor.isBookmark {
-        /* background-color: rgb(255, 242, 166); */
-        background-color: #4c4e46;
-    }
+
     /* blur { */
     /* filter: blur(10px); */
     /* -webkit-backdrop-filter: blur(10px);
@@ -243,37 +287,6 @@
         transition: all 0.3s ease; */
     /* } */
 
-    anchor a {
-        color: rgb(221, 221, 221);
-        text-decoration: none;
-        font-size: 13px;
-        line-height: 20px;
-        height: 100%;
-        display: flex;
-        flex-direction: row;
-        justify-content: flex-start;
-        align-items: center;
-        flex-wrap: nowrap;
-        align-content: flex-end;
-    }
-    anchor a span {
-        display: block;
-        width: 0px;
-        overflow: hidden;
-        opacity: 0;
-
-        /* transition: width 0.3s ease; */
-        /* animation: width-grow 0.4s cubic-bezier(0.455, 0.03, 0.515, 0.955) both; */
-    }
-
-    .titleVisible anchor a span {
-        display: block;
-        min-width: 100px;
-        width: auto;
-        opacity: 1;
-        transition: width 0.3s ease, opacity 1s linear;
-        /* animation: width-grow 0.4s cubic-bezier(0.455, 0.03, 0.515, 0.955) both; */
-    }
     /* transition: width 0.3s ease; */
 
     @keyframes width-grow {
@@ -285,18 +298,7 @@
         }
     }
 
-    /* anchor:hover blur { */
-    /* -webkit-animation: flip-diagonal-1-fwd 0.4s
-            cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
-        animation: flip-diagonal-1-fwd 0.4s
-            cubic-bezier(0.455, 0.03, 0.515, 0.955) both; */
-    /* } */
-
-    anchor:hover a {
-        opacity: 1;
-        /* position: relative; */
-    }
-    svg {
+    anchor svg {
         height: 40px;
         width: 40px;
     }
@@ -340,4 +342,204 @@
             transform: translateZ(160px) rotate3d(1, 1, 0, 180deg);
         }
     } */
+
+   @keyframes -global-width-grow-anchor {
+      0% {
+         width: 50px;
+         /* display: inline-block; */
+      }
+      100% {
+         width: auto;
+         /* display: block; */
+      }
+   }
+    /* body {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+        grid-gap: 5rem;
+        padding: 5rem;
+        background: #f5f7fa; */
+    
+    
+        anchor {
+        --background: #ffffff;
+        --text: black;
+        position: relative;
+        width: 50px;
+      height: 50px;
+      border-radius: 50px;
+      margin: 2px;
+      background-color: rgb(31, 30, 30, 0.65);
+      border: 10px solid transparent;
+      text-overflow: ellipsis;
+      display: block;
+      position: relative;
+      padding-right: 0px;
+      box-sizing: border-box;
+      animation: -global-width-grow-anchor 1s
+      cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
+      transition: all 0.6s ease;
+      /* overflow: hidden; */
+      /* background-color: #fff; */
+        /* height: 12rem;
+            box-shadow: 0 0 2rem -1rem rgba(0, 0, 0, 0.05); */
+
+        &.isBookmark {
+            /* background-color: rgb(255, 242, 166); */
+            background-color: #46471d;
+        }
+        .multiButton {
+            z-index: -1000;
+            position: absolute;
+            top: 1.25rem;
+            left: 1.25rem;
+            border-radius: 100%;
+            width: 0rem;
+            height: 0rem;
+            opacity: 0;
+            transform: translate(-50%, -50%);
+            transition: 0.25s cubic-bezier(0.25, 0, 0, 1) 1.5s ;
+            button {
+                display: grid;
+                place-items: center;
+                position: absolute;
+                width: 2rem;
+                height: 2rem;
+                border: none;
+                border-radius: 100%;
+                background: var(--background);
+                color: var(--text);
+                transform: translate(-50%, -50%);
+                cursor: pointer;
+                // transition: 0.25s cubic-bezier(0.25, 0, 0, 1) 1.5s;
+                transition: left,top 0.25s cubic-bezier(0.25, 0, 0, 1) 1.5s;
+                box-shadow: 0 0 0rem -0.25rem var(--background);
+                &:hover {
+                    background: var(--text);
+                    color: var(--background);
+                    box-shadow: 0 0 1rem -0.25rem var(--background);
+                }
+                &:first-child:nth-last-child(1),
+                &:first-child:nth-last-child(1) ~ * {
+                    //If there is 1 child
+                    &:nth-child(1) {
+                        left: 25%;
+                        top: 25%;
+                    }
+                }
+                &:first-child:nth-last-child(2),
+                &:first-child:nth-last-child(2) ~ * {
+                    //If there are 2 children
+                    &:nth-child(1) {
+                        left: 37.5%;
+                        top: 18.75%;
+                    }
+                    &:nth-child(2) {
+                        left: 18.75%;
+                        top: 37.5%;
+                    }
+                }
+                &:first-child:nth-last-child(3),
+                &:first-child:nth-last-child(3) ~ * {
+                    //If there are 3 children
+                    &:nth-child(1) {
+                        left: 50%;
+                        top: 15.625%;
+                    }
+                    &:nth-child(2) {
+                        left: 25%;
+                        top: 25%;
+                    }
+                    &:nth-child(3) {
+                        left: 15.625%;
+                        top: 50%;
+                    }
+                }
+                &:first-child:nth-last-child(4), //If there are 4 children, if first child is also 4th item from bottom get self, and
+                &:first-child:nth-last-child(4) ~ * {
+                    //If there are 4 children, if first child is also 4th item from bottom get siblings
+                    &:nth-child(1) {
+                        left: 62.5%;
+                        top: 18.75%;
+                    }
+                    &:nth-child(2) {
+                        left: 37.5%;
+                        top: 18.75%;
+                    }
+                    &:nth-child(3) {
+                        left: 18.75%;
+                        top: 37.5%;
+                    }
+                    &:nth-child(4) {
+                        left: 18.75%;
+                        top: 62.5%;
+                    }
+                }
+            }
+        }
+
+        // anchor {
+        //     // position: absolute;
+        //     // width: 100%;
+        //     // height: 100%;
+        //     // border-radius: 1rem;
+        //     // background: var(--background);
+        //     // color: var(--text);
+        // }
+
+        &:hover .multiButton,
+        .multiButton:focus-within {
+            //Hover or a button inside is focused
+            z-index: -1;
+
+            width: 10rem;
+            height: 10rem;
+            opacity: 1;
+        }
+        a {
+            color: rgb(221, 221, 221);
+            text-decoration: none;
+            font-size: 13px;
+            line-height: 20px;
+            height: 100%;
+            display: flex;
+            flex-direction: row;
+            justify-content: flex-start;
+            align-items: center;
+            flex-wrap: nowrap;
+            align-content: flex-end;
+        }
+        &:hover a {
+            opacity: 1;
+            /* position: relative; */
+        }
+        
+        // &:hover blur {
+        //     -webkit-animation: flip-diagonal-1-fwd 0.4s
+        //         cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
+        //     animation: flip-diagonal-1-fwd 0.4s
+        //         cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
+        // }
+
+        .titleVisible & a span {
+            display: block;
+            min-width: 100px;
+            width: auto;
+            opacity: 1;
+            transition: width 0.6s ease, opacity 1s linear;
+            /* animation: width-grow 0.4s cubic-bezier(0.455, 0.03, 0.515, 0.955) both; */
+        }
+        a span {
+            display: block;
+            width: 0px;
+            overflow: hidden;
+            opacity: 0;
+
+            /* transition: width 0.3s ease; */
+            /* animation: width-grow 0.4s cubic-bezier(0.455, 0.03, 0.515, 0.955) both; */
+        }
+    }
+    /* } */
+
+
 </style>
