@@ -1,5 +1,5 @@
 // export function longhover(node:any) {
-	export function longhover(node:any, duration=1000) {
+	export function longhover(node:any, duration=1500) {
 	let timer:any;
 
 	const handleMouseover = () => {

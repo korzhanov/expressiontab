@@ -14,6 +14,9 @@ import {
 // https://vitejs.dev/config/
 export default defineConfig({
   mode: 'development', // production
+  optimizeDeps: {
+    include: ['svelte-hero-icons'],
+  },
   plugins: [
     svelte({
       emitCss: false,
