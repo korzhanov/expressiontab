@@ -3,12 +3,12 @@
     "version": "1.0",
     "description": "Expression Tab",
     "host_permissions": [
-        "http://*/",
-        "https://*/"
+        "<all_urls>"
     ],
     "permissions": [
         "bookmarks",
         "storage",
+        "sessions",
         "history"
     ],
     "chrome_url_overrides": {

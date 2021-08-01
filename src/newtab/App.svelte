@@ -7,6 +7,8 @@
   } from "@macfja/svelte-persistent-store";
   // import { slimscroll } from "svelte-slimscroll";
   import { fade } from "svelte/transition";
+  import { tweened } from "svelte/motion";
+  import { cubicOut } from "svelte/easing";
   import { writable } from "svelte/store";
   // import logo from "../assets/svelte.png";
   import firstbg from "../assets/expression-drops-xfactorial-com-copyright.jpg";
@@ -21,6 +23,14 @@
   //   // target: { tabId: tab.id },
   //   files: ["assets/main.css"]
   // });
+  let m = { x: 0, y: 0 };
+
+  const circleTransitiom = tweened(0, {
+    duration: 700,
+    easing: cubicOut
+  });
+  circleTransitiom.set(10);
+
   let imgsrc: string =
     "https://source.unsplash.com/random/1920x1080/?mountains,water,cloud,night";
   // let background = localStorage.getItem("background");
@@ -57,30 +67,42 @@
     });
   }, 60000);
 
+  let ready = false;
+  onMount(() => (ready = true));
+  onDestroy(() => (ready = false));
 </script>
 
-<main
-  in:fade
-  out:fade
->
-
-  <!-- url('{$background || firstbg}') -->
-  <!-- url('{$background}'), url('{firstbg}') -->
-  <bg
-    in:fade
-    out:fade
-    style="background-image: url('{$background}')
+<!-- {#if ready} -->
+  <main
+    in:fade={{duration:1000}}
+    out:fade={{duration:1000}}
+    on:mousemove={e => (m = { x: e.clientX, y: e.clientY })}
+    on:click={() => circleTransitiom.set(30000)}
+  >
+    <!-- url('{$background || firstbg}') -->
+    <!-- url('{$background}'), url('{firstbg}') -->
+    <bg
+      in:fade
+      out:fade
+      style="background-image: url('{$background}')
   ;"
-  />
-  <overlay in:fade out:fade />
-  <spacer>
-    <Timer />
-    <!-- <Counter /> -->
-  </spacer>
-  <Anchores />
-</main>
+    />
+    <overlay in:fade out:fade />
+    <spacer>
+      <Timer />
+      <!-- <Counter /> -->
+    </spacer>
+    <Anchores />
+    <!-- <circ style="top:{m.y-$circleTransitiom/2}px;left:{m.x-$circleTransitiom/2}px; width: {$circleTransitiom}px;
+    height: {$circleTransitiom}px;"></circ> -->
+<!-- <svg style="top:{m.y}px;left:{m.x}px; width: {$circleTransitiom}px;
+height: {$circleTransitiom}px;">
+  <circle cx=50% cy=50% r={$circleTransitiom} />
+</svg> -->
+  </main>
+<!-- {/if} -->
 
-<style lang="postcss">
+<style lang="scss">
   * {
     --brand-color: rgba(255, 255, 255, 1);
   }
@@ -126,11 +148,28 @@
     justify-content: space-around;
     align-items: center;
   }
-  main:hover spacer {
+  /* main:hover spacer {
     height: 87vh;
     transition: height 0.6s ease-in-out 1s;
+  } */
+  circ {
+    position: fixed;
+    display: block;
+    background-color: #ffffff;
+    border-radius: 50%;
+    width: 10px;
+    height: 10px;
+    z-index: 1000000;
+    transition: all .31s ease-in-out;
   }
-
+  svg {
+    position: fixed;
+   
+    margin: -8px;
+  }
+  circle {
+    fill: #ffffff;
+  }
   /* anchores:hover+spacer, filterbar:hover+spacer {
     height: 30vh;
     transition: height 0.6s ease-in-out 1s;

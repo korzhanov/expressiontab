@@ -16,9 +16,28 @@
         margin: 0 auto;
         padding: 0;
         font-size: 100%;
+        overflow: overlay;
+      }
+
+      ::-webkit-scrollbar {
+        width: 3px;
+        /* display: none; */
+      }
+
+      ::-webkit-scrollbar:hover {
+        width: 10px;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background-color: rgb(11, 11, 11, 50%);
+        border-radius: 20px;
+      }
+      ::-webkit-scrollbar:hover ::-webkit-scrollbar-thumb {
+        background-color: rgba(100, 100, 100, 0.5);
       }
     </style>
   </head>
+
   <body>
     <div id="app"></div>
     <script type="module" src="main.js"></script>

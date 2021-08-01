@@ -2,7 +2,8 @@
     import { onMount, onDestroy } from "svelte";
     import { fly } from "svelte/transition";
 
-    //
+    
+    let timerType: number = 0;
     let date: any = new Date();
     let interval: any;
     $: hour = ("0" + (23 - date.getHours())).slice(-2);

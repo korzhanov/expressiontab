@@ -1,14 +1,14 @@
 <script lang="ts">
-   import { onMount, tick, setContext } from "svelte";
+   import { onMount, tick, setContext, onDestroy } from "svelte";
    import { writable } from "svelte/store";
    import { tweened } from "svelte/motion";
    import { cubicOut, quintOut } from "svelte/easing";
    import { draw, fade } from "svelte/transition";
-   import TailwindCSS from "./TailwindCSS.svelte";
+   // import TailwindCSS from "./TailwindCSS.svelte";
 
-   import AnchoreList from "./AnchoreList.svelte";
+   // import AnchoreList from "./AnchoreList.svelte";
    // import VirtualList from "@sveltejs/svelte-virtual-list";
-   import VirtualList from "./VirtualList.svelte";
+   // import VirtualList from "./VirtualList.svelte";
    import HostItem from "./HostItem.svelte";
    //  import {
    //         persist,
@@ -18,17 +18,27 @@
 
    //   let searchTerm = persist(writable(""), localStorage(), "searchTerm");
    let searchTerm = localStorage.getItem("searchTerm") || "";
-   $: if (searchTerm != "") {
+   $: {
       localStorage.setItem("searchTerm", searchTerm);
    }
    // let searchTerm = "";
    // let bookmarkList: any = bookmarks.then((value) => value);
    let historyList: Array<any> = [],
-      bookmarkList: Map<any,any> = new Map(),
+      bookmarkList: Map<any, any> = new Map(),
       filteredListSliced: Array<any> = [];
+   let bookmarkListSize: number = 0;
    // let maxVisits = 1;
-   let loader = 0;
+   let loader: boolean = false;
    let titleVisible = false;
+   let windowY: number = 0,
+      hh: number = 0,
+      ww: number = 0,
+      st: number = 0,
+      oldwindowY: number = 0,
+      visible = Math.ceil((hh * ww) / 50 / 50) || 200,
+      windowHeight: number = 0,
+      windowWidth: number = 0,
+      autoloader: any;
    // let filteredList: any = bookmarkList;
 
    // let start: number | undefined;
@@ -67,7 +77,7 @@
          chrome.bookmarks.search(searchTerm || "h")
       ]);
       // const bookmarks = promise.then(([a, b]) => {
-      const bookmarks = promise.then((s) => {
+      const bookmarks = promise.then(s => {
          let a: any = s[0];
          let b: any = s[1];
          let c: any = [];
@@ -84,26 +94,28 @@
          b = [];
          arr1Length = a.length;
          // bookmarkList = new Map();
-         // let maxVisitsTmp = 1;
+         let maxVisits: number = 1;
          for (let i = 0; i < arr1Length; i++) {
             let host = "localhost";
 
             try {
-               host = new URL(a[i].url).host.split(":")[0] || "localhost";
-              
-            if (bookmarkList.has(host)) {
-               let bmitems = bookmarkList.get(host);
-               bmitems[0].hostVisitCount = bmitems[0].hostVisitCount + (a[i].visitCount || 1);
-               // maxVisitsTmp = Math.max(maxVisitsTmp, bmitems[0].hostVisitCount);
-               // console.log("bmitems[0].hostVisitCount");
-               // console.log(bmitems[0].hostVisitCount);
-               bookmarkList.set(host, [...bmitems, a[i]]);
-            } else {
-               // console.log("a[i].visitCount");
-               // console.log(a[i].visitCount);
-               a[i].hostVisitCount = a[i].visitCount || 1;
-               bookmarkList.set(host, [a[i]]);
-            }
+               host = new URL(a[i].url).host.split(":")[0];
+
+               if (bookmarkList.has(host)) {
+                  let bmitems = bookmarkList.get(host);
+                  bmitems[0].hostVisitCount =
+                     bmitems[0].hostVisitCount * 1 + (a[i].visitCount || 1);
+                  maxVisits = Math.max(maxVisits, bmitems[0].hostVisitCount);
+                  // console.log(a[i].url);
+                  // console.log("bmitems[0].hostVisitCount");
+                  // console.log(bmitems[0].hostVisitCount);
+                  bookmarkList.set(host, [...bmitems, a[i]]);
+               } else {
+                  // console.log("a[i].visitCount");
+                  // console.log(a[i].visitCount);
+                  a[i].hostVisitCount = a[i].visitCount || 1;
+                  bookmarkList.set(host, [a[i]]);
+               }
             } catch (e) {
                // console.log("No favicon for url: ", a[i].url, a[i].title);
                // console.log(a[i]);
@@ -118,16 +130,61 @@
          // });
          // historyList = a;
          // bookmarkList = b;
+         bookmarkListSize = bookmarkList.size;
          console.log("bookmarkList ready");
-         // maxVisits = maxVisitsTmp;
-         // setContext('maxVisits', maxVisitsTmp);
+         localStorage.setItem("maxVisits", maxVisits + "");
+         loadmore(true);
+         // maxVisits = maxVisits;
+         // setContext('maxVisits', maxVisits);
          // console.log(bookmarkList);
          // bookmarkList = a;
 
          // return bookmarkList;
       });
    }
+   async function loadmore(force: boolean = false) {
+      // setContext('maxVisits', maxVisits);
+      let pixel_offset: number = 200;
+      // loader = false;
+      // console.log("loadmore run");
+      // console.log("bookmarkList.size");
+      // console.log(bookmarkList.size);
+      // console.log(
+      //    "window.innerHeight + window.scrollY",
+      //    window.innerHeight,
+      //    window.scrollY
+      // );
+      // console.log("document.body.offsetHeight", document.body.offsetHeight);
+      // if (listElm.scrollTop + listElm.clientHeight >= listElm.scrollHeight) {
 
+      if (
+         (force ||
+            window.innerHeight + window.scrollY >=
+               document.body.offsetHeight - pixel_offset ||
+            visible != bookmarkList.size) &&
+         loader == false
+      ) {
+         console.log("loadmore render");
+
+         loader = true;
+         // console.log("visible", visible);
+
+         let nowvisible = Math.ceil((hh * ww) / 50 / 50);
+         let incrementVisible = Math.ceil(windowWidth / 50) * 3;
+         // visible = Math.abs(
+         //    Math.min(nowvisible + incrementVisible, bookmarkList.length)
+         // );
+         visible = Math.abs(
+            Math.min(nowvisible + incrementVisible, bookmarkList.size)
+         );
+         //   filteredListSliced = bookmarkList.slice(0, visible);
+         filteredListSliced = Array.from(bookmarkList).slice(0, visible);
+         // console.log(filteredListSliced);
+         // console.log(bookmarkList.size);
+         await tick();
+         loader = false;
+      }
+   }
    // async function toDataURL(urll: string, callback: any) {
    //    var xhr = new XMLHttpRequest();
    //    xhr.onload = function() {
@@ -176,37 +233,27 @@
    // });
    // visible.set(400);
 
-   let windowY: number = 0,
-      hh: number = 0,
-      ww: number = 0,
-      st: number = 0,
-      oldwindowY: number = 0,
-      visible = Math.ceil((hh * ww) / 50 / 50) || 200,
-      windowHeight: number = 0,
-      windowWidth: number = 0,
-      autoloader: any;
-
    // $: visible = filteredList?.length || 0;
 
-   // $: if (titleVisible) {
-   //    visible = 20;
-   // } else {
-   //    visible = 500;
-   // }
+   $: if (titleVisible) {
+      visible = 20;
+   } else {
+      visible = 300;
+   }
 
    // $: if (
    //    Math.abs(Math.min(Math.ceil(visible), filteredList.length)) <
    //    filteredListSliced.length
    // ) {
    //    tick();
-   //    loader = 0;
+   //    loader = false;
    //    filteredListSliced.length = Math.max(
    //       Math.abs(Math.min(Math.ceil(visible), filteredList.length)),
    //       0
    //    );
    // } else {
    //    tick();
-   //    loader = 0;
+   //    loader = false;
    //    filteredListSliced = filteredList?.slice(
    //       0,
    //       Math.abs(Math.min(Math.ceil(visible), filteredList.length))
@@ -221,41 +268,7 @@
    //    //  &&
    //    // visible < filteredList.length
    // )
-   async function loadmore() {
-      // setContext('maxVisits', maxVisits);
-      let pixel_offset: number = 200;
-      // console.log("loadmore");
-      // console.log(
-      //    "window.innerHeight + window.scrollY",
-      //    window.innerHeight,
-      //    window.scrollY
-      // );
-      // console.log("document.body.offsetHeight", document.body.offsetHeight);
-      // if (listElm.scrollTop + listElm.clientHeight >= listElm.scrollHeight) {
 
-      if (
-         window.innerHeight + window.scrollY >=
-         document.body.offsetHeight - pixel_offset
-      ) {
-         loader = 1;
-         // console.log("visible", visible);
-
-         let nowvisible = Math.ceil((hh * ww) / 50 / 50);
-         let incrementVisible = Math.ceil(windowWidth / 50) * 3;
-         // visible = Math.abs(
-         //    Math.min(nowvisible + incrementVisible, bookmarkList.length)
-         // );
-         visible = Math.abs(
-            Math.min(nowvisible + incrementVisible, bookmarkList.size)
-         );
-         //   filteredListSliced = bookmarkList.slice(0, visible);
-         filteredListSliced = Array.from(bookmarkList).slice(0, visible);
-         // console.log(filteredListSliced);
-         // console.log(bookmarkList.size);
-         await tick();
-         loader = 0;
-      }
-   }
    // $: {
    //    // console.log("hh - 300,windowY + windowHeight");
    //    // console.log(hh - 300, windowY + windowHeight);
@@ -295,7 +308,11 @@
    // }
 
    onMount(() => {
-      loadmore();
+      // loadmore(true);
+   });
+
+   onDestroy(() => {
+      localStorage.setItem("maxVisits", "0");
    });
 </script>
 
@@ -417,7 +434,8 @@
    </label>
    <span>
       showing items {visible}
-      of {bookmarkList.size}, {windowHeight} - {windowY} - {hh}</span
+      of {bookmarkListSize}, last {searchTerm.length || 1} week, {windowHeight} -
+      {windowY} - {hh}</span
    >
 </filterBar>
 <anchores bind:clientHeight={hh} bind:clientWidth={ww} class:titleVisible>
@@ -441,7 +459,7 @@
    <!-- <VirtualList items={filteredList} let:item bind:start bind:end>
             <AnchoreItem {...item} />
          </VirtualList> -->
-   {#if { loader }}<loader><div class="lds-circle"><div /></div></loader>{/if}
+   {#if loader}<loader><div class="lds-circle"><div /></div></loader>{/if}
    <!-- <anchor></anchor> -->
 </anchores>
 
@@ -587,22 +605,22 @@
         background-repeat: no-repeat;
         background-size: cover;
         transition: all 0.3s ease; */
-      width: 50px;
+        /* background-color: #fff; */
+      /* width: 50px;
       height: 50px;
       border-radius: 50px;
       margin: 2px;
-      /* background-color: #fff; */
       background-color: rgb(31, 30, 30, 0.65);
       border: 10px solid transparent;
       text-overflow: ellipsis;
-      overflow: hidden;
       display: block;
       position: relative;
       padding-right: 0px;
       box-sizing: border-box;
       animation: -global-width-grow-anchor 1s
-         cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
-      transition: all 0.3s ease;
+      cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
+      transition: all 0.3s ease; */
+      /* overflow: hidden; */
    }
    .titleVisible {
       flex-direction: row;
