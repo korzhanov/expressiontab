@@ -32,7 +32,7 @@
     });
 </script>
 
-<clock-and-greeting on:click="{()=>{timerType+1>1?timerType=0:timerType++}}">
+<clock-and-greeting>
     <!-- <div class="user-greeting">
       <h1 id="user-greeting-time">Good evening,&nbsp;</h1>
       <h1 id="user-greeting-name">what's your <button>name</button>?</h1>
@@ -42,7 +42,7 @@
       </form>
     </div> -->
 
-    <time-display>
+    <time-display on:click="{()=>{timerType+1>1?timerType=0:timerType++}}">
         <p>
             {#key hour}<span in:fly={{ y: -20 }}>{hour}</span>{/key}:
             {#key min}<span in:fly={{ y: -20 }}>{min}</span>{/key}:
