@@ -90,6 +90,7 @@
          a.length = arr1Length + arr2Length;
          for (let i = 0; i < arr2Length; i++) {
             a[arr1Length + i] = b[i];
+            a[arr1Length + i].isBookmark = true;
          }
          b = [];
          arr1Length = a.length;
@@ -324,7 +325,7 @@
 />
 <!-- <p>showing items {start}-{end}:{visible}</p> -->
 <filterBar class="text-white">
-   <input class="text-white" id="search" bind:value={searchTerm} />
+   <input class="text-white" type="search" id="search" bind:value={searchTerm} />
    <label id="changeView">
       <input type="checkbox" bind:checked={titleVisible} />
       <icon>
