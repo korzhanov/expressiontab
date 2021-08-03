@@ -13,9 +13,10 @@
     $: if (unfold == true) {
         tweenOtherAnchores = [];
         otherAnchores.forEach((newItem: any, i: number) => {
+            // anchores.forEach((newItem: any, i: number) => {
             setTimeout(function() {
-                console.log("newItem");
-                console.log(newItem);
+                // console.log("newItem");
+                // console.log(newItem);
                 // tweenOtherAnchores = [...tweenOtherAnchores, newItem];
                 tweenOtherAnchores[i] = newItem;
             }, 150);
@@ -69,6 +70,7 @@
         <AnchoreItem {...item} {host} />
     {/each}
 {:else}
+    {#if unfold}
     <anchorGroup
         class="hovicon effect-8"
         use:longhover={2000}
@@ -79,14 +81,28 @@
         on:mouseover={() => (multiButton = true)}
         on:mouseleave={() => (multiButton = false)} -->
         <!-- {@debug hostAnchore} -->
-        <AnchoreItem {...hostAnchore} {host} />
+        <AnchoreItem {...hostAnchore} {host} unfold={unfold} />
     </anchorGroup>
-    {#if unfold}
         {#each tweenOtherAnchores as item (item)}
             <!-- {#each otherAnchores as item} -->
             <AnchoreItem {...item} {host} />
         {/each}
+        {:else}
+        
+    <anchorGroup
+    class="hovicon effect-8"
+    use:longhover={2000}
+    on:longhover={() => (unfold = !unfold)}
+    class:unfold
+>
+    <!-- 
+    on:mouseover={() => (multiButton = true)}
+    on:mouseleave={() => (multiButton = false)} -->
+    <!-- {@debug hostAnchore} -->
+    <AnchoreItem {...hostAnchore} {host} unfold={unfold} />
+</anchorGroup>
     {/if}
+
 {/if}
 
 <style lang="scss">
@@ -103,8 +119,10 @@
         justify-content: center;
         align-items: baseline;
         flex-direction: row;
-        border: 1px solid rgb(43, 43, 43) !important;
+        // border: 1px solid rgb(43, 43, 43) !important;
+        border: 1px solid transparent !important;
         border-radius: 50%;
+        margin: 30px;
     }
     anchorGroup:hover {
         transition: all 1s ease;
