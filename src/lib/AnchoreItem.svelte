@@ -21,10 +21,12 @@
     export let dateGroupModified: number = now.getTime();
     export let lastVisitTime: number = now.getTime();
     export let id: number = 0;
+    export let unfold: boolean = false;
     export let index: number = 0;
     export let typedCount: number = 0;
     export let parentId: number | null;
-    export let isBookmark: boolean = !!parentId;
+    // export let isBookmark: boolean = !!parentId;
+    export let isBookmark: boolean = false;
     export let visitCount: number = 1;
     export let hostVisitCount: any = 0;
     let multiButton: boolean = false;
@@ -48,10 +50,22 @@
 
     // let weight = maxVisits%300;
 
-    let weightVisits: number = Math.max(
-        (Math.max(hostVisitCount, visitCount) * 3) / maxVisits,
-        0.8
+    // let weightVisits: number = Math.max(
+    //     (Math.max(hostVisitCount, visitCount) * 3) / maxVisits,
+    //     0.8
+    // );
+    // let weightVisits: number = Math.log10(
+    //     Math.max(hostVisitCount, visitCount) * 1
+    // );
+     let weightVisits: number = Math.log10( 
+        Math.max(unfold?visitCount:hostVisitCount, visitCount) * 1
     );
+    // let tempVisits = JSON.parse(localStorage.getItem("tempVisits") || "[]");
+    // tempVisits.push((Math.max(hostVisitCount, visitCount)));
+    // localStorage.setItem("tempVisits", JSON.stringify(tempVisits));
+
+    // console.log((Math.max(hostVisitCount, visitCount) * 3) / maxVisits);
+
     export let title: string = "";
     export let url: string = "";
     // console.log(url);
@@ -83,27 +97,8 @@
         src = img_data;
     }
 
-	// function remove(todo) {
-	// 	todos = todos.filter(t => t !== todo);
-	// }
-
-
-    // if (img_data.length == 0) {
-    //     // let imgpromise = getBase64Image("favicon_" + host, src);
-    //     setTimeout(function() {
-    //         toDataURL(src, function(dataUrl: any) {
-    //             // console.log("RESULT:", dataUrl);
-    //             tick();
-    //             // $img_data = dataUrl;
-    //             console.log("new favicon saved from", host);
-    //             localStorage.setItem("favicon_" + host, dataUrl);
-    //             // img_data = dataUrl;
-    //         });
-    //     }, 15000);
-    //     // console.log(imgpromise.then());
-    // } else {
-    //     // src = $img_data;
-    //     src = img_data;
+    // function remove(todo) {
+    // 	todos = todos.filter(t => t !== todo);
     // }
 
     // let src = "chrome://favicon/?size=16&scale_factor=1x&page_url=" + encodeURIComponent(url);
@@ -134,21 +129,29 @@
 <!-- {#if !new RegExp("^" + ignoreUrl.join("|")).test(url)}
         class:titleVisible -->
 <!-- transition:scale="{{duration: 500, delay: 500, opacity: 0.5, start: 0.5, easing: quintOut}}" -->
+<!-- 
 
+        width:{weightVisits * 100 + 50}px;
+        height:{weightVisits * 100 + 50}px;
+ -->
 <anchor
     in:fly={{ x: -90, duration: 300 }}
     out:fly={{ x: 70, duration: 150 }}
     {title}
     class="rounded-full"
     style="
-        transform: scale({(weightVisits + 0.2).toFixed(2)});
-        margin: 5px {weightVisits * 1 + 10}px;
-        z-index: -{Math.ceil(weightVisits * 1000)};
+        margin: {weightVisits * 10 + 10}px;
+        z-index: -{Math.ceil(weightVisits * 1000)};   
         "
     class:isBookmark
     on:mouseover={() => (multiButton = true)}
     on:mouseleave={() => (multiButton = false)}
 >
+    <bgcircle
+        style="
+        transform: scale({(weightVisits * 1 + 1).toFixed(2)});
+"
+    />
     <slot />
     <a href={url}>
         <anchoricon
@@ -210,8 +213,7 @@
         </span>
     </a>
     {#if multiButton}
-        <div class:multiButton
-             >
+        <div class:multiButton>
             <!-- in:fly={{ x: 5, duration: 300 }}
             out:fly={{ x: 5, duration: 300 }} -->
             <button class="fas fa-star" title="Bookmark">
@@ -343,47 +345,56 @@
         }
     } */
 
-   @keyframes -global-width-grow-anchor {
-      0% {
-         width: 50px;
-         /* display: inline-block; */
-      }
-      100% {
-         width: auto;
-         /* display: block; */
-      }
-   }
+    @keyframes -global-width-grow-anchor {
+        0% {
+            width: 50px;
+            /* display: inline-block; */
+        }
+        100% {
+            width: auto;
+            /* display: block; */
+        }
+    }
     /* body {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
         grid-gap: 5rem;
         padding: 5rem;
         background: #f5f7fa; */
-    
-    
-        anchor {
+
+    anchor {
         --background: #ffffff;
         --text: black;
         position: relative;
         width: 50px;
-      height: 50px;
-      border-radius: 50px;
-      margin: 2px;
-      background-color: rgb(31, 30, 30, 0.65);
-      border: 10px solid transparent;
-      text-overflow: ellipsis;
-      display: block;
-      position: relative;
-      padding-right: 0px;
-      box-sizing: border-box;
-      animation: -global-width-grow-anchor 1s
-      cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
-      transition: all 0.6s ease;
-      /* overflow: hidden; */
-      /* background-color: #fff; */
+        height: 50px;
+        border-radius: 50px;
+        margin: 2px;
+        // background-color: rgb(31, 30, 30, 0.65);
+        border: 10px solid transparent;
+        text-overflow: ellipsis;
+        display: block;
+        position: relative;
+        padding-right: 0px;
+        box-sizing: border-box;
+        animation: -global-width-grow-anchor 1s
+            cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
+        transition: all 0.6s ease;
+        /* overflow: hidden; */
+        /* background-color: #fff; */
         /* height: 12rem;
             box-shadow: 0 0 2rem -1rem rgba(0, 0, 0, 0.05); */
 
+        & bgcircle {
+            width: 30px;
+            height: 30px;
+            background-color: rgba(31, 30, 30, 0.65);
+            border-radius: 50px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            z-index: -1;
+        }
         &.isBookmark {
             /* background-color: rgb(255, 242, 166); */
             background-color: #46471d;
@@ -398,7 +409,7 @@
             height: 0rem;
             opacity: 0;
             transform: translate(-50%, -50%);
-            transition: 0.25s cubic-bezier(0.25, 0, 0, 1) 1.5s ;
+            transition: 0.25s cubic-bezier(0.25, 0, 0, 1) 1.5s;
             button {
                 display: grid;
                 place-items: center;
@@ -412,7 +423,7 @@
                 transform: translate(-50%, -50%);
                 cursor: pointer;
                 // transition: 0.25s cubic-bezier(0.25, 0, 0, 1) 1.5s;
-                transition: left,top 0.25s cubic-bezier(0.25, 0, 0, 1) 1.5s;
+                transition: left, top 0.25s cubic-bezier(0.25, 0, 0, 1) 1.5s;
                 box-shadow: 0 0 0rem -0.25rem var(--background);
                 &:hover {
                     background: var(--text);
@@ -513,7 +524,7 @@
             opacity: 1;
             /* position: relative; */
         }
-        
+
         // &:hover blur {
         //     -webkit-animation: flip-diagonal-1-fwd 0.4s
         //         cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
@@ -540,6 +551,4 @@
         }
     }
     /* } */
-
-
 </style>
