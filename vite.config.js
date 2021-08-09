@@ -36,16 +36,22 @@ export default defineConfig({
     },
     // alias: [{ find: '@', replacement: '/src' }],
   },
-  minify: false,
+  minify: true,
   emptyOutDir: false,
   build: {
     cssCodeSplit: true,
+    watch: {
+      buildDelay: 3000,
+      clearScreen : true,
+      include: __dirname+'/src/**'
+    },
     // assetsDir: 'assets',
     rollupOptions: {
 
       // input: 'src/manifest.json',
       input: {
         manifest: resolve(__dirname, "src/manifest.json"),
+        
         // css: 'src/assests/main.css',
         // newtab: 'src/newtab/index.html',
       },
