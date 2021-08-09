@@ -14,17 +14,17 @@
     // } from "@macfja/svelte-persistent-store";
     // import { writable } from "svelte/store";
     // import TailwindCSS from "./TailwindCSS.svelte";
-    import { fly, scale } from "svelte/transition";
+    import { fly, scale, slide } from "svelte/transition";
     import { quintOut } from "svelte/easing";
     let now = new Date();
     export let dateAdded: number = now.getTime();
     export let dateGroupModified: number = now.getTime();
     export let lastVisitTime: number = now.getTime();
     export let id: number = 0;
-    export let unfold: boolean = false;
+    export let unfold: boolean | null = null;
     export let index: number = 0;
-    export let typedCount: number = 0;
-    export let parentId: number | null;
+    // export let typedCount: number = 0;
+    // export let parentId: number | null = null;
     // export let isBookmark: boolean = !!parentId;
     export let isBookmark: boolean = false;
     export let visitCount: number = 1;
@@ -57,8 +57,8 @@
     // let weightVisits: number = Math.log10(
     //     Math.max(hostVisitCount, visitCount) * 1
     // );
-     let weightVisits: number = Math.log10( 
-        Math.max(unfold?visitCount:hostVisitCount, visitCount) * 1
+    let weightVisits: number = Math.log10(
+        Math.max(unfold ? visitCount : hostVisitCount, visitCount) * 1
     );
     // let tempVisits = JSON.parse(localStorage.getItem("tempVisits") || "[]");
     // tempVisits.push((Math.max(hostVisitCount, visitCount)));
@@ -68,6 +68,18 @@
 
     export let title: string = "";
     export let url: string = "";
+    let ping: string = "";
+    try {
+        let tmping: URL = new URL(url);
+        tmping.searchParams.append(
+            "utm_network",
+            "ExpressionTab_ChromeExtension"
+        );
+        ping = tmping;
+    } catch (e) {
+        console.log(url);
+        console.log(e);
+    }
     // console.log(url);
     // console.log(hostVisitCount);
     // console.log(
@@ -86,6 +98,10 @@
     // } catch (e) {
     //     console.log("No favicon for url: ", url);
     // }
+    
+    // @todo если нет сохраненного фавикона 
+    // показать сначала по прямой ссылке
+    // в следующий раз можно показать и кэшированный
     let src: string =
         "https://s2.googleusercontent.com/s2/favicons?domain_url=" + host;
     let img_data: string = localStorage.getItem("favicon_" + host) || "";
@@ -133,32 +149,59 @@
 
         width:{weightVisits * 100 + 50}px;
         height:{weightVisits * 100 + 50}px;
- -->
-<anchor
-    in:fly={{ x: -90, duration: 300 }}
-    out:fly={{ x: 70, duration: 150 }}
-    {title}
+        z-index: -{Math.ceil(weightVisits * 1000)};  
+
+        on:contextmenu|stopPropagation|preventDefault="{() => {
+				adjusting = !adjusting;
+				if (adjusting) selected = circle;
+			}}"
     class="rounded-full"
-    style="
-        margin: {weightVisits * 10 + 10}px;
-        z-index: -{Math.ceil(weightVisits * 1000)};   
-        "
-    class:isBookmark
     on:mouseover={() => (multiButton = true)}
     on:mouseleave={() => (multiButton = false)}
+    in:slide={{ duration: 700, delay: 300 }}
+    out:slide={{ duration: 700, delay: 300 }}
+    out:scale={{duration: 330, delay: 20, opacity: 0.1, start: 0.5, easing: quintOut}}
+    in:fly={{ x: -90, y: -20, duration: 350 }}
+ -->
+<anchor
+    in:scale={{ duration: 330, opacity: 0.5, start: 0.5 }}
+    out:fly={{ x: -70, y: -20, duration: 350 }}
+    {title}
+    style="
+        margin: {weightVisits * 10 + 10}px; 
+        "
+    class:isBookmark
+    on:contextmenu|stopPropagation|preventDefault={() => (multiButton = true)}
+    on:mouseleave|stopPropagation|preventDefault={() => (multiButton = false)}
 >
     <bgcircle
         style="
         transform: scale({(weightVisits * 1 + 1).toFixed(2)});
+        background-image: url('{src}')
 "
     />
     <slot />
-    <a href={url}>
+    <a {ping} href={url}>
         <anchoricon
-            style="
-        background-image: url('{src}');
-        "
+            style="background-image: url('{src ||
+                'https://favicon.yandex.net/favicon/' + url}');"
         />
+        {#if unfold === false}
+            <anchoricon
+                class="subicon"
+                in:fly={{ x: 95, duration: 300 }}
+                out:fly={{ x: 70, duration: 350 }}
+                style="background-image: url('{src}');"
+            />
+            <anchoricon
+                class="subicon"
+                in:fly={{ x: 55, duration: 300 }}
+                out:fly={{ x: 50, duration: 350 }}
+                style="background-image: url('{src}');
+                transform: scale(0.56) translate(51px, -18px);"
+            />
+        {/if}
+
         <!-- <svg viewBox="0 0 100 100" width="100" height="100">
             <title>{title}</title>
             <defs>
@@ -213,17 +256,20 @@
         </span>
     </a>
     {#if multiButton}
-        <div class:multiButton>
-            <!-- in:fly={{ x: 5, duration: 300 }}
-            out:fly={{ x: 5, duration: 300 }} -->
+        <div
+            class:multiButton
+            in:fly={{ x: 5, duration: 300 }}
+            out:fly={{ x: 5, duration: 300 }}
+            on:mouseenter|stopPropagation|preventDefault={() => {}}
+        >
             <button class="fas fa-star" title="Bookmark">
                 <Icon src={Star} solid size="22" />
             </button>
-            {#if isBookmark}
+            <!-- {#if isBookmark}
                 <button class="fas fa-comment" title="Edit">
                     <Icon src={Pencil} solid size="22" />
                 </button>
-            {/if}
+            {/if} -->
             <button class="fas fa-share-alt" title="Copy url">
                 <Icon src={Duplicate} solid size="22" />
             </button>
@@ -308,9 +354,22 @@
         height: 18px;
         width: 18px;
         margin: 6px;
+        transform: scale(1.2);
         background-repeat: no-repeat;
         background-position: center;
+        border-radius: 2px;
+        // box-shadow: 4px 0 8px 0px #98989870;
         background-size: contain;
+    }
+    anchoricon.subicon {
+        position: absolute;
+        position: absolute;
+        /* left: 17px; */
+        z-index: -1;
+        opacity: 0.2;
+        transform: scale(0.9) translate(16px, -8px);
+        border-radius: 4px;
+        /* filter: brightness(1.29); */
     }
     /* .img-blur { */
     /* filter: blur(10px); */
@@ -389,15 +448,29 @@
             width: 30px;
             height: 30px;
             background-color: rgba(31, 30, 30, 0.65);
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: contain;
             border-radius: 50px;
             position: absolute;
             left: 0;
             top: 0;
             z-index: -1;
+            filter: blur(5px);
+            box-shadow: 5px 5px 10px #222;
+            // backdrop-filter: blur(10px);
         }
         &.isBookmark {
             /* background-color: rgb(255, 242, 166); */
-            background-color: #46471d;
+            //         background-color: #0f0f0f77;
+            //         border-width: 10px !important;
+            // border-color: #f1b426d9;
+            // border-style: outset;
+            background-color: #484848;
+            border-width: 7px !important;
+            border-color: #353535;
+            border-style: solid;
+            padding: 3px;
         }
         .multiButton {
             z-index: -1000;
