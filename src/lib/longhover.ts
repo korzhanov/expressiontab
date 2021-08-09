@@ -1,5 +1,5 @@
 // export function longhover(node:any) {
-	export function longhover(node:any, duration=1500) {
+	export function longhover(node:HTMLElement, duration=1500) {
 	let timer:any;
 
 	const handleMouseover = () => {
@@ -18,13 +18,13 @@
 	node.addEventListener('mouseout', handleMouseout);
 
 	return {
-		update(newDuration:any) {
+		update(newDuration:number) {
 			duration = newDuration;
 		},
 		destroy() {
 			node.removeEventListener('mouseover', handleMouseover);
 			node.removeEventListener('mouseout', handleMouseout);
-			console.log(node);
+			// console.log(node);
 
 		}
 	};
