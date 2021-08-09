@@ -18,19 +18,16 @@
 
    //   let searchTerm = persist(writable(""), localStorage(), "searchTerm");
    let searchTerm = localStorage.getItem("searchTerm") || "";
-   $: {
-      localStorage.setItem("searchTerm", searchTerm);
-   }
+
    // let searchTerm = "";
    // let bookmarkList: any = bookmarks.then((value) => value);
    let historyList: Array<any> = [],
       bookmarkList: Map<any, any> = new Map(),
-      filteredListSliced: Array<any> = [];
-   let bookmarkListSize: number = 0;
-   // let maxVisits = 1;
-   let loader: boolean = false;
-   let titleVisible = false;
-   let windowY: number = 0,
+      filteredListSliced: Array<any> = [],
+      bookmarkListSize: number = 0,
+      loader: boolean = false,
+      titleVisible = false,
+      windowY: number = 0,
       hh: number = 0,
       ww: number = 0,
       st: number = 0,
@@ -39,6 +36,7 @@
       windowHeight: number = 0,
       windowWidth: number = 0,
       autoloader: any;
+   // let maxVisits = 1;
    // let filteredList: any = bookmarkList;
 
    // let start: number | undefined;
@@ -58,7 +56,11 @@
    //    console.log("t", t);
    //    return t;
    // });
-   $: {
+   async function getBookmarks() {
+      console.log("get bookm searchTerm");
+      console.log(searchTerm);
+      // @todo фильтровать по имеющимся анкорам
+      // @todo догружать по мере поиска по истории 
       const promise = Promise.all([
          new Promise(resolve => {
             chrome.history.search(
@@ -77,7 +79,11 @@
          chrome.bookmarks.search(searchTerm || "h")
       ]);
       // const bookmarks = promise.then(([a, b]) => {
-      const bookmarks = promise.then(s => {
+         const s = await promise;
+         console.log("s bookmarks");
+         console.log(s);
+      // const bookmarks = promise.then(s => {
+         // console.log(s);
          let a: any = s[0];
          let b: any = s[1];
          let c: any = [];
@@ -94,7 +100,7 @@
          }
          b = [];
          arr1Length = a.length;
-         // bookmarkList = new Map();
+         bookmarkList = new Map();
          let maxVisits: number = 1;
          for (let i = 0; i < arr1Length; i++) {
             let host = "localhost";
@@ -118,11 +124,17 @@
                   bookmarkList.set(host, [a[i]]);
                }
             } catch (e) {
-               // console.log("No favicon for url: ", a[i].url, a[i].title);
+               console.log(e);
+               console.log("No favicon for url: ", a[i].url, a[i].title);
                // console.log(a[i]);
                // host = a[i].url;
             }
          }
+         bookmarkListSize = bookmarkList.size;
+         console.log("bookmarkList ready");
+         // console.log(bookmarkList);
+         localStorage.setItem("maxVisits", maxVisits + "");
+         loadmore(true);
          // console.log("a",a);
          // console.log("b",b);
          // console.log("c",c);
@@ -131,22 +143,22 @@
          // });
          // historyList = a;
          // bookmarkList = b;
-         bookmarkListSize = bookmarkList.size;
-         console.log("bookmarkList ready");
-         localStorage.setItem("maxVisits", maxVisits + "");
-         loadmore(true);
          // maxVisits = maxVisits;
          // setContext('maxVisits', maxVisits);
-         // console.log(bookmarkList);
          // bookmarkList = a;
 
          // return bookmarkList;
-      });
+      // });
+   }
+   $: {
+      localStorage.setItem("searchTerm", searchTerm);
+      console.log("searchTerm save");
+      getBookmarks();
    }
    async function loadmore(force: boolean = false) {
       // setContext('maxVisits', maxVisits);
       let pixel_offset: number = 200;
-      // loader = false;
+   // loader = false;
       // console.log("loadmore run");
       // console.log("bookmarkList.size");
       // console.log(bookmarkList.size);
@@ -158,6 +170,34 @@
       // console.log("document.body.offsetHeight", document.body.offsetHeight);
       // if (listElm.scrollTop + listElm.clientHeight >= listElm.scrollHeight) {
 
+      // console.log("force", force);
+      // console.log(
+      //    "window.innerHeight + window.scrollY",
+      //    window.innerHeight + window.scrollY
+      // );
+
+      // console.log(
+      //    "document.body.offsetHeight - pixel_offset",
+      //    document.body.offsetHeight - pixel_offset
+      // );
+      // console.log(
+      //    "window.innerHeight + window.scrollY >= document.body.offsetHeight - pixel_offset",
+      //    window.innerHeight + window.scrollY >=
+      //       document.body.offsetHeight - pixel_offset
+      // );
+      // console.log("visible", visible);
+      // console.log("bookmarkList.size", bookmarkList.size);
+      // console.log("visible != bookmarkList.size", visible != bookmarkList.size);
+      // console.log("loader", loader);
+      // console.log(
+      //    "RESULT ",
+      //    (force ||
+      //       window.innerHeight + window.scrollY >=
+      //          document.body.offsetHeight - pixel_offset ||
+      //       visible != bookmarkList.size) &&
+      //       loader == false
+   // );
+
       if (
          (force ||
             window.innerHeight + window.scrollY >=
@@ -168,17 +208,21 @@
          console.log("loadmore render");
 
          loader = true;
-         // console.log("visible", visible);
+         // console.log("bookmarkList", bookmarkList);
 
          let nowvisible = Math.ceil((hh * ww) / 50 / 50);
-         let incrementVisible = Math.ceil(windowWidth / 50) * 3;
+         // let incrementVisible = Math.ceil(windowWidth / 50) * 3;
+         let incrementVisible = 100;
          // visible = Math.abs(
          //    Math.min(nowvisible + incrementVisible, bookmarkList.length)
          // );
+         console.log("old visible", visible);
          visible = Math.abs(
             Math.min(nowvisible + incrementVisible, bookmarkList.size)
          );
+         console.log("new visible", visible);
          //   filteredListSliced = bookmarkList.slice(0, visible);
+         await tick();
          filteredListSliced = Array.from(bookmarkList).slice(0, visible);
          // console.log(filteredListSliced);
          // console.log(bookmarkList.size);
@@ -186,6 +230,13 @@
          loader = false;
       }
    }
+   $: if (titleVisible) {
+      visible = 20;
+   } else {
+      visible = 300;
+   }
+
+//
    // async function toDataURL(urll: string, callback: any) {
    //    var xhr = new XMLHttpRequest();
    //    xhr.onload = function() {
@@ -235,12 +286,6 @@
    // visible.set(400);
 
    // $: visible = filteredList?.length || 0;
-
-   $: if (titleVisible) {
-      visible = 20;
-   } else {
-      visible = 300;
-   }
 
    // $: if (
    //    Math.abs(Math.min(Math.ceil(visible), filteredList.length)) <
@@ -318,14 +363,19 @@
 </script>
 
 <svelte:window
-   on:scroll={loadmore}
+   on:scroll={loadmore(false)}
    bind:scrollY={windowY}
    bind:innerHeight={windowHeight}
    bind:innerWidth={windowWidth}
 />
 <!-- <p>showing items {start}-{end}:{visible}</p> -->
 <filterBar class="text-white">
-   <input class="text-white" type="search" id="search" bind:value={searchTerm} />
+   <input
+      class="text-white"
+      type="search"
+      id="search"
+      bind:value={searchTerm}
+   />
    <label id="changeView">
       <input type="checkbox" bind:checked={titleVisible} />
       <icon>
@@ -434,6 +484,7 @@
       <!-- </icon-list>  -->
    </label>
    <span>
+      {searchTerm}
       showing items {visible}
       of {bookmarkListSize}, last {searchTerm.length || 1} week, {windowHeight} -
       {windowY} - {hh}</span
@@ -451,7 +502,7 @@
    <!-- {#each filteredListSliced as item (item)}
       <AnchoreItem {...item} />
    {/each} -->
-   {#each filteredListSliced as hostItem}
+   {#each filteredListSliced as hostItem (hostItem)}
       <HostItem {hostItem} />
    {/each}
    <!-- {#each bookmarkList as item (item)}
@@ -465,7 +516,7 @@
 </anchores>
 
 <!-- <autoloader bind:this={autoloader}>{hh}</autoloader> -->
-<style lang="postcss">
+<style lang="scss">
    /* autoloader {
       display: block;
       position: relative;
@@ -527,7 +578,6 @@
       display: flex;
       flex-wrap: wrap;
       flex-direction: row;
-      justify-content: center;
       align-content: flex-end;
       align-items: center;
       position: relative;
@@ -540,6 +590,7 @@
       left: 0; */
       /* margin-bottom: 40px; */
       background: rgb(20, 20, 20);
+      justify-content: flex-start;
 
       /* min-height: 700px; */
       /* display: grid;
@@ -547,7 +598,7 @@
       gap: 5px; */
    }
    anchores:after {
-      height: 50px;
+      height: 100px;
       display: block;
       position: absolute;
       left: 0;
@@ -606,7 +657,7 @@
         background-repeat: no-repeat;
         background-size: cover;
         transition: all 0.3s ease; */
-        /* background-color: #fff; */
+      /* background-color: #fff; */
       /* width: 50px;
       height: 50px;
       border-radius: 50px;
