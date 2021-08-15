@@ -60,7 +60,7 @@
     </div> -->
 </clock-and-greeting>
 
-<style lang="postcss">
+<style lang="scss">
     clock-and-greeting {
         height: 75%;
         flex-direction: column;
