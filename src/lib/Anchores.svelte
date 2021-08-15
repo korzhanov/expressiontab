@@ -150,10 +150,26 @@
          // return bookmarkList;
       // });
    }
+
+   // let val='';
+	let timer: any;
+
+	// const debounce = v => {
+	// 	clearTimeout(timer);
+	// 	timer = setTimeout(() => {
+	// 		val = v;
+	// 	}, 750);
+	// }
+
    $: {
+      clearTimeout(timer);
+		timer = setTimeout(() => {
+			// val = v;
       localStorage.setItem("searchTerm", searchTerm);
       console.log("searchTerm save");
       getBookmarks();
+		}, 750);
+      
    }
    async function loadmore(force: boolean = false) {
       // setContext('maxVisits', maxVisits);
@@ -375,7 +391,8 @@
       type="search"
       id="search"
       bind:value={searchTerm}
-   />
+      />
+      <!-- on:keyup={({ target: { value } }) => debounce(value)}  -->
    <label id="changeView">
       <input type="checkbox" bind:checked={titleVisible} />
       <icon>
@@ -486,8 +503,10 @@
    <span>
       {searchTerm}
       showing items {visible}
-      of {bookmarkListSize}, last {searchTerm.length || 1} week, {windowHeight} -
-      {windowY} - {hh}</span
+      of {bookmarkListSize}, last {searchTerm.length || 1} week{searchTerm.length>1?"s":""}, 
+      <!-- {windowHeight} -
+      {windowY} - {hh} -->
+      </span
    >
 </filterBar>
 <anchores bind:clientHeight={hh} bind:clientWidth={ww} class:titleVisible>

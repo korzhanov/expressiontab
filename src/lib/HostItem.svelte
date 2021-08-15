@@ -12,7 +12,7 @@
     let tweenOtherAnchores: Array<any> = [];
     let unfold = false;
 
-    function tweenAnchores() {
+    async function tweenAnchores() {
         unfold = !unfold;
         if (unfold == true) {
             console.log("unfold ", unfold);
@@ -82,10 +82,10 @@
             let fav = localStorage.getItem("favicon_" + host);
             if (!fav?.length) {
                 toDataURL(
-                    // "https://s2.googleusercontent.com/s2/favicons?domain_url=" +
-                    // hostAnchore.url,
-                    "https://favicon.yandex.net/favicon/" +host,
-                    function(dataUrl: any) {
+                    "https://s2.googleusercontent.com/s2/favicons?domain_url=" +
+                    hostAnchore.url,
+                    // "https://favicon.yandex.net/favicon/" +host,
+                    (dataUrl: string)=>{
                         localStorage.setItem("favicon_" + host, dataUrl);
                         console.log("new favicon saved from ", host);
                     }
@@ -110,7 +110,7 @@
         xhr.send();
     }
 </script>
-8
+
 {#if anchores.length < 3}
     {#each anchores as item (item)}
         <AnchoreItem {...item} {host} />
