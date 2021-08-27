@@ -1031,11 +1031,11 @@ class HostItem extends SvelteComponent {
 }
 const { Map: Map_1, clearTimeout: clearTimeout_1, setTimeout: setTimeout_1, window: window_1 } = globals;
 function add_css$2(target) {
-  append_styles(target, "svelte-ijgerc", 'loader.svelte-ijgerc.svelte-ijgerc{clear:left}#search.svelte-ijgerc.svelte-ijgerc{background:rgba(2, 2, 2, 0.2);border:0px;border-bottom:2px solid #141414;height:30px}#changeView.svelte-ijgerc input.svelte-ijgerc{opacity:0;display:none}.text-white.svelte-ijgerc.svelte-ijgerc{color:#fff}filterBar.svelte-ijgerc.svelte-ijgerc{background:#141414;display:flex;position:relative;height:80px;flex-direction:row;flex-wrap:wrap;align-content:space-around;justify-content:flex-start;align-items:center;gap:10px;padding:0 32px}filterBar.svelte-ijgerc .svelte-ijgerc{opacity:0;transition:opacity 0.3s ease}main:hover filterBar.svelte-ijgerc .svelte-ijgerc{opacity:1;transition:opacity 0.3s ease 2s}anchores.svelte-ijgerc.svelte-ijgerc{display:flex;flex-wrap:wrap;flex-direction:row;align-content:flex-end;align-items:center;position:relative;width:100%;height:auto;padding-top:10px;z-index:1;background:#141414;justify-content:flex-start}anchores.svelte-ijgerc.svelte-ijgerc:after{height:100px;display:block;position:absolute;left:0;content:"";background:linear-gradient(0deg, rgba(20, 20, 20, 0), #141414)}.lds-circle.svelte-ijgerc.svelte-ijgerc{display:inline-block;transform:translateZ(1px)}.lds-circle.svelte-ijgerc>div.svelte-ijgerc{display:inline-block;width:40px;height:40px;margin:8px;border-radius:50%;background:#fff;-webkit-animation:svelte-ijgerc-lds-circle 2.4s cubic-bezier(0, 0.2, 0.8, 1) infinite;animation:svelte-ijgerc-lds-circle 2.4s cubic-bezier(0, 0.2, 0.8, 1) infinite}@-webkit-keyframes svelte-ijgerc-lds-circle{0%,100%{-webkit-animation-timing-function:cubic-bezier(0.5, 0, 1, 0.5);animation-timing-function:cubic-bezier(0.5, 0, 1, 0.5)}0%{transform:rotateY(0deg)}50%{transform:rotateY(1800deg);-webkit-animation-timing-function:cubic-bezier(0, 0.5, 0.5, 1);animation-timing-function:cubic-bezier(0, 0.5, 0.5, 1)}100%{transform:rotateY(3600deg)}}@keyframes svelte-ijgerc-lds-circle{0%,100%{-webkit-animation-timing-function:cubic-bezier(0.5, 0, 1, 0.5);animation-timing-function:cubic-bezier(0.5, 0, 1, 0.5)}0%{transform:rotateY(0deg)}50%{transform:rotateY(1800deg);-webkit-animation-timing-function:cubic-bezier(0, 0.5, 0.5, 1);animation-timing-function:cubic-bezier(0, 0.5, 0.5, 1)}100%{transform:rotateY(3600deg)}}.titleVisible.svelte-ijgerc.svelte-ijgerc{flex-direction:row;flex-wrap:wrap}.titleVisible.svelte-ijgerc anchor{width:100% !important;padding:10px !important;margin:10px !important;border:1px solid transparent !important;transform:scale(1) !important;-webkit-animation:-global-width-grow-anchor 1s cubic-bezier(0.455, 0.03, 0.515, 0.955) both;animation:-global-width-grow-anchor 1s cubic-bezier(0.455, 0.03, 0.515, 0.955) both}.titleVisible.svelte-ijgerc anchor:nth-child(-n + 10){transition:transform cubic-bezier(0.23, 1, 0.32, 1), width 0.5s ease}@-webkit-keyframes width-grow-anchor{0%{width:50px}100%{width:auto}}@keyframes width-grow-anchor{0%{width:50px}100%{width:auto}}');
+  append_styles(target, "svelte-26u2mp", 'loader.svelte-26u2mp.svelte-26u2mp{clear:left}#search.svelte-26u2mp.svelte-26u2mp{background:#141414;border:0px;border-bottom:2px solid #b5b5b5;height:30px;width:98%;text-align:center;font-size:30px;padding:10px 0px}#search.svelte-26u2mp.svelte-26u2mp:focus{border-bottom:2px solid #395e9d;outline:none}#changeView.svelte-26u2mp input.svelte-26u2mp{opacity:0;display:none}.text-white.svelte-26u2mp.svelte-26u2mp{color:#fff}filterBar.svelte-26u2mp.svelte-26u2mp{background:#141414;display:flex;position:relative;height:80px;flex-direction:row;flex-wrap:wrap;align-content:space-around;justify-content:flex-start;align-items:center;gap:10px;padding:0 32px}filterBar.svelte-26u2mp .svelte-26u2mp{opacity:0;transition:opacity 0.3s ease}main:hover filterBar.svelte-26u2mp .svelte-26u2mp{opacity:1;transition:opacity 0.3s ease 2s}anchores.svelte-26u2mp.svelte-26u2mp{display:flex;flex-wrap:wrap;flex-direction:row;align-content:flex-end;align-items:center;position:relative;width:100%;height:auto;padding-top:10px;z-index:1;background:#141414;justify-content:flex-start}anchores.svelte-26u2mp.svelte-26u2mp:after{height:100px;display:block;position:absolute;left:0;content:"";background:linear-gradient(0deg, rgba(20, 20, 20, 0), #141414)}.lds-circle.svelte-26u2mp.svelte-26u2mp{display:inline-block;transform:translateZ(1px)}.lds-circle.svelte-26u2mp>div.svelte-26u2mp{display:inline-block;width:40px;height:40px;margin:8px;border-radius:50%;background:#fff;-webkit-animation:svelte-26u2mp-lds-circle 2.4s cubic-bezier(0, 0.2, 0.8, 1) infinite;animation:svelte-26u2mp-lds-circle 2.4s cubic-bezier(0, 0.2, 0.8, 1) infinite}@-webkit-keyframes svelte-26u2mp-lds-circle{0%,100%{-webkit-animation-timing-function:cubic-bezier(0.5, 0, 1, 0.5);animation-timing-function:cubic-bezier(0.5, 0, 1, 0.5)}0%{transform:rotateY(0deg)}50%{transform:rotateY(1800deg);-webkit-animation-timing-function:cubic-bezier(0, 0.5, 0.5, 1);animation-timing-function:cubic-bezier(0, 0.5, 0.5, 1)}100%{transform:rotateY(3600deg)}}@keyframes svelte-26u2mp-lds-circle{0%,100%{-webkit-animation-timing-function:cubic-bezier(0.5, 0, 1, 0.5);animation-timing-function:cubic-bezier(0.5, 0, 1, 0.5)}0%{transform:rotateY(0deg)}50%{transform:rotateY(1800deg);-webkit-animation-timing-function:cubic-bezier(0, 0.5, 0.5, 1);animation-timing-function:cubic-bezier(0, 0.5, 0.5, 1)}100%{transform:rotateY(3600deg)}}.titleVisible.svelte-26u2mp.svelte-26u2mp{flex-direction:row;flex-wrap:wrap}.titleVisible.svelte-26u2mp anchor{width:100% !important;padding:10px !important;margin:10px !important;border:1px solid transparent !important;transform:scale(1) !important;-webkit-animation:-global-width-grow-anchor 1s cubic-bezier(0.455, 0.03, 0.515, 0.955) both;animation:-global-width-grow-anchor 1s cubic-bezier(0.455, 0.03, 0.515, 0.955) both}.titleVisible.svelte-26u2mp anchor:nth-child(-n + 10){transition:transform cubic-bezier(0.23, 1, 0.32, 1), width 0.5s ease}@-webkit-keyframes width-grow-anchor{0%{width:50px}100%{width:auto}}@keyframes width-grow-anchor{0%{width:50px}100%{width:auto}}');
 }
 function get_each_context(ctx, list, i) {
   const child_ctx = ctx.slice();
-  child_ctx[24] = list[i];
+  child_ctx[27] = list[i];
   return child_ctx;
 }
 function create_else_block(ctx) {
@@ -1061,32 +1061,32 @@ function create_else_block(ctx) {
       attr(line0, "y1", "6");
       attr(line0, "x2", "21");
       attr(line0, "y2", "6");
-      attr(line0, "class", "svelte-ijgerc");
+      attr(line0, "class", "svelte-26u2mp");
       attr(line1, "x1", "8");
       attr(line1, "y1", "12");
       attr(line1, "x2", "21");
       attr(line1, "y2", "12");
-      attr(line1, "class", "svelte-ijgerc");
+      attr(line1, "class", "svelte-26u2mp");
       attr(line2, "x1", "8");
       attr(line2, "y1", "18");
       attr(line2, "x2", "21");
       attr(line2, "y2", "18");
-      attr(line2, "class", "svelte-ijgerc");
+      attr(line2, "class", "svelte-26u2mp");
       attr(line3, "x1", "3");
       attr(line3, "y1", "6");
       attr(line3, "x2", "3.01");
       attr(line3, "y2", "6");
-      attr(line3, "class", "svelte-ijgerc");
+      attr(line3, "class", "svelte-26u2mp");
       attr(line4, "x1", "3");
       attr(line4, "y1", "12");
       attr(line4, "x2", "3.01");
       attr(line4, "y2", "12");
-      attr(line4, "class", "svelte-ijgerc");
+      attr(line4, "class", "svelte-26u2mp");
       attr(line5, "x1", "3");
       attr(line5, "y1", "18");
       attr(line5, "x2", "3.01");
       attr(line5, "y2", "18");
-      attr(line5, "class", "svelte-ijgerc");
+      attr(line5, "class", "svelte-26u2mp");
     },
     m(target, anchor) {
       insert(target, line0, anchor);
@@ -1193,16 +1193,16 @@ function create_if_block_1(ctx) {
       attr(circle0, "cx", "12");
       attr(circle0, "cy", "12");
       attr(circle0, "r", "10");
-      attr(circle0, "class", "svelte-ijgerc");
+      attr(circle0, "class", "svelte-26u2mp");
       attr(circle1, "cx", "12");
       attr(circle1, "cy", "12");
       attr(circle1, "r", "2");
-      attr(circle1, "class", "svelte-ijgerc");
+      attr(circle1, "class", "svelte-26u2mp");
       attr(rect, "x", "6");
       attr(rect, "y", "6");
       attr(rect, "width", "12");
       attr(rect, "height", "12");
-      attr(rect, "class", "svelte-ijgerc");
+      attr(rect, "class", "svelte-26u2mp");
     },
     m(target, anchor) {
       insert(target, circle0, anchor);
@@ -1284,15 +1284,15 @@ function create_if_block_1(ctx) {
     }
   };
 }
-function create_each_block(key_1, ctx) {
+function create_each_block(key_2, ctx) {
   let first;
   let hostitem;
   let current;
   hostitem = new HostItem({
-    props: { hostItem: ctx[24] }
+    props: { hostItem: ctx[27] }
   });
   return {
-    key: key_1,
+    key: key_2,
     first: null,
     c() {
       first = empty();
@@ -1308,7 +1308,7 @@ function create_each_block(key_1, ctx) {
       ctx = new_ctx;
       const hostitem_changes = {};
       if (dirty & 4)
-        hostitem_changes.hostItem = ctx[24];
+        hostitem_changes.hostItem = ctx[27];
       hostitem.$set(hostitem_changes);
     },
     i(local) {
@@ -1333,8 +1333,8 @@ function create_if_block(ctx) {
   return {
     c() {
       loader_1 = element("loader");
-      loader_1.innerHTML = `<div class="lds-circle svelte-ijgerc"><div class="svelte-ijgerc"></div></div>`;
-      attr(loader_1, "class", "svelte-ijgerc");
+      loader_1.innerHTML = `<div class="lds-circle svelte-26u2mp"><div class="svelte-26u2mp"></div></div>`;
+      attr(loader_1, "class", "svelte-26u2mp");
     },
     m(target, anchor) {
       insert(target, loader_1, anchor);
@@ -1375,17 +1375,16 @@ function create_fragment$2(ctx) {
   let t11_value = (ctx[0].length > 1 ? "s" : "") + "";
   let t11;
   let t12;
-  let t13;
   let anchores;
   let each_blocks = [];
   let each_1_lookup = new Map_1();
-  let t14;
+  let t13;
   let anchores_resize_listener;
   let current;
   let mounted;
   let dispose;
-  add_render_callback(ctx[13]);
   add_render_callback(ctx[14]);
+  add_render_callback(ctx[15]);
   const if_block_creators = [create_if_block_1, create_else_block];
   const if_blocks = [];
   function select_block_type(ctx2, dirty) {
@@ -1396,7 +1395,7 @@ function create_fragment$2(ctx) {
   current_block_type_index = select_block_type(ctx);
   if_block0 = if_blocks[current_block_type_index] = if_block_creators[current_block_type_index](ctx);
   let each_value = ctx[2];
-  const get_key = (ctx2) => ctx2[24];
+  const get_key = (ctx2) => ctx2[27];
   for (let i = 0; i < each_value.length; i += 1) {
     let child_ctx = get_each_context(ctx, each_value, i);
     let key = get_key(child_ctx);
@@ -1417,28 +1416,27 @@ function create_fragment$2(ctx) {
       t2 = space();
       span = element("span");
       t3 = text(ctx[0]);
-      t4 = text("\r\n      showing items ");
+      t4 = text("\r\n    showing items ");
       t5 = text(ctx[8]);
-      t6 = text("\r\n      of ");
+      t6 = text("\r\n    of ");
       t7 = text(ctx[3]);
       t8 = text(", last ");
       t9 = text(t9_value);
       t10 = text(" week");
       t11 = text(t11_value);
-      t12 = text(",");
-      t13 = space();
+      t12 = space();
       anchores = element("anchores");
       for (let i = 0; i < each_blocks.length; i += 1) {
         each_blocks[i].c();
       }
-      t14 = space();
+      t13 = space();
       if (if_block1)
         if_block1.c();
-      attr(input0, "class", "text-white svelte-ijgerc");
+      attr(input0, "class", "text-white svelte-26u2mp");
       attr(input0, "type", "search");
       attr(input0, "id", "search");
       attr(input1, "type", "checkbox");
-      attr(input1, "class", "svelte-ijgerc");
+      attr(input1, "class", "svelte-26u2mp");
       attr(svg, "xmlns", "http://www.w3.org/2000/svg");
       attr(svg, "width", "24");
       attr(svg, "height", "24");
@@ -1448,14 +1446,14 @@ function create_fragment$2(ctx) {
       attr(svg, "stroke-width", "2");
       attr(svg, "stroke-linecap", "round");
       attr(svg, "stroke-linejoin", "round");
-      attr(svg, "class", "feather feather-stop-circle svelte-ijgerc");
-      attr(icon, "class", "svelte-ijgerc");
+      attr(svg, "class", "feather feather-stop-circle svelte-26u2mp");
+      attr(icon, "class", "svelte-26u2mp");
       attr(label, "id", "changeView");
-      attr(label, "class", "svelte-ijgerc");
-      attr(span, "class", "svelte-ijgerc");
-      attr(filterBar, "class", "text-white svelte-ijgerc");
-      attr(anchores, "class", "svelte-ijgerc");
-      add_render_callback(() => ctx[17].call(anchores));
+      attr(label, "class", "svelte-26u2mp");
+      attr(span, "class", "svelte-26u2mp");
+      attr(filterBar, "class", "text-white svelte-26u2mp");
+      attr(anchores, "class", "svelte-26u2mp");
+      add_render_callback(() => ctx[18].call(anchores));
       toggle_class(anchores, "titleVisible", ctx[1]);
     },
     m(target, anchor) {
@@ -1481,29 +1479,29 @@ function create_fragment$2(ctx) {
       append(span, t9);
       append(span, t10);
       append(span, t11);
-      append(span, t12);
-      insert(target, t13, anchor);
+      insert(target, t12, anchor);
       insert(target, anchores, anchor);
       for (let i = 0; i < each_blocks.length; i += 1) {
         each_blocks[i].m(anchores, null);
       }
-      append(anchores, t14);
+      append(anchores, t13);
       if (if_block1)
         if_block1.m(anchores, null);
-      anchores_resize_listener = add_resize_listener(anchores, ctx[17].bind(anchores));
+      anchores_resize_listener = add_resize_listener(anchores, ctx[18].bind(anchores));
       current = true;
       if (!mounted) {
         dispose = [
           listen(window_1, "scroll", ctx[11](false)),
+          listen(window_1, "keydown", ctx[12]),
           listen(window_1, "scroll", () => {
             scrolling = true;
             clearTimeout_1(scrolling_timeout);
             scrolling_timeout = setTimeout_1(clear_scrolling, 100);
-            ctx[13]();
+            ctx[14]();
           }),
-          listen(window_1, "resize", ctx[14]),
-          listen(input0, "input", ctx[15]),
-          listen(input1, "change", ctx[16])
+          listen(window_1, "resize", ctx[15]),
+          listen(input0, "input", ctx[16]),
+          listen(input1, "change", ctx[17])
         ];
         mounted = true;
       }
@@ -1554,7 +1552,7 @@ function create_fragment$2(ctx) {
       if (dirty & 4) {
         each_value = ctx2[2];
         group_outros();
-        each_blocks = update_keyed_each(each_blocks, dirty, get_key, 1, ctx2, each_value, each_1_lookup, anchores, outro_and_destroy_block, create_each_block, t14, get_each_context);
+        each_blocks = update_keyed_each(each_blocks, dirty, get_key, 1, ctx2, each_value, each_1_lookup, anchores, outro_and_destroy_block, create_each_block, t13, get_each_context);
         check_outros();
       }
       if (ctx2[4]) {
@@ -1594,7 +1592,7 @@ function create_fragment$2(ctx) {
         detach(filterBar);
       if_blocks[current_block_type_index].d();
       if (detaching)
-        detach(t13);
+        detach(t12);
       if (detaching)
         detach(anchores);
       for (let i = 0; i < each_blocks.length; i += 1) {
@@ -1686,6 +1684,24 @@ function instance$2($$self, $$props, $$invalidate) {
       }
     });
   }
+  let key;
+  let keyCode;
+  function handleKeydown(event) {
+    key = event.key;
+    keyCode = event.keyCode;
+    switch (true) {
+      case keyCode == 8:
+        $$invalidate(0, searchTerm.length--, searchTerm);
+        $$invalidate(0, searchTerm);
+        break;
+      case keyCode == 46:
+        $$invalidate(0, searchTerm = "");
+        break;
+      case key.length == 1:
+        $$invalidate(0, searchTerm = searchTerm + key);
+        break;
+    }
+  }
   onMount(() => {
   });
   onDestroy(() => {
@@ -1713,10 +1729,10 @@ function instance$2($$self, $$props, $$invalidate) {
     $$invalidate(7, ww);
   }
   $$self.$$.update = () => {
-    if ($$self.$$.dirty & 4097) {
+    if ($$self.$$.dirty & 8193) {
       {
         clearTimeout(timer);
-        $$invalidate(12, timer = setTimeout(() => {
+        $$invalidate(13, timer = setTimeout(() => {
           localStorage.setItem("searchTerm", searchTerm);
           console.log("searchTerm save");
           getBookmarks();
@@ -1744,6 +1760,7 @@ function instance$2($$self, $$props, $$invalidate) {
     windowHeight,
     windowWidth,
     loadmore,
+    handleKeydown,
     timer,
     onwindowscroll,
     onwindowresize,
