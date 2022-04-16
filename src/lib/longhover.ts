@@ -1,6 +1,6 @@
-// export function longhover(node:any) {
-	export function longhover(node:HTMLElement, duration=1500) {
-	let timer:any;
+	export function longhover(node:HTMLElement, duration=1500): Record<unknown,unknown>{
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	let timer: any | null;
 
 	const handleMouseover = () => {
 		timer = setTimeout(() => {
@@ -18,14 +18,12 @@
 	node.addEventListener('mouseout', handleMouseout);
 
 	return {
-		update(newDuration:number) {
+		update(newDuration:number):void {
 			duration = newDuration;
 		},
-		destroy() {
+		destroy():void {
 			node.removeEventListener('mouseover', handleMouseover);
 			node.removeEventListener('mouseout', handleMouseout);
-			// console.log(node);
-
 		}
 	};
 }
