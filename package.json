@@ -2,7 +2,7 @@
   "name": "expressiontab",
   "author": "Oleg Korzhanov @drug_z",
   "license": "ISC",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Expression New Tab-page for Google Chrome Browser. Spead-dial page extension",
   "scripts": {
     "dev": "vite",
@@ -20,7 +20,7 @@
     "@typescript-eslint/parser": "^4.29.0",
     "autoprefixer": "^10.3.0",
     "eslint": "^7.32.0",
-    "postcss": "^8.3.6",
+    "postcss-scss": "^4.0.0",
     "postcss-load-config": "^3.1.0",
     "postcss-nested": "^5.0.5",
     "postcss-plugin": "^1.0.0",
@@ -30,13 +30,12 @@
     "svelte-check": "^2.1.0",
     "svelte-preprocess": "^4.7.2",
     "svelte-slimscroll": "^1.0.6",
-    "tailwindcss": "^2.2.4",
     "tslib": "^2.2.0",
     "typescript": "^4.3.2",
     "vite": "^2.3.7",
     "vite-plugin-chrome-extension": "^0.0.7"
   },
-  "main": "src/newtab/main.ts",
+  "main": "src/newtab/main.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/drugz/expressiontab.git"
@@ -55,9 +54,7 @@
   "homepage": "https://github.com/drugz/expressiontab#readme",
   "dependencies": {
     "@macfja/svelte-persistent-store": "^1.1.1",
-    "@sveltejs/svelte-virtual-list": "^3.0.1",
-    "matter-js": "^0.17.1",
-    "postcss-scss": "^4.0.0",
-    "svelte-hero-icons": "^2.2.0"
+    "svelte-hero-icons": "^2.2.0",
+    "svelte-tiny-virtual-list": "^2.0.0"
   }
 }

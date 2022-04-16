@@ -13,7 +13,7 @@
         "esModuleInterop": true,
         "lib": [
             "esnext",
-            "dom"
+            "dom",
         ],
         "types": [
             "@types/chrome",
@@ -28,7 +28,7 @@
                 "src/*"
             ],
         },
-         /**
+        /**
          * Typecheck JS in `.svelte` and `.js` files by default.
          * Disable checkJs if you'd like to use dynamic types in JS.
          * Note that setting allowJs false does not prevent the use
@@ -43,5 +43,6 @@
         "src/**/*.js",
         "src/*.svelte",
         "src/**/*.svelte"
+        // "src/newtab/main.js"
     ]
 }

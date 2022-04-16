@@ -1,9 +1,9 @@
 import { resolve } from "path";
 import { defineConfig } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
-import { chromeExtension } from "vite-plugin-chrome-extension";
+import { chromeExtension, simpleReloader } from "vite-plugin-chrome-extension";
 
-const mode = "development"; // production
+const mode = "development"; // production // development
 const isProduction = mode === 'production'; // boolean
 
 // https://vitejs.dev/config/
@@ -12,79 +12,58 @@ export default defineConfig({
   optimizeDeps: {
     include: ["svelte-hero-icons"],
   },
+  logLevel: isProduction ? "silent" : "info",
+  // logLevel: "info",
   plugins: [
     svelte({
       emitCss: isProduction,
-      // entryFileNames: `[name].[ext]`,
-      cssHash: isProduction,
     }),
-    chromeExtension(),
+    chromeExtension(
+      {
+        verbose: true,
+        dynamicImportWrapper: false,
+        contentScriptWrapper: false,
+      }
+    ),
+        // {
+    //   name: 'disable-treeshake',
+    //   transform(code, id) {
+    //     if (id.endsWith('.html')) {
+    //       console.log(id);
+    //       return { moduleSideEffects: 'no-treeshake' };
+    //     }
+    //   },
+    // },
+
+    simpleReloader(),
   ],
-  css: {
-    modules: {
-      generateScopedName: "main.css",
-    },
-  },
   resolve: {
     alias: {
       "@": resolve(__dirname, "src"),
     },
-    // alias: [{ find: '@', replacement: '/src' }],
   },
-  // minify: isProduction,
-  // emptyOutDir: false,
+  emptyOutDir: false,
+  cssCodeSplit: true,
+  assetsDir: 'assets',
   build: {
-    cssCodeSplit: isProduction,
-    minify: isProduction,
-    // watch: {
-    //   buildDelay: 1000,
-    //   clearScreen: true,
-    //   include: __dirname + "/src/**",
-    // },
-    // assetsDir: 'assets',
     rollupOptions: {
-      // input: 'src/manifest.json',
       input: {
         manifest: resolve(__dirname, "src/manifest.json"),
-
-        // css: 'src/assests/main.css',
-        // newtab: 'src/newtab/index.html',
       },
       output: {
-        entryFileNames: `[name].[ext]`,
-        assetFileNames: `[name].[ext]`,
         name: "expressiontab",
-        // css: 'src/assests/main.css',
-        // newtab: 'src/newtab/index.html',
+        entryFileNames: "[name].js",
+        assetFileNames: "[name].[ext]"
       },
     },
-    outDir: "builds/expressiontab",
-  }, 
-  watch: {
-    cssCodeSplit: isProduction,
-    minify: isProduction,
     watch: {
-      buildDelay: 3000,
+      buildDelay: 2000,
       clearScreen: true,
       include: __dirname + "/src/**",
     },
-    assetsDir: 'assets',
-    rollupOptions: {
-      // input: 'src/manifest.json',
-      input: {
-        manifest: resolve(__dirname, "src/manifest.json"),
-
-        // css: 'src/assests/main.css',
-        // newtab: 'src/newtab/index.html',
-      },
-      output: {
-        entryFileNames: `[name].[ext]`,
-        assetFileNames: `[name].[ext]`,
-        name: "expressiontab",
-        // css: 'src/assests/main.css',
-        // newtab: 'src/newtab/index.html',
-      },
-    },
     outDir: "builds/expressiontab",
   },
+  sourcemap: 'inline',
+  assetsInlineLimit: 0,
+  minify: 'terser',
 });
