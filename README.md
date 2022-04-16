@@ -57,6 +57,8 @@ yarn build watch
 ```
 yarn build
 ```
+4. Uncomment `<link rel="stylesheet" type="text/css" href="main.css" />` in builded index.html
+
 #
 # Svelte + TS + Vite
 
