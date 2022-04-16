@@ -2,13 +2,6 @@
 const sveltePreprocess = require("svelte-preprocess");
 
 module.exports = {
-  // experimental: {
-  //   useVitePreprocess: true
-  // },
-  // Consult https://github.com/sveltejs/svelte-preprocess
-  // for more information about preprocessors
-  //     preprocess: sveltePreprocess()
-  // }
   preprocess: sveltePreprocess({
     // defaults: {
     //   style: 'postcss',
@@ -22,11 +15,3 @@ module.exports = {
   // cssHash:true,
 
 }
-
-// import {sveltePreprocess} from 'svelte-preprocess'
-
-// export default {
-//   // Consult https://github.com/sveltejs/svelte-preprocess
-//   // for more information about preprocessors
-//   preprocess: sveltePreprocess()
-// }

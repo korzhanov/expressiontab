@@ -1,9 +1,63 @@
 # expressiontab
-Expression New Tab for Goggle Chrome
+Expression New Tab for Goggle Chrome.
 
-@todo update readme
+Clear design, usefull functions, and more.
 
 
+![Logo XpressionTab](https://github.com/drugz/expressiontab/raw/main/readme.files/logo_xpressiontab.png)
+
+![Main cover 1](https://github.com/drugz/expressiontab/raw/main/readme.files/screenshot_1.jpg)
+#
+![Main cover 2](https://github.com/drugz/expressiontab/raw/main/readme.files/screenshot_2.jpg)
+#
+![Main cover 3](https://github.com/drugz/expressiontab/raw/main/readme.files/screenshot_3.jpg)
+#
+@todo:
+
+[V] more features
+
+[V] make copy button in the context menu
+
+[V] create a new bookmark by clicking on the star icon.
+
+[V] update readme.md
+
+[ ] fix bugs with keydown in searchbar
+
+[ ] fix style of context menu for left anchores
+
+[ ] fix style for lined view
+
+[ ] add VirtualList
+
+[ ] fix bugs, add new
+
+[ ] make release 1.0
+
+#
+# For local dev:
+
+0. Clone repo from github
+1. Install dependencies with 
+```
+yarn
+```
+3. Make buld with
+```
+yarn build watch
+```
+4. Open [chrome://extensions/](chrome://extensions/)
+5. Click `Load unpacked extension` and select the folder `expressiontab\builds\expressiontab`
+6. Open extension`s options page and click `Enable`
+
+# For local production build:
+1. Open vite.config.js
+2. Change `mode: 'development'` to `mode: 'production'`
+3. Make buld with
+```
+yarn build
+```
+#
 # Svelte + TS + Vite
 
 This template should help get you started developing with Svelte and TypeScript in Vite.
