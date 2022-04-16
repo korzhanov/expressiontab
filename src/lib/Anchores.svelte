@@ -17,7 +17,7 @@
   //     } from "@macfja/svelte-persistent-store";
 
   //   let searchTerm = persist(writable(""), localStorage(), "searchTerm");
-  let searchTerm = localStorage.getItem("searchTerm") || "";
+  let searchTerm:string = localStorage.searchTerm || "";
 
   // let searchTerm = "";
   // let bookmarkList: any = bookmarks.then((value) => value);
@@ -173,45 +173,6 @@
   async function loadmore(force: boolean = false) {
     // setContext('maxVisits', maxVisits);
     let pixel_offset: number = 200;
-    // loader = false;
-    // console.log("loadmore run");
-    // console.log("bookmarkList.size");
-    // console.log(bookmarkList.size);
-    // console.log(
-    //    "window.innerHeight + window.scrollY",
-    //    window.innerHeight,
-    //    window.scrollY
-    // );
-    // console.log("document.body.offsetHeight", document.body.offsetHeight);
-    // if (listElm.scrollTop + listElm.clientHeight >= listElm.scrollHeight) {
-
-    // console.log("force", force);
-    // console.log(
-    //    "window.innerHeight + window.scrollY",
-    //    window.innerHeight + window.scrollY
-    // );
-
-    // console.log(
-    //    "document.body.offsetHeight - pixel_offset",
-    //    document.body.offsetHeight - pixel_offset
-    // );
-    // console.log(
-    //    "window.innerHeight + window.scrollY >= document.body.offsetHeight - pixel_offset",
-    //    window.innerHeight + window.scrollY >=
-    //       document.body.offsetHeight - pixel_offset
-    // );
-    // console.log("visible", visible);
-    // console.log("bookmarkList.size", bookmarkList.size);
-    // console.log("visible != bookmarkList.size", visible != bookmarkList.size);
-    // console.log("loader", loader);
-    // console.log(
-    //    "RESULT ",
-    //    (force ||
-    //       window.innerHeight + window.scrollY >=
-    //          document.body.offsetHeight - pixel_offset ||
-    //       visible != bookmarkList.size) &&
-    //       loader == false
-    // );
 
     if (
       (force ||
@@ -226,16 +187,12 @@
       // console.log("bookmarkList", bookmarkList);
 
       let nowvisible = Math.ceil((hh * ww) / 50 / 50);
-      // let incrementVisible = Math.ceil(windowWidth / 50) * 3;
       let incrementVisible = 100;
-      // visible = Math.abs(
-      //    Math.min(nowvisible + incrementVisible, bookmarkList.length)
-      // );
-      console.log("old visible", visible);
+      // console.log("old visible", visible);
       visible = Math.abs(
         Math.min(nowvisible + incrementVisible, bookmarkList.size)
       );
-      console.log("new visible", visible);
+      // console.log("new visible", visible);
       //   filteredListSliced = bookmarkList.slice(0, visible);
       await tick();
       filteredListSliced = Array.from(bookmarkList).slice(0, visible);
@@ -254,139 +211,25 @@
   let key;
   let keyCode;
 
-  function handleKeydown(event) {
+  function handleKeydown(event:any) {
     key = event.key;
-    keyCode = event.keyCode;           
+    keyCode = event.keyCode;
     switch (true) {
-      case keyCode==8:
-        searchTerm.length--;
-        searchTerm = searchTerm;
+      case keyCode == 8:
+        // backspace
+        if (searchTerm.length > 0) {
+          searchTerm = searchTerm.slice(0, -1);
+        }
         break;
-      case keyCode==46:
+      case keyCode == 46:
+        // delete
         searchTerm = "";
         break;
-      case key.length==1:
+      case key.length == 1:
         searchTerm = searchTerm + key;
         break;
     }
   }
-
-  //
-  // async function toDataURL(urll: string, callback: any) {
-  //    var xhr = new XMLHttpRequest();
-  //    xhr.onload = function() {
-  //       var reader = new FileReader();
-  //       reader.onloadend = function() {
-  //          callback(reader.result);
-  //       };
-  //       reader.readAsDataURL(xhr.response);
-  //    };
-  //    xhr.open("GET", urll);
-  //    xhr.responseType = "blob";
-  //    xhr.send();
-  // }
-  // $: filteredList = bookmarkList;
-  // $: filteredListSliced = bookmarkList.slice(0, visible);
-  // $: if (searchTerm == "") {
-  //    filteredListSliced = [...bookmarkList];
-  //    // filteredList = [...bookmarkList];
-  //    // filteredList = bookmarkList;
-  // } else {
-  //    // console.log("bookmarkList", bookmarkList);
-  //    // console.log("filteredList", filteredList);
-  //    // $:
-  //    filteredListSliced = bookmarkList;
-  //    // filteredList = bookmarkList;
-  //    // filteredList = bookmarkList.filter( // фильтрация
-  //    //    (item: { url: string | string[]; title: string | string[] }) =>
-  //    //       (!!item.url && item.url.indexOf(searchTerm) !== -1) ||
-  //    //       (!!item.title && item.title.indexOf(searchTerm) !== -1)
-  //    // );
-  //    // for (let i = 0; bookmarkList.length < i; i++) {
-  //    //    filteredList = [];
-  //    //    let item = bookmarkList[i];
-  //    //    if (
-  //    //       (!!item.url && item.url.indexOf(searchTerm) !== -1) ||
-  //    //       (!!item.title && item.title.indexOf(searchTerm) !== -1)
-  //    //    ) {
-  //    //       filteredList = [...filteredList, item];
-  //    //       // visible=Math.min(filteredList.length,500);
-  //    //    }
-  //    // }
-  // }
-  // const visible = tweened(1, {
-  //    duration: 300,
-  //    easing: cubicOut
-  // });
-  // visible.set(400);
-
-  // $: visible = filteredList?.length || 0;
-
-  // $: if (
-  //    Math.abs(Math.min(Math.ceil(visible), filteredList.length)) <
-  //    filteredListSliced.length
-  // ) {
-  //    tick();
-  //    loader = false;
-  //    filteredListSliced.length = Math.max(
-  //       Math.abs(Math.min(Math.ceil(visible), filteredList.length)),
-  //       0
-  //    );
-  // } else {
-  //    tick();
-  //    loader = false;
-  //    filteredListSliced = filteredList?.slice(
-  //       0,
-  //       Math.abs(Math.min(Math.ceil(visible), filteredList.length))
-  //    );
-  // }
-  // $: autoloaderTop = autoloader?.getBoundingClientRect().top || 0;
-  // $:
-  // $: if (
-  //    // autoloaderTop < windowY + windowHeight
-  //    //  &&
-  //    oldwindowY - windowY != 0
-  //    //  &&
-  //    // visible < filteredList.length
-  // )
-
-  // $: {
-  //    // console.log("hh - 300,windowY + windowHeight");
-  //    // console.log(hh - 300, windowY + windowHeight);
-  //    // tick();
-  //    let nowvisible = Math.ceil((hh * ww) / 50 / 50);
-  //    let incrementVisible = Math.ceil((windowHeight * windowWidth) / 50 / 50);
-
-  //    // visible = Math.min(Math.ceil(visible + 20 + 1*(windowY-oldwindowY)),filteredList.length);
-  //    // loader = 1;
-  //    // visible = Math.abs(
-  //    //    Math.min(
-  //    //       Math.ceil(visible + 20 + 0.8 * (windowY - oldwindowY)),
-  //    //       filteredList.length
-  //    //    )
-  //    // );
-  //    // visible = Math.abs(Math.min(nowvisible+incrementVisible, bookmarkList.length));
-  //    console.log("nowvisible+incrementVisible", nowvisible + incrementVisible);
-  //    console.log("autoloaderTop", autoloaderTop);
-  //    console.log("windowY + windowHeight", windowY + windowHeight);
-
-  //    if (autoloaderTop < windowY + windowHeight) {
-  //       // filteredListSliced = bookmarkList.slice(0, visible);
-  //       filteredListSliced = bookmarkList.slice(
-  //          0,
-  //          Math.abs(
-  //             Math.min(nowvisible + incrementVisible, bookmarkList.length)
-  //          )
-  //       );
-  //       loader = 0;
-  //    } else {
-  //       loader = 1;
-  //    }
-  //    // visible += v;
-  //    // console.log("windowY - oldwindowY");
-  //    // console.log(windowY - oldwindowY);
-  //    oldwindowY = windowY;
-  // }
 
   onMount(() => {
     // loadmore(true);
@@ -398,7 +241,7 @@
 </script>
 
 <svelte:window
-  on:scroll={loadmore(false)}
+  on:scroll={()=>loadmore(false)}
   bind:scrollY={windowY}
   bind:innerHeight={windowHeight}
   bind:innerWidth={windowWidth}
@@ -527,42 +370,21 @@
   </span>
 </filterBar>
 <anchores bind:clientHeight={hh} bind:clientWidth={ww} class:titleVisible>
-  <!-- {@debug bookmarkList} -->
-  <!-- {@debug filteredListSliced} -->
-  <!-- {#each bookmarkList as item (item)} -->
-  <!-- {#each filteredListSliced as item (item)}
-     
-      <AnchoreItem {...item} />
-   {/each}  -->
-  <!-- {#each historyList as item (item)} -->
-  <!-- {#each filteredListSliced as item (item)}
-      <AnchoreItem {...item} />
-   {/each} -->
+ 
   {#each filteredListSliced as hostItem (hostItem)}
     <HostItem {hostItem} />
-  {/each}
-  <!-- {#each bookmarkList as item (item)}
-      <AnchoreItem {...item} />
-   {/each} -->
-  <!-- <VirtualList items={filteredList} let:item bind:start bind:end>
-            <AnchoreItem {...item} />
-         </VirtualList> -->
+  {/each} 
   {#if loader}<loader><div class="lds-circle"><div /></div></loader>{/if}
   <!-- <anchor></anchor> -->
 </anchores>
 
 <!-- <autoloader bind:this={autoloader}>{hh}</autoloader> -->
-<style lang="scss">
-  /* autoloader {
-      display: block;
-      position: relative;
-      border: 1px solid #4ed400;
-   } */
+<style>
   loader {
     clear: left;
   }
   #search {
-   background: rgb(20 20 20);
+    background: rgb(20 20 20);
     border: 0px;
     border-bottom: 2px solid #b5b5b5;
     height: 30px;
@@ -572,8 +394,8 @@
     padding: 10px 0px;
   }
   #search:focus {
-   border-bottom:2px solid #395e9d;
-     outline: none;
+    border-bottom: 2px solid #395e9d;
+    outline: none;
   }
   #changeView input {
     opacity: 0;
@@ -680,25 +502,25 @@
     }
   }
 
-  :global(anchor) {
-    /* float: left; */
-    /* border-radius: 50%; */
-    /* max-width: 300px; */
-    /* clear: both; */
-    /* padding: 2%; */
-    /* display: inline-flex; */
-    /* justify-content: center; */
-    /* align-items: center; */
-    /* background-color: #fff9;
+  /* // :global(anchor) { */
+  /* float: left; */
+  /* border-radius: 50%; */
+  /* max-width: 300px; */
+  /* clear: both; */
+  /* padding: 2%; */
+  /* display: inline-flex; */
+  /* justify-content: center; */
+  /* align-items: center; */
+  /* background-color: #fff9;
         background-color: rgba(255, 255, 255, 0.5); */
-    /* -webkit-backdrop-filter: blur(10px);
+  /* -webkit-backdrop-filter: blur(10px);
         backdrop-filter: blur(10px); */
-    /* background-position: center center;
+  /* background-position: center center;
         background-repeat: no-repeat;
         background-size: cover;
         transition: all 0.3s ease; */
-    /* background-color: #fff; */
-    /* width: 50px;
+  /* background-color: #fff; */
+  /* width: 50px;
       height: 50px;
       border-radius: 50px;
       margin: 2px;
@@ -712,8 +534,8 @@
       animation: -global-width-grow-anchor 1s
       cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
       transition: all 0.3s ease; */
-    /* overflow: hidden; */
-  }
+  /* overflow: hidden; */
+  /* // } */
   .titleVisible {
     flex-direction: row;
     flex-wrap: wrap;

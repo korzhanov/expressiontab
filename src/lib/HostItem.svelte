@@ -153,9 +153,9 @@
 <style lang="scss">
     anchorGroup {
         /* display: block; */
-        /* position: absolute; */
+        /* position: absolute;
         // width: 100%;
-        // height: 100%;
+        // height: 100%; */
         width: 50px;
         height: 50px;
         display: flex;
@@ -164,7 +164,7 @@
         justify-content: center;
         align-items: baseline;
         flex-direction: row;
-        // border: 1px solid rgb(43, 43, 43) !important;
+        /* // border: 1px solid rgb(43, 43, 43) !important;
         // border: 1px solid transparent !important;
         //     border: 10px solid #141414 !important;
         //     border-radius: 50%;
@@ -181,7 +181,7 @@
         // background-color: #543c7733;
         // border-radius: 50%;
         // margin: 30px;
-        // transition: all 1s ease;
+        // transition: all 1s ease; */
 
         width: 50px;
         height: 50px;
@@ -200,16 +200,16 @@
     }
     anchorGroup:hover {
         transition: all 1s ease;
-        // border: 1px dashed rgb(58, 42, 42) !important;
+        /* // border: 1px dashed rgb(58, 42, 42) !important; */
         border: 20px solid #1d1d1df2 !important;
     }
 
     .hovicon {
-        // display: inline-block;
+        /* // display: inline-block;
         // font-size: 45px;
-        // line-height: 90px;
+        // line-height: 90px; */
         cursor: pointer;
-        // margin: 20px;
+        /* // margin: 20px;
         // width: 90px;
         // height: 90px;
         // border-radius: 50%;
@@ -217,18 +217,18 @@
         // position: relative;
         // text-decoration: none;
         // z-index: 1;
-        // color: #fff;
+        // color: #fff; */
     }
-    // .hovicon.auto-width {
+    /* // .hovicon.auto-width {
     //     width: auto;
     //     height: auto;
     //     padding: 15px;
-    // }
+    // } */
     .hovicon:after {
         pointer-events: none;
         position: absolute;
-        // width: 100%;
-        // height: 100%;
+        /* // width: 100%;
+        // height: 100%; */
         width: 50px;
         height: 50px;
         border-radius: 50%;
@@ -238,13 +238,13 @@
         box-sizing: content-box;
     }
     .hovicon:before {
-        speak: none;
+        /* // speak: none;
         // font-size: 48px;
         // line-height: 90px;
         // font-style: normal;
         // font-weight: normal;
         // font-variant: normal;
-        // text-transform: none;
+        // text-transform: none; */
         display: block;
         -webkit-font-smoothing: antialiased;
     }
@@ -262,7 +262,7 @@
     .hovicon.effect-8:after {
         top: 0;
         left: 0;
-        // padding: 0;
+        /* // padding: 0; */
         z-index: -1;
         box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
         opacity: 0;
@@ -283,23 +283,23 @@
         background-color: #ffffffcf;
         transition: all 0.3;
     }
-    .hovicon.effect-8:hover i {
-        /*     color: #fff; */
-    }
+    /* // .hovicon.effect-8:hover i {
+     //   color: #fff; 
+    // } */
     .hovicon.effect-8:hover:after {
-        // -webkit-animation: sonarEffect 1.3s ease-out 1075ms;
+        /* // -webkit-animation: sonarEffect 1.3s ease-out 1075ms;
         // -moz-animation: sonarEffect 1.3s ease-out 1075ms;
-        // animation: sonarEffect 0.5s ease-out 1s;
+        // animation: sonarEffect 0.5s ease-out 1s; */
         animation: sonarEffect 1.5s cubic-bezier(0, 1.86, 0.93, -0.89) 0.5s;
         animation-iteration-count: 2;
     }
     .unfold.hovicon.effect-8:hover:after {
-        // -webkit-animation: sonarEffect 1.3s ease-out 2075ms reverse ;
-        // -moz-animation: sonarEffect 1.3s ease-out 2075ms reverse ;
+        /* // -webkit-animation: sonarEffect 1.3s ease-out 2075ms reverse ;
+        // -moz-animation: sonarEffect 1.3s ease-out 2075ms reverse ; */
         animation: sonarEffect 2s ease-in 1s reverse;
         animation-iteration-count: 1;
     }
-    @-webkit-keyframes sonarEffect {
+    @keyframes sonarEffect {
         0% {
             opacity: 0.3;
         }
@@ -315,7 +315,7 @@
             opacity: 0;
         }
     }
-    // @-moz-keyframes sonarEffect {
+    /* // @-moz-keyframes sonarEffect {
     //     0% {
     //         opacity: 0.3;
     //     }
@@ -346,5 +346,5 @@
     //         transform: scale(1.5);
     //         opacity: 0;
     //     }
-    // }
+    // } */
 </style>
