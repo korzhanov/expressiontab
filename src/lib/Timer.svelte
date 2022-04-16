@@ -33,15 +33,6 @@
 </script>
 
 <clock-and-greeting>
-    <!-- <div class="user-greeting">
-      <h1 id="user-greeting-time">Good evening,&nbsp;</h1>
-      <h1 id="user-greeting-name">what's your <button>name</button>?</h1>
-      <form id="name-form" style="display: none;">
-        <input id="name-input" type="text" maxlength="16">
-        <input id="name-submit" type="button" aria-label="submit">
-      </form>
-    </div> -->
-
     <time-display on:click="{()=>{timerType+1>1?timerType=0:timerType++}}">
         <p>
             {#key hour}<span in:fly={{ y: -20 }}>{hour}</span>{/key}:
@@ -51,6 +42,7 @@
         </p>
     </time-display>
 
+    <!-- @todo Pomodoro timer -->
     <!-- <div class="toggle-pomodoro">
       <button class="start" style="display: none;">Start Pomodoro Cycle</button>
       <button class="stop" style="display: inline-block;">Stop</button>
@@ -60,15 +52,14 @@
     </div> -->
 </clock-and-greeting>
 
-<style lang="scss">
+<style>
     clock-and-greeting {
         height: 75%;
         flex-direction: column;
         /* font-family: Monoton, Lato, sans-serif; */
         font-family: Lato, sans-serif;
     }
-    clock-and-greeting,
-    .user-greeting {
+    clock-and-greeting{
         display: flex;
         justify-content: center;
     }
@@ -96,25 +87,25 @@
         display: inline-block;
         transition: all 0.3s ease;
     }
-    .toggle-pomodoro {
-        display: flex;
-        justify-content: center;
-    }
-    .toggle-pomodoro button {
-        padding: 3px 10px;
-        border-radius: 3px;
-        outline: none;
-        background-color: transparent;
-        border: none;
-        color: #fff;
-        cursor: pointer;
-        font-family: Lato, sans-serif;
-        font-size: 1.2em;
-        font-weight: 600;
-        transition: 0.3s ease;
-    }
-    .toggle-pomodoro button:hover {
-        background-color: rgba(0, 0, 0, 0.5);
-        transition: 0.3s ease;
-    }
+    /* // .toggle-pomodoro {
+    //     display: flex;
+    //     justify-content: center;
+    // }
+    // .toggle-pomodoro button {
+    //     padding: 3px 10px;
+    //     border-radius: 3px;
+    //     outline: none;
+    //     background-color: transparent;
+    //     border: none;
+    //     color: #fff;
+    //     cursor: pointer;
+    //     font-family: Lato, sans-serif;
+    //     font-size: 1.2em;
+    //     font-weight: 600;
+    //     transition: 0.3s ease;
+    // }
+    // .toggle-pomodoro button:hover {
+    //     background-color: rgba(0, 0, 0, 0.5);
+    //     transition: 0.3s ease;
+    // } */
 </style>

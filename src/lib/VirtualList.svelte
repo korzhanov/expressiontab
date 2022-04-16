@@ -1,4 +1,6 @@
 <script>
+// @ts-nocheck
+
 	import { onMount, tick } from 'svelte';
 	// props
 	export let items;
