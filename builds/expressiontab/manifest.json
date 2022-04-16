@@ -1,6 +1,7 @@
 {
     "name": "Expression Tab",
     "version": "1.0",
+    "manifest_version": 3,
     "description": "Expression Tab",
     "host_permissions": [
         "<all_urls>"
@@ -27,6 +28,5 @@
         "32": "assets/icon32.png",
         "48": "assets/icon48.png",
         "128": "assets/icon128.png"
-    },
-    "manifest_version": 3
+    }
 }
