@@ -6,9 +6,7 @@
 
 </script>
 
-<!-- {@debug bookmarks} -->
  {#each bookmarks as bookmark,i }
-    <!-- {@debug i}  -->
     {#if !!bookmark.children}
         <svelte:self bookmarks={bookmark.children} />
     {:else if !!bookmark.url}

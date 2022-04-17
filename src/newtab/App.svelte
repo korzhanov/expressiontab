@@ -10,11 +10,8 @@
   import { tweened } from "svelte/motion";
   import { cubicOut } from "svelte/easing";
   import { writable } from "svelte/store";
-  // import logo from "../assets/svelte.png";
   import firstbg from "../assets/expression-drops-xfactorial-com-copyright.jpg";
   import Anchores from "../lib/Anchores.svelte";
-  // import css from "../assets/main.css";
-  // import Counter from "../lib/Counter.svelte";
   import Timer from "../lib/Timer.svelte";
   // import chrome from "vite-plugin-chrome-extension";
  
@@ -102,7 +99,6 @@
 
 <!-- {/if} -->
 <style lang="scss">
-
   * {
     --brand-color: rgba(255, 255, 255, 1);
   }

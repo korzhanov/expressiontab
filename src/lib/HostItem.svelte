@@ -118,36 +118,17 @@
 {:else}
     <anchorGroup
         class="hovicon effect-8"
-        use:longhover={2000}
+        use:longhover={3000}
         on:longhover|stopPropagation|preventDefault={tweenAnchores}
         on:contextmenu={() => (unfold = true)}
         class:unfold
         title={tweenOtherAnchores.length}
     >
-        <!-- 
-        on:longhover={() => (unfold = !unfold)}
-    on:mouseover={() => (multiButton = true)}
-    on:mouseleave={() => (multiButton = false)} -->
-        <!-- {@debug hostAnchore} -->
         <AnchoreItem {...hostAnchore} {host} {unfold} />
     </anchorGroup>
-    <!-- {#if unfold} -->
-    <!-- <anchorGroup
-            class="hovicon effect-8"
-            use:longhover={3000}
-            on:longhover={() => (unfold = !unfold)}
-            class:unfold
-        >
-            <AnchoreItem {...hostAnchore} {host} {unfold} />
-        </anchorGroup>
-         in:slide={{ duration: 700, delay: 300 }}
-         out:slide={{ duration: 700, delay: 300 }}> -->
     {#each tweenOtherAnchores as item (item)}
-        <!-- {#each otherAnchores as item} -->
         <AnchoreItem {...item} {host} />
     {/each}
-    <!-- {:else} -->
-    <!-- {/if} -->
 {/if}
 
 <style lang="scss">
