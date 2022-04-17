@@ -409,7 +409,8 @@
     align-content: flex-end;
     align-items: center;
     position: relative;
-    width: 100%;
+    width: 96%;
+    padding:2%;
     height: auto;
     /* min-height: 500px; */
     padding-top: 10px;
