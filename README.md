@@ -42,9 +42,9 @@ Clear design, usefull functions, and more.
 ```
 yarn
 ```
-3. Make buld with
+3. Run dev
 ```
-yarn build watch
+yarn dev
 ```
 4. Open [chrome://extensions/](chrome://extensions/)
 5. Click `Load unpacked extension` and select the folder `expressiontab\builds\expressiontab`
@@ -57,7 +57,6 @@ yarn build watch
 ```
 yarn build
 ```
-4. Uncomment `<link rel="stylesheet" type="text/css" href="main.css" />` in builded index.html
 
 #
 # Svelte + TS + Vite
