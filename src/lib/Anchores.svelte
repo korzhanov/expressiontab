@@ -2,25 +2,14 @@
   import { onMount, tick, setContext, onDestroy } from "svelte";
   import { writable } from "svelte/store";
   import { tweened } from "svelte/motion";
+  import Keydown from "svelte-keydown";
   import { cubicOut, quintOut } from "svelte/easing";
   import { draw, fade } from "svelte/transition";
-  // import TailwindCSS from "./TailwindCSS.svelte";
-
-  // import AnchoreList from "./AnchoreList.svelte";
   // import VirtualList from "@sveltejs/svelte-virtual-list";
   // import VirtualList from "./VirtualList.svelte";
   import HostItem from "./HostItem.svelte";
-  //  import {
-  //         persist,
-  //         indexedDBStorage
-  //         ,localStorage
-  //     } from "@macfja/svelte-persistent-store";
+  let searchTerm: string = localStorage.searchTerm || "";
 
-  //   let searchTerm = persist(writable(""), localStorage(), "searchTerm");
-  let searchTerm:string = localStorage.searchTerm || "";
-
-  // let searchTerm = "";
-  // let bookmarkList: any = bookmarks.then((value) => value);
   let historyList: Array<any> = [],
     bookmarkList: Map<any, any> = new Map(),
     filteredListSliced: Array<any> = [],
@@ -36,26 +25,7 @@
     windowHeight: number = 0,
     windowWidth: number = 0,
     autoloader: any;
-  // let maxVisits = 1;
-  // let filteredList: any = bookmarkList;
 
-  // let start: number | undefined;
-  // let end: number | undefined;
-  // let historyTree: any = chrome.history.search(
-  //    {
-  //       text: "",
-  //       startTime: new Date().getTime() - 1000 * 60 * 60 * 24 * 7,
-  //       maxResults: 500
-  //    },
-  //    () => {}
-  // );
-  //  let bookmarkTree:any = chrome.bookmarks.search("h").then((f)=>{console.log("f", f); return(f)});
-  // let bookmarkTree: any = chrome.bookmarks.search("h");
-
-  // $: bookmarks = bookmarkTree.then((t: any) => {
-  //    console.log("t", t);
-  //    return t;
-  // });
   async function getBookmarks() {
     console.log("get bookm searchTerm");
     console.log(searchTerm);
@@ -82,14 +52,9 @@
     const s = await promise;
     console.log("s bookmarks");
     console.log(s);
-    // const bookmarks = promise.then(s => {
-    // console.log(s);
     let a: any = s[0];
     let b: any = s[1];
     let c: any = [];
-    // a.sort((a1: any, a2: any) => { // сортировочка
-    //    return a2.visitCount - a1.visitCount;
-    // });
     // c = [...a, ...b];
     let arr1Length = a.length;
     let arr2Length = b.length;
@@ -162,45 +127,39 @@
   // }
 
   $: {
+    console.log("new timer");
+    localStorage.searchTerm = searchTerm;
     clearTimeout(timer);
     timer = setTimeout(() => {
       // val = v;
-      localStorage.setItem("searchTerm", searchTerm);
       console.log("searchTerm save");
       getBookmarks();
-    }, 750);
+    }, 1050);
   }
   async function loadmore(force: boolean = false) {
     // setContext('maxVisits', maxVisits);
     let pixel_offset: number = 200;
 
-    if (
-      (force ||
-        window.innerHeight + window.scrollY >=
-          document.body.offsetHeight - pixel_offset ||
-        visible != bookmarkList.size) &&
-      loader == false
-    ) {
-      console.log("loadmore render");
+    // if (
+    //   (force ||
+    //     window.innerHeight + window.scrollY >=
+    //       document.body.offsetHeight - pixel_offset ||
+    //     visible != bookmarkList.size) &&
+    //   loader == false
+    // ) {
+    console.log("loadmore render");
 
-      loader = true;
-      // console.log("bookmarkList", bookmarkList);
-
-      let nowvisible = Math.ceil((hh * ww) / 50 / 50);
-      let incrementVisible = 100;
-      // console.log("old visible", visible);
-      visible = Math.abs(
-        Math.min(nowvisible + incrementVisible, bookmarkList.size)
-      );
-      // console.log("new visible", visible);
-      //   filteredListSliced = bookmarkList.slice(0, visible);
-      await tick();
-      filteredListSliced = Array.from(bookmarkList).slice(0, visible);
-      // console.log(filteredListSliced);
-      // console.log(bookmarkList.size);
-      await tick();
-      loader = false;
-    }
+    loader = true;
+    let nowvisible = Math.ceil((hh * ww) / 50 / 50);
+    let incrementVisible = 100;
+    visible = Math.abs(
+      Math.min(nowvisible + incrementVisible, bookmarkList.size)
+    );
+    await tick();
+    filteredListSliced = Array.from(bookmarkList).slice(0, visible);
+    await tick();
+    loader = false;
+    // }
   }
   $: if (titleVisible) {
     visible = 20;
@@ -208,28 +167,33 @@
     visible = 300;
   }
 
-  let key;
-  let keyCode;
+  // let key;
+  // let keyCode;
 
-  function handleKeydown(event:any) {
-    key = event.key;
-    keyCode = event.keyCode;
-    switch (true) {
-      case keyCode == 8:
-        // backspace
-        if (searchTerm.length > 0) {
-          searchTerm = searchTerm.slice(0, -1);
-        }
-        break;
-      case keyCode == 46:
-        // delete
-        searchTerm = "";
-        break;
-      case key.length == 1:
-        searchTerm = searchTerm + key;
-        break;
-    }
-  }
+  // function handleKeyup(event: any) {
+  //   console.log(event.target);
+  //   // if (event.target.tagName !== "BODY"){
+  //   //   return false;
+  //   // }
+  //   key = event.key;
+  //   keyCode = event.keyCode;
+  //   console.log(keyCode);
+  //   switch (true) {
+  //     case keyCode == 8:
+  //       // backspace
+  //       if (searchTerm.length > 0) {
+  //         searchTerm = searchTerm.slice(0, -1);
+  //       }
+  //       break;
+  //     case keyCode == 46:
+  //       // delete
+  //       searchTerm = "";
+  //       break;
+  //     case key.length == 1:
+  //       searchTerm = searchTerm + key;
+  //       break;
+  //   }
+  // }
 
   onMount(() => {
     // loadmore(true);
@@ -240,16 +204,35 @@
   });
 </script>
 
-<svelte:window
+<!-- 
   on:scroll={()=>loadmore(false)}
+  on:keyup={handleKeyup}-->
+<svelte:window
   bind:scrollY={windowY}
   bind:innerHeight={windowHeight}
   bind:innerWidth={windowWidth}
-  on:keydown={handleKeydown}
 />
 <!-- <p>showing items {start}-{end}:{visible}</p> -->
 <filterBar class="text-white">
   <input class="text-white" type="search" id="search" bind:value={searchTerm} />
+  <Keydown
+    pauseOnInput
+    on:Backspace={() => {
+      if (searchTerm.length > 0) {
+        searchTerm = searchTerm.slice(0, -1);
+      }
+    }}
+    on:Delete={() => {
+      searchTerm = "";
+    }}
+    on:Escape={() => {
+      searchTerm = "";
+    }}
+    on:key={(e) => {
+      console.log(e);
+      if (e.detail.length == 1) searchTerm = searchTerm + e.detail;
+    }}
+  />
   <!-- on:keyup={({ target: { value } }) => debounce(value)}  -->
   <label id="changeView">
     <input type="checkbox" bind:checked={titleVisible} />
@@ -338,25 +321,6 @@
         {/if}
       </svg>
     </icon>
-
-    <!-- <icon-list 
-         in:fade="{{delay: 500, duration: 300}}"
-         out:fade="{{delay: 200, duration: 300}}"
-         > -->
-    <!-- <svg
-               xmlns="http://www.w3.org/2000/svg"
-               width="24"
-               height="24"
-               viewBox="0 0 24 24"
-               fill="none"
-               stroke="currentColor"
-               stroke-width="2"
-               stroke-linecap="round"
-               stroke-linejoin="round"
-               class="feather feather-list"
-               ></svg
-            > -->
-    <!-- </icon-list>  -->
   </label>
   <span>
     {searchTerm}
@@ -370,12 +334,10 @@
   </span>
 </filterBar>
 <anchores bind:clientHeight={hh} bind:clientWidth={ww} class:titleVisible>
- 
   {#each filteredListSliced as hostItem (hostItem)}
     <HostItem {hostItem} />
-  {/each} 
+  {/each}
   {#if loader}<loader><div class="lds-circle"><div /></div></loader>{/if}
-  <!-- <anchor></anchor> -->
 </anchores>
 
 <!-- <autoloader bind:this={autoloader}>{hh}</autoloader> -->
