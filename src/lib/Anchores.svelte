@@ -8,11 +8,13 @@
   // import VirtualList from "@sveltejs/svelte-virtual-list";
   // import VirtualList from "./VirtualList.svelte";
   import HostItem from "./HostItem.svelte";
+  import { filteredListSliced } from "./stores";
+
   let searchTerm: string = localStorage.searchTerm || "";
 
   let historyList: Array<any> = [],
     bookmarkList: Map<any, any> = new Map(),
-    filteredListSliced: Array<any> = [],
+    // filteredListSliced: Array<any> = [],
     bookmarkListSize: number = 0,
     loader: boolean = false,
     titleVisible = false,
@@ -27,92 +29,91 @@
     autoloader: any;
 
   async function getBookmarks() {
+    //
     console.log("get bookm searchTerm");
     console.log(searchTerm);
+    loader = true;
     // @todo фильтровать по имеющимся анкорам
     // @todo догружать по мере поиска по истории
     const promise = Promise.all([
+      // получаем историю посещений
       new Promise((resolve) => {
         chrome.history.search(
           {
-            text: searchTerm,
+            text: searchTerm, // запрос для поиска
             startTime:
               new Date().getTime() -
-              1000 * 60 * 60 * 24 * 7 * (searchTerm.length + 1),
-            maxResults: 2000,
+              1000 * 60 * 60 * 24 * Math.max(7, searchTerm.length + 1), // последние 7 дней или по количеству символов
+            maxResults: 2000, // максимальное количество результатов
           },
           (results) => {
-            return resolve(results);
+            return resolve(results); // возвращаем результат
           }
         );
       }),
-      chrome.bookmarks.search(searchTerm || "h"),
+      chrome.bookmarks.search(searchTerm || "http"), // получаем массив закладок по запросу или по всем ссылкообразным закладкам если нет запроса
     ]);
-    // const bookmarks = promise.then(([a, b]) => {
-    const s = await promise;
-    console.log("s bookmarks");
-    console.log(s);
-    let a: any = s[0];
-    let b: any = s[1];
-    let c: any = [];
+    const s = await promise; // получаем массив из двух объектов
+    let a: any = s[0]; // первый объект истории
+    let b: any = s[1]; // второй объект закладок
+    // let c: any = [];
     // c = [...a, ...b];
-    let arr1Length = a.length;
-    let arr2Length = b.length;
-    a.length = arr1Length + arr2Length;
+    let arr1Length = a.length; // длина массива истории
+    let arr2Length = b.length; // длина массива закладок
+    // a.length = arr1Length + arr2Length;
+    // записываем массив закладок b в конец массива истории a
     for (let i = 0; i < arr2Length; i++) {
       a[arr1Length + i] = b[i];
-      a[arr1Length + i].isBookmark = true;
+      a[arr1Length + i].isBookmark = true; // добавляем поле обозначающее что это закладка
     }
-    b = [];
-    arr1Length = a.length;
-    bookmarkList = new Map();
-    let maxVisits: number = 1;
+    // b = []; // очищаем массив закладок
+    arr1Length = a.length; // получаем длину массива после добавления анкоров
+    bookmarkList = new Map(); // очищаем карту анкоров
+    let maxVisits: number = 1; // максимальное количество посещений
     for (let i = 0; i < arr1Length; i++) {
-      let host = "localhost";
-
+      // перебираем массив истории и закладок
+      let host = "localhost"; // хост по умолчанию
       try {
-        host = new URL(a[i].url).host.split(":")[0];
+        // попытка получить хост из адреса
+        host = new URL(a[i].url).host.split(":")[0]; // получаем хост
 
         if (bookmarkList.has(host)) {
-          let bmitems = bookmarkList.get(host);
+          // если хост уже есть в карте
+          let bmitems = bookmarkList.get(host); // получаем массив анкоров для хоста
           bmitems[0].hostVisitCount =
-            bmitems[0].hostVisitCount * 1 + (a[i].visitCount || 1);
-          maxVisits = Math.max(maxVisits, bmitems[0].hostVisitCount);
-          // console.log(a[i].url);
-          // console.log("bmitems[0].hostVisitCount");
-          // console.log(bmitems[0].hostVisitCount);
-          bookmarkList.set(host, [...bmitems, a[i]]);
+            bmitems[0].hostVisitCount * 1 + (a[i].visitCount || 1); // увеличиваем количество посещений
+          maxVisits = Math.max(maxVisits, bmitems[0].hostVisitCount); // получаем максимальное количество посещений
+          bookmarkList.set(host, [...bmitems, a[i]]); // добавляем в карту анкоров
         } else {
-          // console.log("a[i].visitCount");
-          // console.log(a[i].visitCount);
-          a[i].hostVisitCount = a[i].visitCount || 1;
-          bookmarkList.set(host, [a[i]]);
+          // если хоста нет в карте
+          a[i].hostVisitCount = a[i].visitCount || 1; // присваиваем количество посещений
+          bookmarkList.set(host, [a[i]]); // добавляем в карту анкоров
         }
       } catch (e) {
+        // если не удалось получить хост
         console.log(e);
-        console.log("No favicon for url: ", a[i].url, a[i].title);
-        // console.log(a[i]);
-        // host = a[i].url;
+        console.log("Link without host: ", a[i].url, a[i].title);
       }
     }
-    bookmarkListSize = bookmarkList.size;
-    console.log("bookmarkList ready");
+    loader = false; // закончили загрузку
+    bookmarkListSize = bookmarkList.size; // получаем длину карты анкоров
+    console.log("bookmarkList ready"); // выводим сообщение о готовности карты анкоров
     // console.log(bookmarkList);
-    localStorage.setItem("maxVisits", maxVisits + "");
-    loadmore(true);
+    localStorage.maxVisits = maxVisits + ""; // сохраняем максимальное количество посещений
+    loadmore(true); // отправляем в рендер данные о карте анкоров
     // console.log("a",a);
-    // console.log("b",b);
-    // console.log("c",c);
-    // c.sort((c1: any, c2: any) => {
-    //    return c1.url - c2.url;
-    // });
-    // historyList = a;
-    // bookmarkList = b;
-    // maxVisits = maxVisits;
-    // setContext('maxVisits', maxVisits);
-    // bookmarkList = a;
+      // console.log("b",b);
+      // console.log("c",c);
+      // c.sort((c1: any, c2: any) => {
+      //    return c1.url - c2.url;
+      // });
+      // historyList = a;
+      // bookmarkList = b;
+      // maxVisits = maxVisits;
+      // setContext('maxVisits', maxVisits);
+      // bookmarkList = a;
 
-    // return bookmarkList;
+      // return bookmarkList;
     // });
   }
 
@@ -120,46 +121,70 @@
   let timer: any;
 
   // const debounce = v => {
-  // 	clearTimeout(timer);
-  // 	timer = setTimeout(() => {
-  // 		val = v;
-  // 	}, 750);
+    // 	clearTimeout(timer);
+    // 	timer = setTimeout(() => {
+    // 		val = v;
+    // 	}, 750);
   // }
 
   $: {
     console.log("new timer");
-    localStorage.searchTerm = searchTerm;
-    clearTimeout(timer);
+    localStorage.searchTerm = searchTerm; // сохраняем поисковый запрос в локальное хранилище
+    console.log("searchTerm save");
+    clearTimeout(timer); // очищаем таймер
     timer = setTimeout(() => {
-      // val = v;
-      console.log("searchTerm save");
-      getBookmarks();
-    }, 1050);
+      // запускаем таймер
+      getBookmarks(); // запускаем загрузку анкоров
+    }, 1050); // задержка в мс перед загрузкой анкоров
   }
+
   async function loadmore(force: boolean = false) {
-    // setContext('maxVisits', maxVisits);
+    // загружаем закладки
     let pixel_offset: number = 200;
-
-    // if (
-    //   (force ||
-    //     window.innerHeight + window.scrollY >=
-    //       document.body.offsetHeight - pixel_offset ||
-    //     visible != bookmarkList.size) &&
-    //   loader == false
-    // ) {
-    console.log("loadmore render");
-
-    loader = true;
-    let nowvisible = Math.ceil((hh * ww) / 50 / 50);
-    let incrementVisible = 100;
-    visible = Math.abs(
-      Math.min(nowvisible + incrementVisible, bookmarkList.size)
+    console.log(
+      "window.scrollY + window.innerHeight, document.body.scrollHeight - pixel_offset"
     );
-    await tick();
-    filteredListSliced = Array.from(bookmarkList).slice(0, visible);
-    await tick();
-    loader = false;
-    // }
+    console.log(
+      window.scrollY + window.innerHeight,
+      document.body.scrollHeight - pixel_offset
+    );
+    if (
+      force || // если принудительно загружаем
+      // если приближаемся к концу страницы
+      (window.scrollY + window.innerHeight >=
+        Math.max(0, document.body.scrollHeight - pixel_offset) &&
+        bookmarkListSize > 0) || // если есть карта анкоров
+      visible != bookmarkList.size
+    ) {
+      // если карта анкоров изменилась
+      console.log("loadmore render"); // выводим сообщение о загрузке закладок
+      loader = true;
+      // показывать закладки по мере прокрутки до конца страницы
+      // let bookmarkListArray = Array.from(bookmarkList.values()); // получаем массив анкоров из карты анкоров
+      let nowvisible = Math.ceil((hh * ww) / 50 / 50); // получаем примерное количество видимых анкоров
+      console.log("nowvisible", nowvisible);
+      let start = visible; // начальное значение видимых анкоров
+      let end = Math.min(visible + nowvisible, bookmarkListSize); // конечное значение видимых анкоров
+      visible = end; // присваиваем количество видимых анкоров
+      console.log("visible", visible);
+      console.log("start, end", start, end);
+      try {
+        // await tick();
+        if (visible ) { filteredListSliced.set(Array.from(bookmarkList).slice(0, end)); // получаем массив анкоров из карты анкоров
+        console.log($filteredListSliced);
+        } else filteredListSliced.set([]);
+        // let incrementVisible = 100;
+        // visible = Math.abs(
+        //   Math.min(nowvisible + incrementVisible, bookmarkList.size)
+        // );
+        // filteredListSliced = Array.from(bookmarkList).slice(0, visible);
+        // await tick();
+        loader = false;
+      } catch (e) {
+        console.log("error of render");
+        console.log(e);
+      }
+    }
   }
   $: if (titleVisible) {
     visible = 20;
@@ -171,36 +196,36 @@
   // let keyCode;
 
   // function handleKeyup(event: any) {
-  //   console.log(event.target);
-  //   // if (event.target.tagName !== "BODY"){
-  //   //   return false;
-  //   // }
-  //   key = event.key;
-  //   keyCode = event.keyCode;
-  //   console.log(keyCode);
-  //   switch (true) {
-  //     case keyCode == 8:
-  //       // backspace
-  //       if (searchTerm.length > 0) {
-  //         searchTerm = searchTerm.slice(0, -1);
-  //       }
-  //       break;
-  //     case keyCode == 46:
-  //       // delete
-  //       searchTerm = "";
-  //       break;
-  //     case key.length == 1:
-  //       searchTerm = searchTerm + key;
-  //       break;
-  //   }
+    //   console.log(event.target);
+    //   // if (event.target.tagName !== "BODY"){
+    //   //   return false;
+    //   // }
+    //   key = event.key;
+    //   keyCode = event.keyCode;
+    //   console.log(keyCode);
+    //   switch (true) {
+    //     case keyCode == 8:
+    //       // backspace
+    //       if (searchTerm.length > 0) {
+    //         searchTerm = searchTerm.slice(0, -1);
+    //       }
+    //       break;
+    //     case keyCode == 46:
+    //       // delete
+    //       searchTerm = "";
+    //       break;
+    //     case key.length == 1:
+    //       searchTerm = searchTerm + key;
+    //       break;
+    //   }
   // }
 
   onMount(() => {
-    // loadmore(true);
+    loadmore(true);
   });
 
   onDestroy(() => {
-    localStorage.setItem("maxVisits", "0");
+    // localStorage.setItem("maxVisits", "0");
   });
 </script>
 
@@ -329,13 +354,16 @@
     1
       ? "s"
       : ""}
-    <!--, {windowHeight} -
-      {windowY} - {hh} -->
+    <!-- , {windowHeight} -
+    {windowY} - {hh} -->
   </span>
 </filterBar>
 <anchores bind:clientHeight={hh} bind:clientWidth={ww} class:titleVisible>
-  {#each filteredListSliced as hostItem (hostItem)}
-    <HostItem {hostItem} />
+  <!-- {#if loader}<loader><div class="lds-circle"><div /></div></loader>{/if} -->
+  {#each $filteredListSliced as hostItem (hostItem)}
+  <!-- {#if hostItem[0].url} -->
+      <HostItem {hostItem} />
+    <!-- {/if} -->
   {/each}
   {#if loader}<loader><div class="lds-circle"><div /></div></loader>{/if}
 </anchores>
@@ -346,7 +374,7 @@
     clear: left;
   }
   #search {
-    background: rgb(20 20 20);
+    background: rgb(20, 20, 20);
     border: 0px;
     border-bottom: 2px solid #b5b5b5;
     height: 30px;
@@ -410,7 +438,7 @@
     align-items: center;
     position: relative;
     width: 96%;
-    padding:2%;
+    padding: 2%;
     height: auto;
     /* min-height: 500px; */
     padding-top: 10px;
