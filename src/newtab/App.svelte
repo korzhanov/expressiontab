@@ -32,6 +32,8 @@
   //   files: ["main.css"]
   // });
   let m = { x: 0, y: 0 };
+  let scrollY = 0;
+  let windowHeight = 0;
 
   const circleTransitiom = tweened(0, {
     duration: 700,
@@ -48,18 +50,25 @@
   // let background = new Image();
   // background.src = imgsrc;
 
-  function toDataURL(urll: string, callback: any) {
-    var xhr = new XMLHttpRequest();
-    xhr.onload = function() {
-      var reader = new FileReader();
-      reader.onloadend = function() {
-        callback(reader.result);
+ 
+  async function toDataURL(urll: string):Promise<any> {
+    return new Promise((resolve) => {
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", urll, true);
+      xhr.onload = function(e) {
+        var reader = new FileReader();
+        reader.readAsDataURL(xhr.response);
+        reader.onloadend = function() {
+          resolve(reader.result);
+        };
       };
-      reader.readAsDataURL(xhr.response);
-    };
-    xhr.open("GET", urll);
-    xhr.responseType = "blob";
-    xhr.send();
+      xhr.onerror = function() {
+        resolve(undefined);
+        console.error("** An error occurred during the XMLHttpRequest");
+      };
+      xhr.responseType = "blob";
+      xhr.send();
+    });
   }
 
   // setTimeout(function() {
@@ -67,13 +76,11 @@
   //   var base = localStorage.getItem('nextImage');
   //   if(base) $('.image img').attr('src', base)
   // }, 1);
-  setTimeout(function() {
-    toDataURL(imgsrc, function(dataUrl: any) {
+  setTimeout(async () => {
       // console.log("RESULT:", dataUrl);
       tick();
-      $background = dataUrl;
-    });
-  }, 60000);
+      $background = await toDataURL(imgsrc);
+  }, 120000);
 
   let ready = false;
   onMount(() => (ready = true));
@@ -81,19 +88,20 @@
 </script>
 
 <!-- {#if ready} -->
-
+<svelte:window bind:innerHeight={windowHeight} bind:scrollY />
 <main in:fade={{ duration: 1000 }} out:fade={{ duration: 1000 }}>
   <bg
     in:fade
     out:fade
-    style="background-image: url('{$background}')
-  ;"
+    style="background-image: url('{$background}');"
+    style:opacity={Math.abs((windowHeight - Math.min(scrollY,windowHeight)))/100}
   />
-  <overlay in:fade out:fade />
+  <!-- <overlay in:fade out:fade /> -->
   <spacer>
     <Timer />
     <!-- <Counter /> -->
   </spacer>
+
   <Anchores />
 </main>
 
