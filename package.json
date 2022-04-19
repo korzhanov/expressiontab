@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "description": "Expression New Tab-page for Google Chrome Browser. Spead-dial page extension",
   "scripts": {
-    "dev": "nodemon --delay 3 -e js,ts,svelte,css --watch src --exec \"yarn build\"",
+    "dev": "nodemon --delay 1 -e js,ts,svelte,css --watch src --exec \"yarn build\"",
     "build": "vite build",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "eslint ."
