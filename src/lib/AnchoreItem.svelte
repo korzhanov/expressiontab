@@ -103,8 +103,7 @@
   // @todo если нет сохраненного фавикона
   // показать сначала по прямой ссылке
   // в следующий раз можно показать и кэшированный
-  let src: string =
-    "https://s2.googleusercontent.com/s2/favicons?domain_url=" + host;
+  let src: string = "https://s2.googleusercontent.com/s2/favicons?domain_url=" + host;
   let img_data: string = localStorage.getItem("favicon_" + host) || "";
   // @todo написать поиск фавикон по url.path
   // let img_data = persist(writable(""), localStorage(), "favicon_" + host);
@@ -270,7 +269,7 @@
         <!-- {#if isBookmark}
       {:else}
         {/if}
-     {#if isBookmark} 
+     {#if isBookmark}
                 <button class="fas fa-comment" title="Edit">
                     <Icon src={Pencil} solid size="22" />
                 </button>
@@ -282,10 +281,10 @@
         >
           <Icon src={Duplicate} solid size="22" />
         </button>
-        <!-- <button title="Delete"
-      on:click={deleteAnchore()}>
+        <button title="Delete"
+      on:click={()=>deleteAnchore()}>
         <Icon src={Trash} solid size="22" />
-      </button> -->
+      </button>
       </div>
     {/if}
   </anchor>
