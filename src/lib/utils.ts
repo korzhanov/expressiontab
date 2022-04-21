@@ -18,3 +18,12 @@
       xhr.send();
     });
   }
+
+  
+  export const ignoreUrl = [
+    "chrome:",
+    "chrome-extension:",
+    "javascript:",
+    "file:",
+    "data:",
+  ];
