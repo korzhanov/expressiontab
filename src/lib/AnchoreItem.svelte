@@ -38,40 +38,10 @@
   let multiButton: boolean = false;
   let deleted: boolean = false;
   let maxVisits: number = localStorage?.maxVisits * 1 || 500;
-  // if (hasContext('maxVisits')) {
-  // 	maxVisits = Math.max(getContext('maxVisits'), maxVisits);
-  // }
-  // let weightVisits: number = Math.ceil(
-  //     ((Math.max(hostVisitCount, visitCount)||maxVisits)));
 
-  //     x = 50px
-  // r =
-
-  // visits<=10 = 40px = x0.8
-  // visits<=20 = 50px = x1
-  // visits>20 = 50px = x1
-  // visits=  R*50px = xR
-  // visits>=maxVisits = 300px = x3
-  // maxVisits=300
-  // visits=weight
-
-  // let weight = maxVisits%300;
-
-  // let weightVisits: number = Math.max(
-  //     (Math.max(hostVisitCount, visitCount) * 3) / maxVisits,
-  //     0.8
-  // );
-  // let weightVisits: number = Math.log10(
-  //     Math.max(hostVisitCount, visitCount) * 1
-  // );
   let weightVisits: number = Math.log10(
     Math.max(unfold ? visitCount : hostVisitCount, visitCount) * 1
   );
-  // let tempVisits = JSON.parse(localStorage.getItem("tempVisits") || "[]");
-  // tempVisits.push((Math.max(hostVisitCount, visitCount)));
-  // localStorage.setItem("tempVisits", JSON.stringify(tempVisits));
-
-  // console.log((Math.max(hostVisitCount, visitCount) * 3) / maxVisits);
 
   let ping = "";
   try {
@@ -82,18 +52,6 @@
     console.log(url);
     console.log(e);
   }
-  // console.log(url);
-  // console.log(hostVisitCount);
-  // console.log(
-  //     `let weightVisits (${weightVisits}): number = Math.max(Math.max(hostVisitCount (${hostVisitCount}), visitCount (${visitCount}))*3/maxVisits (${maxVisits}), 0.8);`
-  // );
-  let ignoreUrl = [
-    "chrome:",
-    "chrome-extension:",
-    "javascript:",
-    "file:",
-    "data:",
-  ];
   export let host = "localhost";
   // try {
   //     host = new URL(url).host.split(":")[0] || "localhost";
@@ -108,10 +66,7 @@
   let src: string = globe;
   let img_data: string = localStorage.getItem("favicon_" + host) || 'https://favicon.yandex.net/favicon/' + host;
   // @todo написать поиск фавикон по url.path
-  // let img_data = persist(writable(""), localStorage(), "favicon_" + host);
 
-  // getBase64Image("favicon_" + host, src);
-  // if ($img_data.length == 0) {
   if (img_data.length > 0) {
     src = img_data;
   }
@@ -120,8 +75,6 @@
   // 	todos = todos.filter(t => t !== todo);
   // }
 
-  // let src = "chrome://favicon/?size=16&scale_factor=1x&page_url=" + encodeURIComponent(url);
-  // let src = "chrome://favicon2/?size=16&scale_factor=1x&page_url=" + encodeURI(url);
   // Чтобы получить значок для домена, используйте:
   // https://s2.googleusercontent.com/s2/favicons?domain=www.stackoverflow.com
   // http://www.google.com/s2/favicons?domain=somedomain.com
@@ -129,13 +82,7 @@
   // Чтобы получить значок для URL-адреса, используйте:
   // https://s2.googleusercontent.com/s2/favicons?domain_url=https://www.stackoverflow.com
   // chrome://favicon2/?size=16&scale_factor=1x&page_url=https%3A%2F%2Fdocs.google.com%2Fforms%2Fd%2Fe%2F1FAIpQLSckRt0pts60MaYbNv73y5tiIMjLsfpuEdHwrsFXr9v6Bi21fg%2Fviewform&allow_google_server_fallback=0
-  // function onAnchorClick(event) {
-  //     chrome.tabs.create({
-  //         selected: true,
-  //         url: event.srcElement.href
-  //     });
-  //     return false;
-  // }
+ 
   async function copyToBuffer(e: Event, copyText: string) {
     e.preventDefault();
     document.addEventListener(
@@ -174,7 +121,6 @@
       console.log(e);
     }
   }
-  //
 </script>
 
 {#if !deleted}
@@ -289,7 +235,7 @@
   </anchor>
 {/if}
 
-<style>
+<style lang="scss">
 
   .invisible{
     display:none;
@@ -323,14 +269,6 @@
     border-radius: 4px;
   }
 
-  @keyframes -global-width-grow-anchor {
-    0% {
-      width: 50px;
-    }
-    100% {
-      width: auto;
-    }
-  }
   anchor {
     --background: #fff;
     --text: black;
@@ -345,8 +283,7 @@
     position: relative;
     padding-right: 0px;
     box-sizing: border-box;
-    animation: -global-width-grow-anchor 1s
-      cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
+    animation: -global-width-grow-anchor 1s cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
     transition: all 0.6s ease;
   }
   anchor bgcircle {
@@ -363,7 +300,20 @@
     z-index: -1;
     filter: brightness(1) contrast(1) saturate(1.3) blur(5px);
     box-shadow: 5px 5px 10px #222;
+    // animation: pulseEffect 3s both infinite;
   }
+
+  // $percent: 1%;
+// @for $i from 1 through 20 {
+  // :global(* bgcircle:nth-of-type(#{$i}) ) {
+  bgcircle {
+     animation: pulseEffect infinite;
+     animation-duration: 10s;
+     transition-delay: 10s;
+     animation-delay: 10s;
+   }
+// }
+
   anchor.isBookmark {
     background-color: #484848;
     border-width: 7px !important;
@@ -494,5 +444,25 @@
     width: 0px;
     overflow: hidden;
     opacity: 0;
+  }
+  
+  @keyframes -global-width-grow-anchor {
+    0% {
+      width: 50px;
+    }
+    100% {
+      width: auto;
+    }
+  }
+  @keyframes pulseEffect {
+    0% {
+      opacity: 1;
+    }
+    40% {
+      opacity: 0.7;
+    }
+    100% {
+      opacity: 1;
+    }
   }
 </style>
