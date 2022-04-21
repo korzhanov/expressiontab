@@ -9,7 +9,7 @@
   // import VirtualList from "./VirtualList.svelte";
   import HostItem from "./HostItem.svelte";
   import { filteredListSliced } from "./stores";
-  import { toDataURL } from "./utils";
+  import { toDataURL, ignoreUrl } from "./utils";
 
   let searchTerm: string = localStorage.searchTerm || "";
   let favicon_localhost = localStorage.favicon_localhost;
@@ -85,6 +85,19 @@
     for (let i = 0; i < arr1Length; i++) {
       // перебираем массив истории и закладок
       let host = "localhost"; // хост по умолчанию
+      // если url начинается на префикс из приведенных в списке ignoreUrl , то удаляем этот элемент из массива
+      try {
+        
+      ignoreUrl.forEach((item) => {
+        if (a[i]?.url?.startsWith(item)) {
+          a.splice(i, 1);
+          arr1Length--;
+        }
+      });
+      } catch (error) {
+        console.log(error);
+      }
+
       try {
         // попытка получить хост из адреса
         host = new URL(a[i].url).host.split(":")[0]; // получаем хост
@@ -141,6 +154,7 @@
 
   $: {
     console.log("new timer");
+    filteredListSliced.set([]);
     localStorage.searchTerm = searchTerm; // сохраняем поисковый запрос в локальное хранилище
     console.log("searchTerm save");
     clearTimeout(timer); // очищаем таймер
@@ -191,11 +205,11 @@
         // );
         // filteredListSliced = Array.from(bookmarkList).slice(0, visible);
         // await tick();
-        loader = false;
       } catch (e) {
         console.log("error of render");
         console.log(e);
       }
+        loader = false;
     }
   }
   $: if (titleVisible) {
@@ -251,7 +265,7 @@
 />
 <!-- <p>showing items {start}-{end}:{visible}</p> -->
 <filterBar class="text-white">
-  <input class="text-white" type="search" id="search" bind:value={searchTerm} />
+  <input class="text-white" type="search" id="search" bind:value={searchTerm} title="Press Esc or Del to clear" />
   <Keydown
     pauseOnInput
     on:Backspace={() => {
@@ -371,11 +385,8 @@
   </span>
 </filterBar>
 <anchores bind:clientHeight={hh} bind:clientWidth={ww} class:titleVisible>
-  <!-- {#if loader}<loader><div class="lds-circle"><div /></div></loader>{/if} -->
   {#each $filteredListSliced as hostItem (hostItem)}
-  <!-- {#if hostItem[0].url} -->
       <HostItem {hostItem} />
-    <!-- {/if} -->
   {/each}
   {#if loader}<loader><div class="lds-circle"><div /></div></loader>{/if}
 </anchores>
@@ -383,6 +394,7 @@
 <!-- <autoloader bind:this={autoloader}>{hh}</autoloader> -->
 <style>
   loader {
+    margin: 0 auto;
     clear: left;
   }
   #search {
@@ -484,8 +496,10 @@
     width: 40px;
     height: 40px;
     margin: 8px;
-    border-radius: 50%;
-    background: #fff;
+    /* border-radius: 50%; */
+    /* background: #fff; */
+    background:center no-repeat url("../assets/icon32.png");
+    background-size: contain;
     animation: lds-circle 2.4s cubic-bezier(0, 0.2, 0.8, 1) infinite;
   }
   @keyframes lds-circle {
