@@ -77,13 +77,13 @@
         //   localStorage.setItem("favicon_localhost", favicon_localhost);
         // }
         const promises = Promise.all([
+            toDataURL("http://www.google.com/s2/favicons?domain=" + host),
+            toDataURL("https://favicon.yandex.net/favicon/" + host),
+        //   toDataURL("chrome://favicon2/?size=16&scale_factor=1x&page_url=" +encodeURIComponent(hostAnchore.url)),
           toDataURL(
             "https://s2.googleusercontent.com/s2/favicons?domain_url=" +
               hostAnchore.url
           ),
-          toDataURL("https://favicon.yandex.net/favicon/" + host),
-          toDataURL("http://www.google.com/s2/favicons?domain=" + host),
-        //   toDataURL("chrome://favicon2/?size=16&scale_factor=1x&page_url=" +encodeURIComponent(hostAnchore.url)),
         ]);
         let datas = await promises;
         console.log(datas);
@@ -111,7 +111,7 @@
   {:else}
     <anchorGroup
       class="hovicon effect-8"
-      use:longhover={2600}
+      use:longhover={3000}
       on:longhover|stopPropagation|preventDefault={tweenAnchores}
       on:contextmenu={() => (unfold = true)}
       class:unfold
@@ -127,10 +127,6 @@
 
 <style lang="scss">
   anchorGroup {
-    /* display: block; */
-    /* position: absolute;
-        // width: 100%;
-        // height: 100%; */
     width: 50px;
     height: 50px;
     display: flex;
@@ -139,25 +135,6 @@
     justify-content: center;
     align-items: baseline;
     flex-direction: row;
-    /* // border: 1px solid rgb(43, 43, 43) !important;
-        // border: 1px solid transparent !important;
-        //     border: 10px solid #141414 !important;
-        //     border-radius: 50%;
-        //     margin: 30px;
-        //     width: 50px;
-        // height: 50px;
-        // display: flex;
-        // flex-wrap: wrap;
-        // align-content: center;
-        // justify-content: center;
-        // align-items: baseline;
-        // flex-direction: row;
-        // border: 8px solid #f5d6ea2b !important;
-        // background-color: #543c7733;
-        // border-radius: 50%;
-        // margin: 30px;
-        // transition: all 1s ease; */
-
     width: 50px;
     height: 50px;
     display: flex;
@@ -180,30 +157,11 @@
   }
 
   .hovicon {
-    /* // display: inline-block;
-        // font-size: 45px;
-        // line-height: 90px; */
     cursor: pointer;
-    /* // margin: 20px;
-        // width: 90px;
-        // height: 90px;
-        // border-radius: 50%;
-        // text-align: center;
-        // position: relative;
-        // text-decoration: none;
-        // z-index: 1;
-        // color: #fff; */
   }
-  /* // .hovicon.auto-width {
-    //     width: auto;
-    //     height: auto;
-    //     padding: 15px;
-    // } */
   .hovicon:after {
     pointer-events: none;
     position: absolute;
-    /* // width: 100%;
-        // height: 100%; */
     width: 50px;
     height: 50px;
     border-radius: 50%;
@@ -213,66 +171,36 @@
     box-sizing: content-box;
   }
   .hovicon:before {
-    /* // speak: none;
-        // font-size: 48px;
-        // line-height: 90px;
-        // font-style: normal;
-        // font-weight: normal;
-        // font-variant: normal;
-        // text-transform: none; */
     display: block;
     -webkit-font-smoothing: antialiased;
   }
   /* Effect 8 */
   .hovicon.effect-8 {
-    /*     background: rgba(255, 255, 255, 0.1); */
-    -webkit-transition: -webkit-transform ease-out 0.1s, background;
-    -moz-transition: -moz-transform ease-out 0.1s, background;
     transition: transform ease-out 0.1s, background;
-    /* transition: transform ease-out 0.1s, background; */
-    /* background-color: #ffffffcf; */
     transition: all ease-out 0.7s;
-    /* background-color: #ffffffcf; */
   }
   .hovicon.effect-8:after {
     top: 0;
     left: 0;
-    /* // padding: 0; */
     z-index: -1;
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
     opacity: 0;
-    -webkit-transform: scale(0.9);
-    -moz-transform: scale(0.9);
-    -ms-transform: scale(0.9);
     transform: scale(0.9);
   }
   .hovicon.effect-8:hover {
-    /*     background: rgba(255, 255, 255, 0.05); */
-    -webkit-transform: scale(0.93);
-    -moz-transform: scale(0.93);
-    -ms-transform: scale(0.93);
     transform: scale(0.93);
-    /*     color: #fff; */
     background-color: #ffffffcf;
     transform: scale(0.93);
     background-color: #ffffffcf;
     transition: all 0.3;
   }
-  /* // .hovicon.effect-8:hover i {
-     //   color: #fff; 
-    // } */
   .hovicon.effect-8:hover:after {
-    /* // -webkit-animation: sonarEffect 1.3s ease-out 1075ms;
-        // -moz-animation: sonarEffect 1.3s ease-out 1075ms;
-        // animation: sonarEffect 0.5s ease-out 1s; */
-    animation: sonarEffect 1.5s cubic-bezier(0, 1.86, 0.93, -0.89) 0.5s;
-    animation-iteration-count: 2;
+    animation: sonarEffect 2.77s cubic-bezier(0, 1.86, 0.93, -0.89) 0.33s;
+    animation-iteration-count: 3;
   }
   .unfold.hovicon.effect-8:hover:after {
-    /* // -webkit-animation: sonarEffect 1.3s ease-out 2075ms reverse ;
-        // -moz-animation: sonarEffect 1.3s ease-out 2075ms reverse ; */
-    animation: sonarEffect 2s ease-in 1s reverse;
-    animation-iteration-count: 1;
+    animation: sonarEffect 0.8s ease-in 1s reverse;
+    animation-iteration-count: 3;
   }
   @keyframes sonarEffect {
     0% {
@@ -290,36 +218,4 @@
       opacity: 0;
     }
   }
-  /* // @-moz-keyframes sonarEffect {
-    //     0% {
-    //         opacity: 0.3;
-    //     }
-    //     40% {
-    //         opacity: 0.5;
-    //         box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1),
-    //             0 0 10px 10px #adadad, 0 0 0 10px rgba(255, 255, 255, 0.5);
-    //     }
-    //     100% {
-    //         box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1),
-    //             0 0 10px 10px #adadad, 0 0 0 10px rgba(255, 255, 255, 0.5);
-    //         -moz-transform: scale(1.5);
-    //         opacity: 0;
-    //     }
-    // }
-    // @keyframes sonarEffect {
-    //     0% {
-    //         opacity: 0.3;
-    //     }
-    //     40% {
-    //         opacity: 0.5;
-    //         box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1),
-    //             0 0 10px 10px #adadad, 0 0 0 10px rgba(255, 255, 255, 0.5);
-    //     }
-    //     100% {
-    //         box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1),
-    //             0 0 10px 10px #adadad, 0 0 0 10px rgba(255, 255, 255, 0.5);
-    //         transform: scale(1.5);
-    //         opacity: 0;
-    //     }
-    // } */
 </style>
