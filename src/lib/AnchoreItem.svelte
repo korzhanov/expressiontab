@@ -25,6 +25,7 @@
   export let lastVisitTime: number = now.getTime();
   export let id: number = 0;
   export let unfold: boolean | null = null;
+  export let childrenInvisible: boolean | null = null;
   export let index: number = 0;
   export let typedCount: number = 0;
   export let parentId: number | null = null;
@@ -103,8 +104,9 @@
   // @todo если нет сохраненного фавикона
   // показать сначала по прямой ссылке
   // в следующий раз можно показать и кэшированный
-  let src: string = "https://s2.googleusercontent.com/s2/favicons?domain_url=" + host;
-  let img_data: string = localStorage.getItem("favicon_" + host) || "";
+  // let src: string = "https://s2.googleusercontent.com/s2/favicons?domain_url=" + host;
+  let src: string = globe;
+  let img_data: string = localStorage.getItem("favicon_" + host) || 'https://favicon.yandex.net/favicon/' + host;
   // @todo написать поиск фавикон по url.path
   // let img_data = persist(writable(""), localStorage(), "favicon_" + host);
 
@@ -177,10 +179,7 @@
 
 {#if !deleted}
   <!-- {@debug url} -->
-  <!-- {@debug weightVisits}
-{@debug maxVisits}
-{@debug visitCount}
-{@debug hostVisitCount} -->
+  <!-- {@debug weightVisits}} -->
   <!-- {#if !new RegExp("^" + ignoreUrl.join("|")).test(url)}
         class:titleVisible -->
   <!-- transition:scale="{{duration: 500, delay: 500, opacity: 0.5, start: 0.5, easing: quintOut}}" -->
@@ -210,6 +209,7 @@
         margin: {weightVisits * 10 + 10}px; 
         "
     class:isBookmark
+    class:invisible={!childrenInvisible}
     on:contextmenu|stopPropagation|preventDefault={() => (multiButton = true)}
     on:mouseleave|stopPropagation|preventDefault={() => (multiButton = false)}
   >
@@ -229,8 +229,7 @@
           start: 0.5,
           easing: quintOut,
         }}
-        style="background-image: url('{src ||
-          'https://favicon.yandex.net/favicon/' + host}');"
+        style="background-image: url('{src}');"
       />
       {#if unfold === false}
         <anchoricon
@@ -291,6 +290,11 @@
 {/if}
 
 <style>
+
+  .invisible{
+    display:none;
+  }
+
   @keyframes width-grow {
     0% {
       width: 0px;
