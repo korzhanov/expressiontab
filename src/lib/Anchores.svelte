@@ -9,8 +9,20 @@
   // import VirtualList from "./VirtualList.svelte";
   import HostItem from "./HostItem.svelte";
   import { filteredListSliced } from "./stores";
+  import { toDataURL } from "./utils";
 
   let searchTerm: string = localStorage.searchTerm || "";
+  let favicon_localhost = localStorage.favicon_localhost;
+
+  (async ()=>{
+  if (!favicon_localhost || favicon_localhost?.lenth==0) {
+          favicon_localhost = await toDataURL(
+            "https://s2.googleusercontent.com/s2/favicons?domain_url=http://localhost"
+          );
+          localStorage.setItem("favicon_localhost", favicon_localhost);
+        }
+  })();
+
 
   let historyList: Array<any> = [],
     bookmarkList: Map<any, any> = new Map(),
@@ -187,7 +199,7 @@
     }
   }
   $: if (titleVisible) {
-    visible = 20;
+    visible = 200;
   } else {
     visible = 300;
   }
