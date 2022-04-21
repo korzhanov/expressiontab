@@ -13,6 +13,7 @@
   import firstbg from "../assets/expression-drops-xfactorial-com-copyright.jpg";
   import Anchores from "../lib/Anchores.svelte";
   import Timer from "../lib/Timer.svelte";
+  import {toDataURL} from "../lib/utils";
   // import chrome from "vite-plugin-chrome-extension";
  
 // const cssmodules = import.meta.glob("./*/*.css");
@@ -51,26 +52,6 @@
   // background.src = imgsrc;
 
  
-  async function toDataURL(urll: string):Promise<any> {
-    return new Promise((resolve) => {
-      var xhr = new XMLHttpRequest();
-      xhr.open("GET", urll, true);
-      xhr.onload = function(e) {
-        var reader = new FileReader();
-        reader.readAsDataURL(xhr.response);
-        reader.onloadend = function() {
-          resolve(reader.result);
-        };
-      };
-      xhr.onerror = function() {
-        resolve(undefined);
-        console.error("** An error occurred during the XMLHttpRequest");
-      };
-      xhr.responseType = "blob";
-      xhr.send();
-    });
-  }
-
   // setTimeout(function() {
   //   $('.image img').css('opacity', '1')
   //   var base = localStorage.getItem('nextImage');

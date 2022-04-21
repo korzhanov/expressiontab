@@ -1,9 +1,11 @@
 <script lang="ts">
   import { setContext, getContext, hasContext, tick } from "svelte";
+  import { children } from "svelte/internal";
   import { fly, scale, slide } from "svelte/transition";
 
   import AnchoreItem from "./AnchoreItem.svelte";
   import { longhover } from "./longhover";
+  import { toDataURL } from "./utils";
   export let hostItem: any;
 //   console.log(hostItem);
   let domain = hostItem[0];
@@ -12,63 +14,48 @@
   let otherAnchores = anchores.slice(1);
   let tweenOtherAnchores: Array<any> = [];
   let unfold = false;
+  let childrenInvisible = false;
+
   let favicon_localhost = localStorage.favicon_localhost;
 
   async function tweenAnchores() {
     unfold = !unfold;
-    if (unfold == true) {
-      console.log("unfold ", unfold);
-      let minLenght: number = otherAnchores.length;
-      if (otherAnchores.length > 100) {
-        minLenght = Math.min(Math.floor(otherAnchores.length / 2), 50);
-        // setTimeout(async function() {
-        //     await tick();
-        console.log("minLenght = " + minLenght);
-        //     tweenOtherAnchores = otherAnchores;
-        //     // tweenOtherAnchores = otherAnchores.slice(minLenght);
-        // }, 500);
-      }
-      for (let i = 0; i < minLenght; i++) {
-        let newItem = otherAnchores[i];
-        setTimeout(async function() {
-          // console.log("newItem");
-          // console.log(newItem);
-          // console.log("i", i);
-          await tick();
-          tweenOtherAnchores[i] = newItem;
-        }, 350);
-        // tweenOtherAnchores[i] = newItem;
-      }
-      if (otherAnchores.length > 100) {
-        // minLenght = Math.min(Math.floor(otherAnchores.length / 2), 75);
-        setTimeout(async function() {
-          await tick();
-          // console.log("minLenght*40 = " + minLenght * 40);
-          tweenOtherAnchores = otherAnchores;
-          // tweenOtherAnchores = otherAnchores.slice(minLenght);
-        }, 350);
-      }
-      console.log("minLengh = " + minLenght);
-    } else {
-      console.log("unfold ", unfold);
-      //  tweenOtherAnchores = [];
-      tweenOtherAnchores = tweenOtherAnchores.slice(
-        0,
-        Math.min(Math.floor(tweenOtherAnchores.length / 3), 100)
-      );
-      for (let j = 0; j < tweenOtherAnchores.length; j++) {
-        setTimeout(async function(j: number) {
-          // console.log(j);
-          // if (tweenOtherAnchores.length > 0)
-          await tick();
-          tweenOtherAnchores.pop();
-          // tweenOtherAnchores.slice(
-          //    tweenOtherAnchores.length - 2, 1
-          // );
-          tweenOtherAnchores = tweenOtherAnchores;
-        }, 300);
-      }
-    }
+    childrenInvisible = !childrenInvisible;
+    // if (unfold == true) { // если выпадает
+    //   let minLenght: number = otherAnchores.length; // минимальная длина массива
+    //   if (otherAnchores.length > 50) { // если больше 50 элементов
+    //     minLenght = Math.min(Math.floor(otherAnchores.length / 2), 50); // минимальная длина массива
+    //   }
+    //   for (let i = 0; i < minLenght; i++) { // проходим по массиву и добавляем в массив твинов
+    //     let newItem = otherAnchores[i];
+    //     // setTimeout(async function() {
+    //       tweenOtherAnchores[i] = newItem;
+    //     // }, 150);
+    //     // tweenOtherAnchores[i] = newItem;
+    //   }
+    //   if (otherAnchores.length > 50) { // если больше 50 элементов
+    //     setTimeout(async function() {
+    //       await tick();
+    //       tweenOtherAnchores = otherAnchores;
+    //     }, 350);
+    //   }
+    //   console.log("minLengh = " + minLenght);
+    // } else {
+    //   console.log("unfold ", unfold);
+    //   tweenOtherAnchores = tweenOtherAnchores.slice(
+    //     0,
+    //     Math.min(Math.floor(tweenOtherAnchores.length / 3), 100)
+    //   );
+    //   for (let j = 0; j < tweenOtherAnchores.length; j++) {
+    //     setTimeout(async function(j: number) {
+    //       tweenOtherAnchores.pop();
+    //       // tweenOtherAnchores.slice(
+    //       //    tweenOtherAnchores.length - 2, 1
+    //       // );
+    //       tweenOtherAnchores = tweenOtherAnchores;
+    //     }, 300);
+    //   }
+    // }
     hostAnchore = hostAnchore;
   }
 
@@ -83,12 +70,12 @@
     setTimeout(async () => {
       let fav = localStorage.getItem("favicon_" + host);
       if (!fav?.length) {
-        if (!favicon_localhost.lenth) {
-          favicon_localhost = await toDataURL(
-            "https://s2.googleusercontent.com/s2/favicons?domain_url=http://localhost"
-          );
-          localStorage.setItem("favicon_localhost", favicon_localhost);
-        }
+        // if (!favicon_localhost || favicon_localhost?.lenth==0) {
+        //   favicon_localhost = await toDataURL(
+        //     "https://s2.googleusercontent.com/s2/favicons?domain_url=http://localhost"
+        //   );
+        //   localStorage.setItem("favicon_localhost", favicon_localhost);
+        // }
         const promises = Promise.all([
           toDataURL(
             "https://s2.googleusercontent.com/s2/favicons?domain_url=" +
@@ -114,45 +101,26 @@
     console.log("No favicon for url: ", hostAnchore, e);
   }
 
-  async function toDataURL(urll: string) {
-    return new Promise((resolve) => {
-      var xhr = new XMLHttpRequest();
-      xhr.open("GET", urll, true);
-      xhr.onload = function(e) {
-        var reader = new FileReader();
-        reader.readAsDataURL(xhr.response);
-        reader.onloadend = function() {
-          resolve(reader.result);
-        };
-      };
-      xhr.onerror = function() {
-        resolve(undefined);
-        console.error("** An error occurred during the XMLHttpRequest");
-      };
-      xhr.responseType = "blob";
-      xhr.send();
-    });
-  }
 </script>
 
 {#if hostItem}
   {#if anchores.length < 3}
     {#each anchores as item (item)}
-      <AnchoreItem {...item} {host} />
+      <AnchoreItem {...item} {host}  childrenInvisible=false />
     {/each}
   {:else}
     <anchorGroup
       class="hovicon effect-8"
-      use:longhover={3000}
+      use:longhover={2600}
       on:longhover|stopPropagation|preventDefault={tweenAnchores}
       on:contextmenu={() => (unfold = true)}
       class:unfold
-      title={tweenOtherAnchores.length}
+      title={otherAnchores.length}
     >
-      <AnchoreItem {...hostAnchore} {host} {unfold} />
+      <AnchoreItem {...hostAnchore} {host} {unfold}  childrenInvisible=true/>
     </anchorGroup>
-    {#each tweenOtherAnchores as item (item)}
-      <AnchoreItem {...item} {host} />
+    {#each otherAnchores as item (item)}
+      <AnchoreItem {...item} {host} {childrenInvisible}/>
     {/each}
   {/if}
 {/if}
