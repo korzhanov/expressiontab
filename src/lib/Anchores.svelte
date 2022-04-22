@@ -11,18 +11,23 @@
   import { filteredListSliced } from "./stores";
   import { toDataURL, ignoreUrl } from "./utils";
 
+  import InfiniteScroll from "svelte-infinite-scroll";
+
+  
+  let page = 0;
+  let size = 200;
+
   let searchTerm: string = localStorage.searchTerm || "";
   let favicon_localhost = localStorage.favicon_localhost;
 
-  (async ()=>{
-  if (!favicon_localhost || favicon_localhost?.lenth==0) {
-          favicon_localhost = await toDataURL(
-            "https://s2.googleusercontent.com/s2/favicons?domain_url=http://localhost"
-          );
-          localStorage.setItem("favicon_localhost", favicon_localhost);
-        }
+  (async () => {
+    if (!favicon_localhost || favicon_localhost?.lenth == 0) {
+      favicon_localhost = await toDataURL(
+        "https://s2.googleusercontent.com/s2/favicons?domain_url=http://localhost"
+      );
+      localStorage.setItem("favicon_localhost", favicon_localhost);
+    }
   })();
-
 
   let historyList: Array<any> = [],
     bookmarkList: Map<any, any> = new Map(),
@@ -42,7 +47,7 @@
 
   async function getBookmarks() {
     //
-    console.log("get bookm searchTerm");
+    console.log("get bookmark searchTerm");
     console.log(searchTerm);
     loader = true;
     // @todo фильтровать по имеющимся анкорам
@@ -87,15 +92,19 @@
       let host = "localhost"; // хост по умолчанию
       // если url начинается на префикс из приведенных в списке ignoreUrl , то удаляем этот элемент из массива
       try {
-        
-      ignoreUrl.forEach((item) => {
-        if (a[i]?.url?.startsWith(item)) {
-          a.splice(i, 1);
-          arr1Length--;
+        let ignore = false;
+        ignoreUrl.map((item) => {
+          if (a[i]?.url?.startsWith(item)) {
+            // a.splice(i, 1);
+            // arr1Length--;
+            ignore = true;
+          }
+        });
+        if (ignore) {
+          continue;
         }
-      });
       } catch (error) {
-        console.log(error);
+        console.error(error);
       }
 
       try {
@@ -108,7 +117,9 @@
           bmitems[0].hostVisitCount =
             bmitems[0].hostVisitCount * 1 + (a[i].visitCount || 1); // увеличиваем количество посещений
           maxVisits = Math.max(maxVisits, bmitems[0].hostVisitCount); // получаем максимальное количество посещений
-          bookmarkList.set(host, [...bmitems, a[i]]); // добавляем в карту анкоров
+          bmitems.push(a[i]); // добавляем в массив анкоров для хоста
+          bookmarkList.set(host, bmitems); // добавляем в карту анкоров
+          // bookmarkList.set(host, [...bmitems, a[i]]); // добавляем в карту анкоров
         } else {
           // если хоста нет в карте
           a[i].hostVisitCount = a[i].visitCount || 1; // присваиваем количество посещений
@@ -116,47 +127,32 @@
         }
       } catch (e) {
         // если не удалось получить хост
-        console.log(e);
+        console.error(e);
         console.log("Link without host: ", a[i].url, a[i].title);
       }
     }
     loader = false; // закончили загрузку
     bookmarkListSize = bookmarkList.size; // получаем длину карты анкоров
-    console.log("bookmarkList ready"); // выводим сообщение о готовности карты анкоров
-    // console.log(bookmarkList);
+    // console.log("bookmarkList ready"); // выводим сообщение о готовности карты анкоров
     localStorage.maxVisits = maxVisits + ""; // сохраняем максимальное количество посещений
-    loadmore(true); // отправляем в рендер данные о карте анкоров
-    // console.log("a",a);
-      // console.log("b",b);
-      // console.log("c",c);
-      // c.sort((c1: any, c2: any) => {
-      //    return c1.url - c2.url;
-      // });
-      // historyList = a;
-      // bookmarkList = b;
-      // maxVisits = maxVisits;
-      // setContext('maxVisits', maxVisits);
-      // bookmarkList = a;
-
-      // return bookmarkList;
-    // });
+    // loadmore(true); // отправляем в рендер данные о карте анкоров
+    filteredListSliced.set(Array.from(bookmarkList)); // получаем массив анкоров из карты анкоров
+   
   }
 
   // let val='';
   let timer: any;
 
   // const debounce = v => {
-    // 	clearTimeout(timer);
-    // 	timer = setTimeout(() => {
-    // 		val = v;
-    // 	}, 750);
+  // 	clearTimeout(timer);
+  // 	timer = setTimeout(() => {
+  // 		val = v;
+  // 	}, 750);
   // }
 
   $: {
-    console.log("new timer");
-    filteredListSliced.set([]);
     localStorage.searchTerm = searchTerm; // сохраняем поисковый запрос в локальное хранилище
-    console.log("searchTerm save");
+    filteredListSliced.set([]);
     clearTimeout(timer); // очищаем таймер
     timer = setTimeout(() => {
       // запускаем таймер
@@ -166,97 +162,101 @@
 
   async function loadmore(force: boolean = false) {
     // загружаем закладки
-    let pixel_offset: number = 200;
-    console.log(
-      "window.scrollY + window.innerHeight, document.body.scrollHeight - pixel_offset"
-    );
-    console.log(
-      window.scrollY + window.innerHeight,
-      document.body.scrollHeight - pixel_offset
-    );
-    if (
-      force || // если принудительно загружаем
-      // если приближаемся к концу страницы
-      (window.scrollY + window.innerHeight >=
-        Math.max(0, document.body.scrollHeight - pixel_offset) &&
-        bookmarkListSize > 0) || // если есть карта анкоров
-      visible != bookmarkList.size
-    ) {
-      // если карта анкоров изменилась
-      console.log("loadmore render"); // выводим сообщение о загрузке закладок
-      loader = true;
-      // показывать закладки по мере прокрутки до конца страницы
-      // let bookmarkListArray = Array.from(bookmarkList.values()); // получаем массив анкоров из карты анкоров
-      let nowvisible = Math.ceil((hh * ww) / 50 / 50); // получаем примерное количество видимых анкоров
-      console.log("nowvisible", nowvisible);
-      let start = visible; // начальное значение видимых анкоров
-      let end = Math.min(visible + nowvisible, bookmarkListSize); // конечное значение видимых анкоров
-      visible = end; // присваиваем количество видимых анкоров
-      console.log("visible", visible);
-      console.log("start, end", start, end);
-      try {
-        // await tick();
-        if (visible ) { filteredListSliced.set(Array.from(bookmarkList).slice(0, end)); // получаем массив анкоров из карты анкоров
-        console.log($filteredListSliced);
-        } else filteredListSliced.set([]);
-        // let incrementVisible = 100;
-        // visible = Math.abs(
-        //   Math.min(nowvisible + incrementVisible, bookmarkList.size)
-        // );
-        // filteredListSliced = Array.from(bookmarkList).slice(0, visible);
-        // await tick();
-      } catch (e) {
-        console.log("error of render");
-        console.log(e);
-      }
-        loader = false;
-    }
+    // let pixel_offset: number = 500;
+    // console.log(
+    //   "windowY + window.innerHeight, document.body.scrollHeight - pixel_offset"
+    // );
+    // console.log(
+    //   windowY + window.innerHeight,
+    //   document.body.scrollHeight - pixel_offset
+    // );
+
+    // if (
+    //   force || // если принудительно загружаем
+    //   // если приближаемся к концу страницы
+    //   (windowHeight + windowY >=
+    //     document.documentElement.scrollHeight - pixel_offset && // или приближаемся к концу страницы
+    //   bookmarkListSize > 0 && // если есть карта анкоров
+    //     visible != bookmarkList.size)
+    // ) {
+    //   // если карта анкоров изменилась
+    //   console.log("loadmore render"); // выводим сообщение о загрузке закладок
+    //   loader = true;
+    //   // показывать закладки по мере прокрутки до конца страницы
+    //   // let bookmarkListArray = Array.from(bookmarkList.values()); // получаем массив анкоров из карты анкоров
+    //   // let nowvisible = Math.ceil((hh * ww) / 50 / 50); // получаем примерное количество видимых анкоров
+    //   // console.log("nowvisible", nowvisible);
+    //   let start = visible; // начальное значение видимых анкоров
+    //   let end = Math.min(visible + 400, bookmarkListSize); // конечное значение видимых анкоров
+    //   visible = end; // присваиваем количество видимых анкоров
+    //   console.log("visible", visible);
+    //   console.log("start, end", start, end);
+    //   try {
+    //     const startTime = performance.now();
+
+    //     // await tick();
+    //     if (visible) {
+    //       // filteredListSliced.set(Array.from(bookmarkList).slice(0, end)); // получаем массив анкоров из карты анкоров
+    //       // filteredListSliced.set(Array.from(bookmarkList).slice(0, end)); // получаем массив анкоров из карты анкоров
+    //       filteredListSliced.set(Array.from(bookmarkList)); // получаем массив анкоров из карты анкоров
+    //     } else filteredListSliced.set([]);
+    //     // let incrementVisible = 100;
+    //     // visible = Math.abs(
+    //     //   Math.min(nowvisible + incrementVisible, bookmarkList.size)
+    //     // );
+    //     // filteredListSliced = Array.from(bookmarkList).slice(0, visible);
+    //     // await tick();
+
+    //     const duration = performance.now() - startTime;
+    //     console.log(`filteredListSliced.set took ${duration}ms`);
+    //   } catch (e) {
+    //     console.log("error of render");
+    //     console.log(e);
+    //   }
+    //   loader = false;
+    //   scrolling = false;
+    // }
   }
+
   $: if (titleVisible) {
     visible = 200;
   } else {
     visible = 300;
   }
 
-  // let key;
-  // let keyCode;
-
-  // function handleKeyup(event: any) {
-    //   console.log(event.target);
-    //   // if (event.target.tagName !== "BODY"){
-    //   //   return false;
-    //   // }
-    //   key = event.key;
-    //   keyCode = event.keyCode;
-    //   console.log(keyCode);
-    //   switch (true) {
-    //     case keyCode == 8:
-    //       // backspace
-    //       if (searchTerm.length > 0) {
-    //         searchTerm = searchTerm.slice(0, -1);
-    //       }
-    //       break;
-    //     case keyCode == 46:
-    //       // delete
-    //       searchTerm = "";
-    //       break;
-    //     case key.length == 1:
-    //       searchTerm = searchTerm + key;
-    //       break;
-    //   }
-  // }
-
   onMount(() => {
-    loadmore(true);
+    // loadmore(true);
   });
 
   onDestroy(() => {
     // localStorage.setItem("maxVisits", "0");
   });
+
+  // let scrolling = false;
+  // // при прокрутке окна
+  // function onScroll() {
+  //   console.log("scrolling");
+  //   if (
+  //     !scrolling &&
+  //     windowHeight + windowY >= document.documentElement.scrollHeight - 500
+  //   ) {
+  //     loader = true;
+  //     scrolling = true;
+  //     console.log("scrolled to bottom");
+  //     loadmore();
+  //   }
+  // }
+
+  let hostItems: Array<any> = [];
+
+  $: hostItems = [
+    ...hostItems,
+    ...$filteredListSliced.splice(size * page, size * (page + 1) - 1)
+  ];
 </script>
 
 <!-- 
-  on:scroll={()=>loadmore(false)}
+  on:scroll={() => onScroll()}
   on:keyup={handleKeyup}-->
 <svelte:window
   bind:scrollY={windowY}
@@ -265,7 +265,13 @@
 />
 <!-- <p>showing items {start}-{end}:{visible}</p> -->
 <filterBar class="text-white">
-  <input class="text-white" type="search" id="search" bind:value={searchTerm} title="Press Esc or Del to clear" />
+  <input
+    class="text-white"
+    type="search"
+    id="search"
+    bind:value={searchTerm}
+    title="Press Esc or Del to clear"
+  />
   <Keydown
     pauseOnInput
     on:Backspace={() => {
@@ -280,7 +286,6 @@
       searchTerm = "";
     }}
     on:key={(e) => {
-      console.log(e);
       if (e.detail.length == 1) searchTerm = searchTerm + e.detail;
     }}
   />
@@ -385,9 +390,11 @@
   </span>
 </filterBar>
 <anchores bind:clientHeight={hh} bind:clientWidth={ww} class:titleVisible>
-  {#each $filteredListSliced as hostItem (hostItem)}
-      <HostItem {hostItem} />
+  <!-- {#each $filteredListSliced as hostItem (hostItem)} -->
+  {#each hostItems as hostItem (hostItem)}
+    <HostItem {hostItem} />
   {/each}
+  <InfiniteScroll window={true} threshold={1000} on:loadMore={() => page++} />
   {#if loader}<loader><div class="lds-circle"><div /></div></loader>{/if}
 </anchores>
 
@@ -498,7 +505,7 @@
     margin: 8px;
     /* border-radius: 50%; */
     /* background: #fff; */
-    background:center no-repeat url("../assets/icon32.png");
+    background: center no-repeat url("../assets/icon32.png");
     background-size: contain;
     animation: lds-circle 2.4s cubic-bezier(0, 0.2, 0.8, 1) infinite;
   }

@@ -49,8 +49,8 @@
     tmping.searchParams.append("utm_network", "ExpressionTab_ChromeExtension");
     ping = tmping.href;
   } catch (e) {
-    console.log(url);
-    console.log(e);
+    console.error(url);
+    console.error(e);
   }
   export let host = "localhost";
   // try {

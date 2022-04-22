@@ -2180,6 +2180,11 @@
   "resolved" "https://registry.npmjs.org/svelte-hmr/-/svelte-hmr-0.14.11.tgz"
   "version" "0.14.11"
 
+"svelte-infinite-scroll@^2.0.1":
+  "integrity" "sha512-goTHCfOHRDCs8C5MeSuIc6LlAQ8zVQ+M4Y3LyvrDjx5rqSSxSrdCuQwIyWYNcO6j6/mnqRro3QB64ClBzfn+Wg=="
+  "resolved" "https://registry.npmjs.org/svelte-infinite-scroll/-/svelte-infinite-scroll-2.0.1.tgz"
+  "version" "2.0.1"
+
 "svelte-keydown@^0.5.0":
   "integrity" "sha512-DgY6AYlKbBocSvjC3kUeNPcStJQOTOCxAGG9ymVHzJdsQ1hRJuB8pcnB4UFH8uH3bAPdYyXXa3LwenLDL41eqQ=="
   "resolved" "https://registry.npmjs.org/svelte-keydown/-/svelte-keydown-0.5.0.tgz"
@@ -2207,7 +2212,12 @@
   "resolved" "https://registry.npmjs.org/svelte-tiny-virtual-list/-/svelte-tiny-virtual-list-2.0.3.tgz"
   "version" "2.0.3"
 
-"svelte@^3.0", "svelte@^3.23.0", "svelte@^3.24.0", "svelte@^3.42.1", "svelte@^3.44.0", "svelte@>=3.19.0":
+"svelte-virtual-scroll-list@^1.0.8":
+  "integrity" "sha512-4DundEQCJzRPGPOMdx48BJvq70gRHH4qn/IxggmGKhWGY9U/11pxd9u0n/iY8iLq26XjBtQSAy4xZM9r3Tlq9Q=="
+  "resolved" "https://registry.npmjs.org/svelte-virtual-scroll-list/-/svelte-virtual-scroll-list-1.0.8.tgz"
+  "version" "1.0.8"
+
+"svelte@^3.0", "svelte@^3.0.0", "svelte@^3.23.0", "svelte@^3.24.0", "svelte@^3.42.1", "svelte@^3.44.0", "svelte@>=3.19.0":
   "integrity" "sha512-4JaJp3HEoTCGARRWZQIZDUanhYv0iyoHikklVHVLH9xFE9db22g4TDv7CPeNA8HD1JgjXI1vlhR1JZvvhaTu2Q=="
   "resolved" "https://registry.npmjs.org/svelte/-/svelte-3.47.0.tgz"
   "version" "3.47.0"

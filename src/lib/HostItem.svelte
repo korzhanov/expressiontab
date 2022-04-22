@@ -7,7 +7,6 @@
   import { longhover } from "./longhover";
   import { toDataURL } from "./utils";
   export let hostItem: any;
-//   console.log(hostItem);
   let domain = hostItem[0];
   let anchores = hostItem[1] || [];
   let hostAnchore = anchores[0] || [];
@@ -86,7 +85,6 @@
           ),
         ]);
         let datas = await promises;
-        console.log(datas);
         // перебираем все полученные иконки
         datas.forEach((data: any) => {
           if (data && data.length && data !== favicon_localhost) {
@@ -94,7 +92,6 @@
           }
         });
         if (fav) localStorage.setItem("favicon_" + host, fav);
-        console.log("new favicon saved from ", host);
       }
     }, 10000);
   } catch (e) {
