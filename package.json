@@ -55,8 +55,6 @@
   "dependencies": {
     "@macfja/svelte-persistent-store": "^1.1.1",
     "svelte-hero-icons": "^2.2.0",
-    "svelte-infinite-scroll": "^2.0.1",
-    "svelte-keydown": "^0.5.0",
-    "svelte-tiny-virtual-list": "^2.0.0"
+    "svelte-keydown": "^0.5.0"
   }
 }
