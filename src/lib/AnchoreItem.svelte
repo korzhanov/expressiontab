@@ -9,39 +9,33 @@
     Globe,
   } from "svelte-hero-icons";
   import globe from "../assets/Globe.svg";
-
-  // import {
-  //     persist,
-  //     indexedDBStorage
-  //     // ,localStorage
-  // } from "@macfja/svelte-persistent-store";
-  // import { writable } from "svelte/store";
-  // import TailwindCSS from "./TailwindCSS.svelte";
   import { fly, scale, slide } from "svelte/transition";
   import { quintOut } from "svelte/easing";
+
+  export let anchor: any = {};
   let now = new Date();
-  export let dateAdded: number = now.getTime();
-  let dateGroupModified: number = now.getTime();
-  export let lastVisitTime: number = now.getTime();
-  export let id: number = 0;
+  // let dateAdded: number = anchor.dateAdded || now.getTime();
+  // let dateGroupModified: number = anchor.dateGroupModified || now.getTime();
+  // let lastVisitTime: number = anchor.lastVisitTime || now.getTime();
+  let id: number = anchor.id || 0;
   export let unfold: boolean | null = null;
   export let childrenInvisible: boolean | null = null;
-  export let index: number = 0;
-  export let typedCount: number = 0;
-  export let parentId: number | null = null;
-  // export let isBookmark: boolean = !!parentId;
-  export let isBookmark: boolean = false;
-  export let title: string = "";
-  export let url: string = "";
-  export let visitCount: number = 1;
-  export let hostVisitCount: any = 0;
+  let index: number = anchor.index || 0;
+  let typedCount: number = anchor.typedCount || 0;
+  let parentId: number | null = anchor.parentId || null;
+  let isBookmark: boolean = anchor.isBookmark || false;
+  let title: string = anchor.title || "";
+  let url: string = anchor.url || "";
+  let visitCount: number = anchor.visitCount || 1;
+  let hostVisitCount: any = anchor.hostVisitCount || 0;
   let multiButton: boolean = false;
   let deleted: boolean = false;
   let maxVisits: number = localStorage?.maxVisits * 1 || 500;
 
-  let weightVisits: number = Math.log10(
-    Math.max(unfold ? visitCount : hostVisitCount, visitCount) * 1
-  );
+  export let weightVisits: number =
+    // anchor.weightVisits ||
+    Math.log10(Math.max(unfold ? visitCount : hostVisitCount, visitCount) * 1);
+  let weightVisitsRadius: any = anchor.weightVisitsRadius || 50;
 
   let ping = "";
   try {
@@ -64,7 +58,9 @@
   // в следующий раз можно показать и кэшированный
   // let src: string = "https://s2.googleusercontent.com/s2/favicons?domain_url=" + host;
   let src: string = globe;
-  let img_data: string = localStorage.getItem("favicon_" + host) || 'https://favicon.yandex.net/favicon/' + host;
+  let img_data: string =
+    localStorage.getItem("favicon_" + host) ||
+    "https://favicon.yandex.net/favicon/" + host;
   // @todo написать поиск фавикон по url.path
 
   if (img_data.length > 0) {
@@ -82,7 +78,7 @@
   // Чтобы получить значок для URL-адреса, используйте:
   // https://s2.googleusercontent.com/s2/favicons?domain_url=https://www.stackoverflow.com
   // chrome://favicon2/?size=16&scale_factor=1x&page_url=https%3A%2F%2Fdocs.google.com%2Fforms%2Fd%2Fe%2F1FAIpQLSckRt0pts60MaYbNv73y5tiIMjLsfpuEdHwrsFXr9v6Bi21fg%2Fviewform&allow_google_server_fallback=0
- 
+
   async function copyToBuffer(e: Event, copyText: string) {
     e.preventDefault();
     document.addEventListener(
@@ -226,19 +222,17 @@
         >
           <Icon src={Duplicate} solid size="22" />
         </button>
-        <button title="Delete"
-      on:click={()=>deleteAnchore()}>
-        <Icon src={Trash} solid size="22" />
-      </button>
+        <button title="Delete" on:click={() => deleteAnchore()}>
+          <Icon src={Trash} solid size="22" />
+        </button>
       </div>
     {/if}
   </anchor>
 {/if}
 
 <style lang="scss">
-
-  .invisible{
-    display:none;
+  .invisible {
+    display: none;
   }
 
   @keyframes width-grow {
@@ -283,7 +277,8 @@
     position: relative;
     padding-right: 0px;
     box-sizing: border-box;
-    animation: -global-width-grow-anchor 1s cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
+    animation: -global-width-grow-anchor 1s
+      cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
     transition: all 0.6s ease;
   }
   anchor bgcircle {
@@ -304,15 +299,15 @@
   }
 
   // $percent: 1%;
-// @for $i from 1 through 20 {
+  // @for $i from 1 through 20 {
   // :global(* bgcircle:nth-of-type(#{$i}) ) {
   bgcircle {
-     animation: pulseEffect infinite;
-     animation-duration: 10s;
-     transition-delay: 10s;
-     animation-delay: 10s;
-   }
-// }
+    animation: pulseEffect infinite;
+    animation-duration: 10s;
+    transition-delay: 10s;
+    animation-delay: 10s;
+  }
+  // }
 
   anchor.isBookmark {
     background-color: #484848;
@@ -445,7 +440,7 @@
     overflow: hidden;
     opacity: 0;
   }
-  
+
   @keyframes -global-width-grow-anchor {
     0% {
       width: 50px;

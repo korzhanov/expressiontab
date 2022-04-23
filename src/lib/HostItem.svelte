@@ -7,10 +7,10 @@
   import { longhover } from "./longhover";
   import { toDataURL } from "./utils";
   export let hostItem: any;
-  let domain = hostItem[0];
-  let anchores = hostItem[1] || [];
+  let anchores = hostItem || [];
   let hostAnchore = anchores[0] || [];
-  let otherAnchores = anchores.slice(1);
+//   let domain = new URL(anchores[0].url).host.split(":")[0]  ;
+  let otherAnchores = anchores[1]?anchores.slice(1):[];
   let tweenOtherAnchores: Array<any> = [];
   let unfold = false;
   let childrenInvisible = false;
@@ -103,7 +103,7 @@
 {#if hostItem}
   {#if anchores.length < 3}
     {#each anchores as item (item)}
-      <AnchoreItem {...item} {host}  childrenInvisible=false />
+      <AnchoreItem anchor={item} {host} childrenInvisible=false />
     {/each}
   {:else}
     <anchorGroup
@@ -114,10 +114,10 @@
       class:unfold
       title={otherAnchores.length}
     >
-      <AnchoreItem {...hostAnchore} {host} {unfold}  childrenInvisible=true/>
+      <AnchoreItem anchor={hostAnchore} {host} {unfold} childrenInvisible={true}/>
     </anchorGroup>
     {#each otherAnchores as item (item)}
-      <AnchoreItem {...item} {host} {childrenInvisible}/>
+      <AnchoreItem anchor={item} {host} {childrenInvisible}/>
     {/each}
   {/if}
 {/if}
