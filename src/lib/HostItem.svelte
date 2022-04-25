@@ -6,6 +6,9 @@
   import AnchoreItem from "./AnchoreItem.svelte";
   import { longhover } from "./longhover";
   import { toDataURL } from "./utils";
+  import { filteredListSliced } from "./stores";
+
+  export let key: any;
   export let hostItem: any;
   let anchores = hostItem || [];
   let hostAnchore = anchores[0] || [];
@@ -20,6 +23,11 @@
   async function tweenAnchores() {
     unfold = !unfold;
     childrenInvisible = !childrenInvisible;
+    // let changedHost = $filteredListSliced[key];
+    // filteredListSliced.update((value)=>{
+    //   value[key] = changedHost;
+    //   return value;
+    // });
     // if (unfold == true) { // если выпадает
     //   let minLenght: number = otherAnchores.length; // минимальная длина массива
     //   if (otherAnchores.length > 50) { // если больше 50 элементов
@@ -65,7 +73,8 @@
   // setContext('maxVisits', maxVisits);
   let host: string = "localhost";
   try {
-    host = new URL(hostAnchore.url).host.split(":")[0];
+    // host = new URL(hostAnchore.url).host.split(":")[0];
+    host = hostAnchore.host;
     setTimeout(async () => {
       let fav = localStorage.getItem("favicon_" + host);
       if (!fav?.length) {
@@ -148,6 +157,7 @@
     transition: all 1s ease;
   }
   anchorGroup:hover {
+
     transition: all 1s ease;
     /* // border: 1px dashed rgb(58, 42, 42) !important; */
     border: 20px solid #1d1d1df2 !important;
@@ -173,10 +183,12 @@
   }
   /* Effect 8 */
   .hovicon.effect-8 {
+    will-change: transform, opacity;
     transition: transform ease-out 0.1s, background;
     transition: all ease-out 0.7s;
   }
   .hovicon.effect-8:after {
+    will-change: transform, opacity;
     top: 0;
     left: 0;
     z-index: -1;
@@ -185,17 +197,18 @@
     transform: scale(0.9);
   }
   .hovicon.effect-8:hover {
-    transform: scale(0.93);
-    background-color: #ffffffcf;
+    will-change: transform;
     transform: scale(0.93);
     background-color: #ffffffcf;
     transition: all 0.3;
   }
   .hovicon.effect-8:hover:after {
+    will-change: transform;
     animation: sonarEffect 2.77s cubic-bezier(0, 1.86, 0.93, -0.89) 0.33s;
     animation-iteration-count: 3;
   }
   .unfold.hovicon.effect-8:hover:after {
+    will-change: transform;
     animation: sonarEffect 0.8s ease-in 1s reverse;
     animation-iteration-count: 3;
   }
