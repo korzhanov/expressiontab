@@ -153,54 +153,66 @@
         console.log("Link without host: ", c.url, c.title);
       }
     }
+    await makechanks();
+    // console.log("chankList",chankList);
+    loader = false; // закончили загрузку
+    bookmarkListSize = bookmarkList.size; // получаем длину карты анкоров
+    localStorage.maxVisits = maxVisits + ""; // сохраняем максимальное количество посещений
+    // loadmore(true); // отправляем в рендер данные о карте анкоров
+  }
+
+  // разбиваем на чанки
+
+  async function makechanks() {
+    loader = true; // начали рендер
+
     // разбиваем bookmarkList на чанки по длине окна и радиусу анкоров
     let chankList: Array<any> = [];
 
       let ik = 1;
+
     bookmarkList.forEach((value, key, map) => {
       const last = chankList[chankList.length - 1];
       // let value = bookmarkList.get(key);
       // console.log("last");
-      // console.log(last);
       // console.log("key",key);
       // console.log("value");
       // console.log(value);
+      console.log("last.width,last.width+130,windowWidth");
+      console.log(last?.width, last?.width + 130, windowWidth - 50);
       if (
         !last ||
-        last.width + value[0].weightVisitsRadius * 2 >= windowWidth
+        // last.width + value[0].weightVisitsRadius * 2 >= windowWidth
+        last.width + 130 >= windowWidth - 100
       ) {
-        chankList.push(
-          {
+        chankList.push({
             key: ik,
             value: [value],
-            width: value[0].weightVisitsRadius * 2,
-          },
-        );
+          // width: value[0].weightVisitsRadius * 2,
+          width: 130,
+        });
       // console.log("value[0].weightVisitsRadius * 2",value[0].weightVisitsRadius * 2);
       // console.log("last.width",last.width);
       // console.log("last",last);
+        console.log("newline");
       } else {
         last.value.push(value);
-        last.width = last.width*1 + value[0].weightVisitsRadius * 2;
+        // last.width = last.width * 1 + value[0].weightVisitsRadius * 2;
+        last.width = last.width * 1 + 130;
       // console.log("value[0].weightVisitsRadius * 2",value[0].weightVisitsRadius * 2);
       // console.log("last.width",last.width);
       // console.log("last",last);
-
+        console.log("add last");
       }
+      console.log(last);
       ik++;
+      console.log("chankList", chankList);
     });
-    // console.log("chankList",chankList);
-    loader = false; // закончили загрузку
-    bookmarkListSize = bookmarkList.size; // получаем длину карты анкоров
-    // console.log("bookmarkList ready"); // выводим сообщение о готовности карты анкоров
-    localStorage.maxVisits = maxVisits + ""; // сохраняем максимальное количество посещений
-    // loadmore(true); // отправляем в рендер данные о карте анкоров
-    // filteredListSliced.set(Array.from(bookmarkList)); // получаем массив анкоров из карты анкоров
     filteredListSliced.set(chankList); // получаем массив анкоров из карты анкоров
-    // console.log("bookmarkList");
-    // console.log(bookmarkList);
-    // console.log("filteredListSliced");
-    // console.log($filteredListSliced);
+    // console.log("chankList", JSON.stringify(chankList));
+    loader = false; // закончили загрузку
+
+    // filteredListSliced.set(Array.from(bookmarkList)); // получаем массив анкоров из карты анкоров
   }
 
   // let val='';
