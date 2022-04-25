@@ -241,14 +241,9 @@
 
   onDestroy(() => {
     // localStorage.setItem("maxVisits", "0");
+    filteredListSliced.set($filteredListSliced.slice(0,200));
+    console.log("destroy anchores");
   });
-
-  // let hostItems: Array<any> = [];
-
-  // $: hostItems = [
-  //   ...hostItems,
-  //   ...$filteredListSliced.splice(size * page, size * (page + 1) - 1),
-  // ];
 </script>
 
 <!-- 
