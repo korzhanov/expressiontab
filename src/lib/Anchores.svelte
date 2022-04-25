@@ -14,6 +14,8 @@
   import { filteredListSliced } from "./stores";
   import { toDataURL, ignoreUrl } from "./utils";
 
+  let online = true;
+  let persistloading = true;
   let page = 0;
   let size = 200;
 
@@ -253,6 +255,7 @@
   bind:scrollY={windowY}
   bind:innerHeight={windowHeight}
   bind:innerWidth={windowWidth}
+  bind:online
 />
 <!-- <p>showing items {start}-{end}:{visible}</p> -->
 <!-- <filterBar class="text-white">
