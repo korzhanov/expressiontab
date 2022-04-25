@@ -49,7 +49,7 @@
 
   async function getBookmarks() {
     //
-    console.log("get bookmark searchTerm",searchTerm);
+    console.log("get bookmark searchTerm", searchTerm);
     loader = true;
     // @todo фильтровать по имеющимся анкорам
     // @todo догружать по мере поиска по истории
@@ -69,21 +69,13 @@
           }
         );
       }),
-      chrome.bookmarks.search(searchTerm || "http"), // получаем массив закладок по запросу или по всем ссылкообразным закладкам если нет запроса
+      chrome.bookmarks.search(searchTerm || "h"), // получаем массив закладок по запросу или по всем ссылкообразным закладкам если нет запроса
     ]);
     const s = await promise; // получаем массив из двух объектов
     let a: any = s[0]; // первый объект истории
     let b: any = s[1]; // второй объект закладок
     let arr1Length = a.length; // длина массива истории
     let arr2Length = b.length; // длина массива закладок
-    // a.length = arr1Length + arr2Length;
-    // // записываем массив закладок b в конец массива истории a
-    // for (let i = 0; i < arr2Length; i++) {
-    //   a[arr1Length + i] = b[i];
-    //   a[arr1Length + i].isBookmark = true; // добавляем поле обозначающее что это закладка
-    // }
-    // // b = []; // очищаем массив закладок
-    // arr1Length = a.length; // получаем длину массива после добавления анкоров
     bookmarkList = new Map(); // очищаем карту анкоров
     let maxVisits: number = 1; // максимальное количество посещений
     // оптимизировать проход по массивам, совместить вычисления в один проход по длине массива
@@ -99,7 +91,6 @@
       if (!c.url) {
         continue;
       }
-
       let host = "localhost"; // хост по умолчанию
       // если url начинается на префикс из приведенных в списке ignoreUrl , то удаляем этот элемент из массива
       try {
@@ -130,10 +121,14 @@
           bmitems[0].hostVisitCount =
             bmitems[0].hostVisitCount * 1 + (c.visitCount || 1); // увеличиваем количество посещений хоста
           maxVisits = Math.max(maxVisits, bmitems[0].hostVisitCount); // получаем максимальное количество посещений
-          c.weightVisits = Math.log10(Math.max(c.visitCount||1,c.hostVisitCount||1)); // получаем вес посещений
+          c.weightVisits = Math.log10(
+            Math.max(c.visitCount || 1, c.hostVisitCount || 1)
+          ); // получаем вес посещений
           c.weightVisitsRadius = c.weightVisits * 10 + 10 + 50; // получаем примерный радиус анкора в зависимисти от веса посещений
-          bmitems[0].weightVisits = bmitems[0].weightVisits * 1 + c.weightVisits; // увеличиваем вес посещений хоста
-          bmitems[0].weightVisitsRadius = bmitems[0].weightVisits * 10 + 10 + 50; // увеличиваем вес посещений хоста
+          bmitems[0].weightVisits =
+            bmitems[0].weightVisits * 1 + c.weightVisits; // увеличиваем вес посещений хоста
+          bmitems[0].weightVisitsRadius =
+            bmitems[0].weightVisits * 10 + 10 + 50; // увеличиваем вес посещений хоста
           // console.log("bmitems[0].weightVisits",bmitems[0].weightVisits);
 
           bmitems.push(c); // добавляем в массив анкоров для хоста
@@ -145,7 +140,7 @@
           c.hostVisitCount = c.visitCount || 1; // присваиваем количество посещений
           c.weightVisits = Math.log10(c.hostVisitCount); // получаем вес посещений
           // console.log("c.weightVisits",c.weightVisits);
-          
+
           c.weightVisitsRadius = c.weightVisits * 10 + 10 + 50; // получаем примерный радиус анкора в зависимисти от веса посещений
           bookmarkList.set(host, [c]); // добавляем в карту анкоров
         }
@@ -171,7 +166,7 @@
     // разбиваем bookmarkList на чанки по длине окна и радиусу анкоров
     let chankList: Array<any> = [];
 
-      let ik = 1;
+    let ik = 1;
 
     bookmarkList.forEach((value, key, map) => {
       const last = chankList[chankList.length - 1];
@@ -188,22 +183,22 @@
         last.width + 130 >= windowWidth - 100
       ) {
         chankList.push({
-            key: ik,
-            value: [value],
+          key: ik,
+          value: [value],
           // width: value[0].weightVisitsRadius * 2,
           width: 130,
         });
-      // console.log("value[0].weightVisitsRadius * 2",value[0].weightVisitsRadius * 2);
-      // console.log("last.width",last.width);
-      // console.log("last",last);
+        // console.log("value[0].weightVisitsRadius * 2",value[0].weightVisitsRadius * 2);
+        // console.log("last.width",last.width);
+        // console.log("last",last);
         console.log("newline");
       } else {
         last.value.push(value);
         // last.width = last.width * 1 + value[0].weightVisitsRadius * 2;
         last.width = last.width * 1 + 130;
-      // console.log("value[0].weightVisitsRadius * 2",value[0].weightVisitsRadius * 2);
-      // console.log("last.width",last.width);
-      // console.log("last",last);
+        // console.log("value[0].weightVisitsRadius * 2",value[0].weightVisitsRadius * 2);
+        // console.log("last.width",last.width);
+        // console.log("last",last);
         console.log("add last");
       }
       console.log(last);
@@ -228,12 +223,12 @@
       timeout = 3000;
     }
       console.log("searchTerm", searchTerm);
-    localStorage.searchTerm = searchTerm; // сохраняем поисковый запрос в локальное хранилище
+      localStorage.searchTerm = searchTerm; // сохраняем поисковый запрос в локальное хранилище
       // filteredListSliced.set([]);
-    clearTimeout(timer); // очищаем таймер
-    timer = setTimeout(() => {
-      // запускаем таймер
-      getBookmarks(); // запускаем загрузку анкоров
+      clearTimeout(timer); // очищаем таймер
+      timer = setTimeout(() => {
+        // запускаем таймер
+        getBookmarks(); // запускаем загрузку анкоров
       }, timeout); // задержка в мс перед загрузкой анкоров
   }
 
@@ -258,7 +253,7 @@
   bind:online
 />
 <!-- <p>showing items {start}-{end}:{visible}</p> -->
-<!-- <filterBar class="text-white">
+<filterBar class="text-white">
   <input
     class="text-white"
     type="search"
@@ -379,7 +374,7 @@
       ? "s"
       : ""}
   </span>
-</filterBar> -->
+</filterBar>
 <anchores bind:clientHeight={hh} bind:clientWidth={ww} class:titleVisible>
   <!-- {#each $filteredListSliced as hostItem (hostItem)} -->
   <!-- {#each hostItems as hostItem (hostItem)} -->
@@ -388,7 +383,7 @@
   <VirtualScroll let:data data={$filteredListSliced} key="key" pageMode={true}
   topThreshold={5}
   bottomThreshold={5}
-            >
+  >
    
     <div class="itemWrapper">
       <HostItems {...data} /></div>
@@ -462,11 +457,7 @@
    } */
   anchores {
     display: block;
-    /* display: flex;
-    flex-wrap: wrap;
-    flex-direction: row;
-    align-content: flex-end;
-    align-items: center; */
+    /*  */
     position: relative;
     width: 96%;
     padding: 2%;
@@ -536,40 +527,6 @@
     }
   }
 
-  /* // :global(anchor) { */
-  /* float: left; */
-  /* border-radius: 50%; */
-  /* max-width: 300px; */
-  /* clear: both; */
-  /* padding: 2%; */
-  /* display: inline-flex; */
-  /* justify-content: center; */
-  /* align-items: center; */
-  /* background-color: #fff9;
-        background-color: rgba(255, 255, 255, 0.5); */
-  /* -webkit-backdrop-filter: blur(10px);
-        backdrop-filter: blur(10px); */
-  /* background-position: center center;
-        background-repeat: no-repeat;
-        background-size: cover;
-        transition: all 0.3s ease; */
-  /* background-color: #fff; */
-  /* width: 50px;
-      height: 50px;
-      border-radius: 50px;
-      margin: 2px;
-      background-color: rgb(31, 30, 30, 0.65);
-      border: 10px solid transparent;
-      text-overflow: ellipsis;
-      display: block;
-      position: relative;
-      padding-right: 0px;
-      box-sizing: border-box;
-      animation: -global-width-grow-anchor 1s
-      cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
-      transition: all 0.3s ease; */
-  /* overflow: hidden; */
-  /* // } */
   .titleVisible {
     flex-direction: row;
     flex-wrap: wrap;
