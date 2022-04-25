@@ -536,9 +536,16 @@
     content: "";
     background: linear-gradient(0deg, rgba(20, 20, 20, 0), rgba(20, 20, 20, 1));
   }
-  /* anchores > div {
+  anchores .itemWrapper {
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: row;
+    align-content: flex-end;
+    align-items: center;
     width: 100%;
-  } */
+    min-height: 70px;
+    justify-content: center;
+  }
 
   .lds-circle {
     display: inline-block;
