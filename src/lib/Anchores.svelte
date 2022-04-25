@@ -217,83 +217,22 @@
 
   // let val='';
   let timer: any;
+  $: newSearch(searchTerm);
 
-  // const debounce = v => {
-  // 	clearTimeout(timer);
-  // 	timer = setTimeout(() => {
-  // 		val = v;
-  // 	}, 750);
-  // }
-
-  $: {
+  async function newSearch(searchTerm: string) {
+    let timeout = 1050;
+    if (!persistloading) {
+      persistloading = false;
+      timeout = 3000;
+    }
+      console.log("searchTerm", searchTerm);
     localStorage.searchTerm = searchTerm; // сохраняем поисковый запрос в локальное хранилище
-    filteredListSliced.set([]);
+      // filteredListSliced.set([]);
     clearTimeout(timer); // очищаем таймер
     timer = setTimeout(() => {
       // запускаем таймер
       getBookmarks(); // запускаем загрузку анкоров
-    }, 1050); // задержка в мс перед загрузкой анкоров
-  }
-
-  async function loadmore(force: boolean = false) {
-    // загружаем закладки
-    // let pixel_offset: number = 500;
-    // console.log(
-    //   "windowY + window.innerHeight, document.body.scrollHeight - pixel_offset"
-    // );
-    // console.log(
-    //   windowY + window.innerHeight,
-    //   document.body.scrollHeight - pixel_offset
-    // );
-    // if (
-    //   force || // если принудительно загружаем
-    //   // если приближаемся к концу страницы
-    //   (windowHeight + windowY >=
-    //     document.documentElement.scrollHeight - pixel_offset && // или приближаемся к концу страницы
-    //   bookmarkListSize > 0 && // если есть карта анкоров
-    //     visible != bookmarkList.size)
-    // ) {
-    //   // если карта анкоров изменилась
-    //   console.log("loadmore render"); // выводим сообщение о загрузке закладок
-    //   loader = true;
-    //   // показывать закладки по мере прокрутки до конца страницы
-    //   // let bookmarkListArray = Array.from(bookmarkList.values()); // получаем массив анкоров из карты анкоров
-    //   // let nowvisible = Math.ceil((hh * ww) / 50 / 50); // получаем примерное количество видимых анкоров
-    //   // console.log("nowvisible", nowvisible);
-    //   let start = visible; // начальное значение видимых анкоров
-    //   let end = Math.min(visible + 400, bookmarkListSize); // конечное значение видимых анкоров
-    //   visible = end; // присваиваем количество видимых анкоров
-    //   console.log("visible", visible);
-    //   console.log("start, end", start, end);
-    //   try {
-    //     const startTime = performance.now();
-    //     // await tick();
-    //     if (visible) {
-    //       // filteredListSliced.set(Array.from(bookmarkList).slice(0, end)); // получаем массив анкоров из карты анкоров
-    //       // filteredListSliced.set(Array.from(bookmarkList).slice(0, end)); // получаем массив анкоров из карты анкоров
-    //       filteredListSliced.set(Array.from(bookmarkList)); // получаем массив анкоров из карты анкоров
-    //     } else filteredListSliced.set([]);
-    //     // let incrementVisible = 100;
-    //     // visible = Math.abs(
-    //     //   Math.min(nowvisible + incrementVisible, bookmarkList.size)
-    //     // );
-    //     // filteredListSliced = Array.from(bookmarkList).slice(0, visible);
-    //     // await tick();
-    //     const duration = performance.now() - startTime;
-    //     console.log(`filteredListSliced.set took ${duration}ms`);
-    //   } catch (e) {
-    //     console.log("error of render");
-    //     console.log(e);
-    //   }
-    //   loader = false;
-    //   scrolling = false;
-    // }
-  }
-
-  $: if (titleVisible) {
-    visible = 200;
-  } else {
-    visible = 300;
+      }, timeout); // задержка в мс перед загрузкой анкоров
   }
 
   onMount(() => {
