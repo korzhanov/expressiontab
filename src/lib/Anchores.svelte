@@ -127,9 +127,8 @@
         if (bookmarkList.has(host)) {
           // если хост уже есть в карте
           let bmitems = bookmarkList.get(host); // получаем массив анкоров для хоста
-          bmitems[0].hostVisitCount =
-            bmitems[0].hostVisitCount * 1 + (c.visitCount || 1); // увеличиваем количество посещений хоста
-          maxVisits = Math.max(maxVisits, bmitems[0].hostVisitCount); // получаем максимальное количество посещений
+          bmitems.hostVisitCount = (bmitems.hostVisitCount ? bmitems.hostVisitCount * 1 : 1) + (c.visitCount || 1); // увеличиваем количество посещений хоста
+          maxVisits = Math.max(maxVisits, bmitems.hostVisitCount); // получаем максимальное количество посещений
           c.weightVisits = Math.log10(
             Math.max(c.visitCount || 1, c.hostVisitCount || 1)
           ); // получаем вес посещений
