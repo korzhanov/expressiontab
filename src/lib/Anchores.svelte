@@ -69,6 +69,7 @@
   }
 
   async function getBookmarks() {
+    const startTime = performance.now();
 
     //
     console.log("get bookmark searchTerm", searchTerm);
@@ -163,12 +164,12 @@
     loader = false; // закончили загрузку
     bookmarkListSize = bookmarkList.size; // получаем длину карты анкоров
     localStorage.maxVisits = maxVisits + ""; // сохраняем максимальное количество посещений
-    // loadmore(true); // отправляем в рендер данные о карте анкоров
+    console.log(`getBookmarks took ${performance.now() - startTime}ms`);
   }
 
   // разбиваем на чанки
 
-  async function makechanks() {
+    const startTime = performance.now();
     loader = true; // начали рендер
 
     // разбиваем bookmarkList на чанки по длине окна и радиусу анкоров
@@ -218,6 +219,7 @@
     loader = false; // закончили загрузку
 
     // filteredListSliced.set(Array.from(bookmarkList)); // получаем массив анкоров из карты анкоров
+    console.log(`makechanks took ${performance.now() - startTime}ms`);
   }
 
   // let val='';
