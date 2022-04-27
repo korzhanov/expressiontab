@@ -6,14 +6,17 @@
   import AnchoreItem from "./AnchoreItem.svelte";
   import { longhover } from "./longhover";
   import { toDataURL } from "./utils";
-  import { filteredListSliced } from "./stores";
+  import { filteredListSliced, nodesList } from "./stores";
 
   export let key: any;
   export let hostItem: any;
-  let anchores = hostItem || [];
-  let hostAnchore = anchores[0] || [];
-//   let domain = new URL(anchores[0].url).host.split(":")[0]  ;
-  let otherAnchores = anchores[1]?anchores.slice(1):[];
+  let anchores = hostItem.nodes || [];
+  // console.log("anchores",anchores);
+  // console.log("hostitem $nodesList",$nodesList);
+  let hostAnchore = $nodesList[anchores[0]] || [];
+  //   let domain = new URL(anchores[0].url).host.split(":")[0]  ;
+  let otherAnchores = anchores[1] ? anchores.slice(1) : [];
+  // console.log("otherAnchores",otherAnchores);
   let tweenOtherAnchores: Array<any> = [];
   let unfold = false;
   let childrenInvisible = false;
@@ -76,9 +79,10 @@
 </script>
 
 {#if hostItem}
-  {#if anchores.length < 3}
+  {#if anchores.length < 2}
     {#each anchores as item (item)}
-      <AnchoreItem anchor={item} {host} childrenInvisible=false />
+      <!-- <AnchoreItem anchor={$nodesList[item]} {host} childrenInvisible={false} /> -->
+      <AnchoreItem index={item}  childrenInvisible={false} />
     {/each}
   {:else}
     <anchorGroup
@@ -89,11 +93,29 @@
       class:unfold
       title={otherAnchores.length}
     >
-      <AnchoreItem anchor={hostAnchore} {host} {unfold} childrenInvisible={true}/>
+      <!-- <AnchoreItem
+        anchor={hostAnchore}
+        {host}
+        {unfold}
+        childrenInvisible={true}
+      /> -->
+      <AnchoreItem
+        index={anchores[0]}
+        {unfold}
+        childrenInvisible={true}
+      />
     </anchorGroup>
-    {#each otherAnchores as item (item)}
+    {#if unfold}
+      <!-- <div class="otherAnchores"> -->
+      {#each otherAnchores as item (item)}
+        <!-- <AnchoreItem anchor={$nodesList[item]} {host} {childrenInvisible} /> -->
+        <AnchoreItem index={item}  {childrenInvisible} />
+      {/each}
+      <!-- </div> -->
+    {/if}
+    <!-- {#each otherAnchores as item (item)}
       <AnchoreItem anchor={item} {host} {childrenInvisible}/>
-    {/each}
+    {/each} -->
   {/if}
 {/if}
 
@@ -123,7 +145,6 @@
     transition: all 1s ease;
   }
   anchorGroup:hover {
-
     transition: all 1s ease;
     /* // border: 1px dashed rgb(58, 42, 42) !important; */
     border: 20px solid #1d1d1df2 !important;

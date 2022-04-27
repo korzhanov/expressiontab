@@ -11,8 +11,15 @@
   import globe from "../assets/Globe.svg";
   import { fly, scale, slide } from "svelte/transition";
   import { quintOut } from "svelte/easing";
+  import { filteredListSliced, nodesList } from "./stores";
 
-  export let anchor: any = {};
+  export let index: number = 0;
+  console.log("index", index);
+  // let index: number = anchor.index || 0;
+  export let anchor: any = $nodesList[index] || {};
+  // console.log("$nodesList", $nodesList);
+  // console.log("$nodesList[index]", $nodesList[index]);
+  // console.log("anchor", anchor);
   let now = new Date();
   // let dateAdded: number = anchor.dateAdded || now.getTime();
   // let dateGroupModified: number = anchor.dateGroupModified || now.getTime();
@@ -46,7 +53,8 @@
     console.error(url);
     console.error(e);
   }
-  export let host = "localhost";
+  export let host = "";
+  host = host || anchor.host || "localhost";
   // try {
   //     host = new URL(url).host.split(":")[0] || "localhost";
   // } catch (e) {
