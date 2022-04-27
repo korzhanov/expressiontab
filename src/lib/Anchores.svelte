@@ -11,7 +11,7 @@
   import VirtualScroll from "svelte-virtual-scroll-list";
   import HostItem from "./HostItem.svelte";
   import HostItems from "./HostItems.svelte";
-  import { filteredListSliced } from "./stores";
+  import { filteredListSliced, nodesList } from "./stores";
   import { toDataURL, ignoreUrl } from "./utils";
 
   let online = true;
