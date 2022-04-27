@@ -27,7 +27,6 @@
   let id: number = anchor.id || 0;
   export let unfold: boolean | null = null;
   export let childrenInvisible: boolean | null = null;
-  let index: number = anchor.index || 0;
   let typedCount: number = anchor.typedCount || 0;
   let parentId: number | null = anchor.parentId || null;
   let isBookmark: boolean = anchor.isBookmark || false;
@@ -157,23 +156,23 @@
   -->
   <!-- -->
   <anchor
-    {title} style:margin="{weightVisits * 10 + 10}px;" 
+    {title}
+    style:margin="{weightVisits * 10 + 10}px;"
     class:isBookmark
     class:invisible={!childrenInvisible}
     on:contextmenu|stopPropagation|preventDefault={() => (multiButton = true)}
     on:mouseleave|stopPropagation|preventDefault={() => (multiButton = false)}
   >
     <bgcircle
-    style="
-    transform: scale({(weightVisits * 1 + 1).toFixed(2)});
+      style="
+    transform: translateZ(0) scale({(weightVisits * 1 + 1).toFixed(2)});
     background-image: url('{src}');
 "
     />
     <!-- style="background-image: url('{src}');" -->
     <slot />
     <a {ping} href={url}>
-
-<!-- 
+      <!-- 
         transition:scale={{
           duration: 500,
           delay: 50,
@@ -182,9 +181,7 @@
           easing: quintOut,
         }} -->
 
-      <anchoricon
-        style:background-image="url('{src}')"
-      />
+      <anchoricon style:background-image="url('{src}')" />
       <!-- style="background-image: url('{src}');" -->
       {#if unfold === false}
         <anchoricon
@@ -198,7 +195,7 @@
           in:fly={{ x: 55, duration: 300 }}
           out:fly={{ x: 50, duration: 350 }}
           style:background-image="url('{src}')"
-          style="transform: scale(0.56) translate(51px, -18px);"
+          style="transform:  translateZ(0) scale(0.56) translate(51px, -18px);"
         />
       {/if}
 
@@ -206,11 +203,11 @@
         <strong>{title}</strong> | {isBookmark ? "⭐" : visitCount + " visits"}
       </span>
     </a>
-    {#if multiButton}    
+    {#if multiButton}
+        <!-- in:fly={{ x: 5, duration: 300 }}
+        out:fly={{ x: 5, duration: 300 }} -->
       <div
         class:multiButton
-        in:fly={{ x: 5, duration: 300 }}
-        out:fly={{ x: 5, duration: 300 }}
         on:mouseenter|stopPropagation|preventDefault={() => {}}
       >
         <button
@@ -260,19 +257,20 @@
     height: 18px;
     width: 18px;
     margin: 6px;
-    transform: scale(1.2);
+    transform: translateZ(0) scale(1.2);
     background-repeat: no-repeat;
     background-position: center;
     border-radius: 2px;
     background-image: url("../assets/Globe.svg");
     background-size: contain;
+    box-sizing: border-box;
     filter: drop-shadow(3px 1px 4px rgba(20, 20, 20, 0.52));
   }
   anchoricon.subicon {
     position: absolute;
     z-index: -1;
     opacity: 0.2;
-    transform: scale(0.9) translate(16px, -8px);
+    transform: translateZ(0) scale(0.9) translate(16px, -8px);
     border-radius: 4px;
   }
 
@@ -307,6 +305,7 @@
     top: 0;
     z-index: -1;
     filter: brightness(1) contrast(1) saturate(1.3) blur(5px);
+    transform: translateZ(0);
     box-shadow: 5px 5px 10px #222;
     // animation: pulseEffect 3s both infinite;
     // }
@@ -315,7 +314,7 @@
     // @for $i from 1 through 20 {
     // :global(* bgcircle:nth-of-type(#{$i}) ) {
     // bgcircle {
-    will-change: transform,filter,opacity;
+    will-change: transform, filter, opacity;
     // animation: pulseEffect infinite;
     // animation-duration: 10s;
     // transition-delay: 10s;
@@ -355,69 +354,75 @@
     border-radius: 100%;
     background: var(--background);
     color: var(--text);
-    transform: translate(-50%, -50%);
+    transform: translateZ(0) translate(-50%, -50%);
     cursor: pointer;
+    // transition: 0.25s cubic-bezier(0.25, 0, 0, 1) 1.5s;
     transition: left, top 0.25s cubic-bezier(0.25, 0, 0, 1) 1.5s;
     box-shadow: 0 0 0rem -0.25rem var(--background);
+    &:hover {
+      background: var(--text);
+      color: var(--background);
+      box-shadow: 0 0 1rem -0.25rem var(--background);
+      z-index: 1000;
+    }
+    &:first-child:nth-last-child(1),
+    &:first-child:nth-last-child(1) ~ * {
+      //If there is 1 child
+      &:nth-child(1) {
+        left: 25%;
+        top: 25%;
+      }
+    }
+    &:first-child:nth-last-child(2),
+    &:first-child:nth-last-child(2) ~ * {
+      //If there are 2 children
+      &:nth-child(1) {
+        left: 37.5%;
+        top: 18.75%;
+      }
+      &:nth-child(2) {
+        left: 18.75%;
+        top: 37.5%;
+      }
+    }
+    &:first-child:nth-last-child(3),
+    &:first-child:nth-last-child(3) ~ * {
+      //If there are 3 children
+      &:nth-child(1) {
+        left: 50%;
+        top: 15.625%;
+      }
+      &:nth-child(2) {
+        left: 25%;
+        top: 25%;
+      }
+      &:nth-child(3) {
+        left: 15.625%;
+        top: 50%;
+      }
+    }
+    &:first-child:nth-last-child(4), //If there are 4 children, if first child is also 4th item from bottom get self, and
+                &:first-child:nth-last-child(4) ~ * {
+      //If there are 4 children, if first child is also 4th item from bottom get siblings
+      &:nth-child(1) {
+        left: 62.5%;
+        top: 18.75%;
+      }
+      &:nth-child(2) {
+        left: 37.5%;
+        top: 18.75%;
+      }
+      &:nth-child(3) {
+        left: 18.75%;
+        top: 37.5%;
+      }
+      &:nth-child(4) {
+        left: 18.75%;
+        top: 62.5%;
+      }
+    }
   }
-  .multiButton button:hover {
-    background: var(--text);
-    color: var(--background);
-    box-shadow: 0 0 1rem -0.25rem var(--background);
-  }
-  .multiButton button.isBookmark {
-    background-color: #f90;
-  }
-  .multiButton button:first-child:nth-last-child(1):nth-child(1),
-  .multiButton button:first-child:nth-last-child(1) ~ *:nth-child(1) {
-    left: 25%;
-    top: 25%;
-  }
-  .multiButton button:first-child:nth-last-child(2):nth-child(1),
-  .multiButton button:first-child:nth-last-child(2) ~ *:nth-child(1) {
-    left: 37.5%;
-    top: 18.75%;
-  }
-  .multiButton button:first-child:nth-last-child(2):nth-child(2),
-  .multiButton button:first-child:nth-last-child(2) ~ *:nth-child(2) {
-    left: 18.75%;
-    top: 37.5%;
-  }
-  .multiButton button:first-child:nth-last-child(3):nth-child(1),
-  .multiButton button:first-child:nth-last-child(3) ~ *:nth-child(1) {
-    left: 50%;
-    top: 15.625%;
-  }
-  .multiButton button:first-child:nth-last-child(3):nth-child(2),
-  .multiButton button:first-child:nth-last-child(3) ~ *:nth-child(2) {
-    left: 25%;
-    top: 25%;
-  }
-  .multiButton button:first-child:nth-last-child(3):nth-child(3),
-  .multiButton button:first-child:nth-last-child(3) ~ *:nth-child(3) {
-    left: 15.625%;
-    top: 50%;
-  }
-  .multiButton button:first-child:nth-last-child(4):nth-child(1),
-  .multiButton button:first-child:nth-last-child(4) ~ *:nth-child(1) {
-    left: 62.5%;
-    top: 18.75%;
-  }
-  .multiButton button:first-child:nth-last-child(4):nth-child(2),
-  .multiButton button:first-child:nth-last-child(4) ~ *:nth-child(2) {
-    left: 37.5%;
-    top: 18.75%;
-  }
-  .multiButton button:first-child:nth-last-child(4):nth-child(3),
-  .multiButton button:first-child:nth-last-child(4) ~ *:nth-child(3) {
-    left: 18.75%;
-    top: 37.5%;
-  }
-  .multiButton button:first-child:nth-last-child(4):nth-child(4),
-  .multiButton button:first-child:nth-last-child(4) ~ *:nth-child(4) {
-    left: 18.75%;
-    top: 62.5%;
-  }
+
   anchor:hover .multiButton,
   .multiButton:focus-within {
     z-index: 100;
