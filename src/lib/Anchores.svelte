@@ -132,14 +132,14 @@
           c.weightVisits = Math.log10(
             Math.max(c.visitCount || 1, c.hostVisitCount || 1)
           ); // получаем вес посещений
-          c.weightVisitsRadius = c.weightVisits * 10 + 10 + 50; // получаем примерный радиус анкора в зависимисти от веса посещений
-          bmitems[0].weightVisits =
-            bmitems[0].weightVisits * 1 + c.weightVisits; // увеличиваем вес посещений хоста
-          bmitems[0].weightVisitsRadius =
-            bmitems[0].weightVisits * 10 + 10 + 50; // увеличиваем вес посещений хоста
-          // console.log("bmitems[0].weightVisits",bmitems[0].weightVisits);
-
-          bmitems.push(c); // добавляем в массив анкоров для хоста
+          // c.weightVisitsRadius = c.weightVisits * 10 + 10 + 50; // получаем примерный радиус анкора в зависимисти от веса посещений
+          bmitems.weightVisits = bmitems.weightVisits
+            ? bmitems.weightVisits * 1
+            : 1 + c.weightVisits; // увеличиваем вес посещений хоста
+          bmitems.weightVisitsRadius =
+            Math.ceil(bmitems.weightVisits * 10) + 10 + 50; // получаем примерный радиус анкора в зависимисти от веса посещений
+          // bmitems.push(c); // добавляем в массив анкоров для хоста
+          bmitems.nodes.push(newNodesList.length); // добавляем в массив анкоров для хоста
           bookmarkList.set(host, bmitems); // добавляем в карту анкоров
           // bookmarkList.set(host, [...bmitems, c]); // добавляем в карту анкоров
         } else {
@@ -148,10 +148,11 @@
           c.hostVisitCount = c.visitCount || 1; // присваиваем количество посещений
           c.weightVisits = Math.log10(c.hostVisitCount); // получаем вес посещений
           // console.log("c.weightVisits",c.weightVisits);
-
-          c.weightVisitsRadius = c.weightVisits * 10 + 10 + 50; // получаем примерный радиус анкора в зависимисти от веса посещений
-          bookmarkList.set(host, [c]); // добавляем в карту анкоров
+          c.weightVisitsRadius = Math.ceil(c.weightVisits * 10) + 10 + 50; // получаем примерный радиус анкора в зависимисти от веса посещений
+          // bookmarkList.set(host, [c]); // добавляем в карту анкоров
+          bookmarkList.set(host, { nodes: [newNodesList.length] }); // добавляем в карту анкоров
         }
+        newNodesList.push(c);
       } catch (e) {
         // если не удалось получить хост
         console.error(e);
