@@ -222,6 +222,35 @@
     console.log(`makechanks took ${performance.now() - startTime}ms`);
   }
 
+  async function storeFavicon(url: string) {
+    try {
+      let host = new URL(url).host.split(":")[0];
+      setTimeout(async () => {
+        let fav = localStorage.getItem("favicon_" + host);
+        if (!fav?.length) {
+          const promises = Promise.all([
+            toDataURL("http://www.google.com/s2/favicons?domain=" + host),
+            toDataURL("https://favicon.yandex.net/favicon/" + host),
+            //   toDataURL("chrome://favicon2/?size=16&scale_factor=1x&page_url=" +encodeURIComponent(hostAnchore.url)),
+            toDataURL(
+              "https://s2.googleusercontent.com/s2/favicons?domain_url=" + url
+            ),
+          ]);
+          let datas = await promises;
+          // перебираем все полученные иконки
+          datas.forEach((data: any) => {
+            if (data && data.length && data !== favicon_localhost) {
+              fav = data;
+            }
+          });
+          if (fav) localStorage.setItem("favicon_" + host, fav);
+        }
+      }, 10000);
+    } catch (e) {
+      console.log("No favicon for url: ", e);
+    }
+  }
+
   // let val='';
   let timer: any;
   $: newSearch(searchTerm);

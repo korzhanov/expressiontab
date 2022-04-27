@@ -71,41 +71,7 @@
   // 	maxVisits = Math.max(getContext('maxVisits'), maxVisits);
   // }
   // setContext('maxVisits', maxVisits);
-  let host: string = "localhost";
-  try {
-    // host = new URL(hostAnchore.url).host.split(":")[0];
-    host = hostAnchore.host;
-    setTimeout(async () => {
-      let fav = localStorage.getItem("favicon_" + host);
-      if (!fav?.length) {
-        // if (!favicon_localhost || favicon_localhost?.lenth==0) {
-        //   favicon_localhost = await toDataURL(
-        //     "https://s2.googleusercontent.com/s2/favicons?domain_url=http://localhost"
-        //   );
-        //   localStorage.setItem("favicon_localhost", favicon_localhost);
-        // }
-        const promises = Promise.all([
-            toDataURL("http://www.google.com/s2/favicons?domain=" + host),
-            toDataURL("https://favicon.yandex.net/favicon/" + host),
-        //   toDataURL("chrome://favicon2/?size=16&scale_factor=1x&page_url=" +encodeURIComponent(hostAnchore.url)),
-          toDataURL(
-            "https://s2.googleusercontent.com/s2/favicons?domain_url=" +
-              hostAnchore.url
-          ),
-        ]);
-        let datas = await promises;
-        // перебираем все полученные иконки
-        datas.forEach((data: any) => {
-          if (data && data.length && data !== favicon_localhost) {
-            fav = data;
-          }
-        });
-        if (fav) localStorage.setItem("favicon_" + host, fav);
-      }
-    }, 10000);
-  } catch (e) {
-    console.log("No favicon for url: ", hostAnchore, e);
-  }
+
 
 </script>
 
