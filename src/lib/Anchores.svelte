@@ -143,7 +143,7 @@
           bookmarkList.set(host, bmitems); // добавляем в карту анкоров
           // bookmarkList.set(host, [...bmitems, c]); // добавляем в карту анкоров
         } else {
-          // если хоста нет в карте
+          // если хоста нет в карте         
           // console.log("c",c);
           c.hostVisitCount = c.visitCount || 1; // присваиваем количество посещений
           c.weightVisits = Math.log10(c.hostVisitCount); // получаем вес посещений
@@ -164,7 +164,6 @@
     // console.log("bookmarkList", bookmarkList);
     // console.log("nodesList",$nodesList);
     await makechanks();
-    // console.log("chankList",chankList);
     loader = false; // закончили загрузку
     bookmarkListSize = bookmarkList.size; // получаем длину карты анкоров
     localStorage.maxVisits = maxVisits + ""; // сохраняем максимальное количество посещений
@@ -206,10 +205,8 @@
       ik++;
     });
     filteredListSliced.set(chankList); // получаем массив анкоров из карты анкоров
-    // console.log("chankList", JSON.stringify(chankList));
     loader = false; // закончили загрузку
 
-    // filteredListSliced.set(Array.from(bookmarkList)); // получаем массив анкоров из карты анкоров
     console.log(`makechanks took ${performance.now() - startTime}ms`);
   }
 
@@ -252,14 +249,14 @@
       persistloading = false;
       timeout = 3000;
     }
-      console.log("searchTerm", searchTerm);
-      localStorage.searchTerm = searchTerm; // сохраняем поисковый запрос в локальное хранилище
-      // filteredListSliced.set([]);
-      clearTimeout(timer); // очищаем таймер
-      timer = setTimeout(() => {
-        // запускаем таймер
-        getBookmarks(); // запускаем загрузку анкоров
-      }, timeout); // задержка в мс перед загрузкой анкоров
+    console.log("searchTerm", searchTerm);
+    localStorage.searchTerm = searchTerm; // сохраняем поисковый запрос в локальное хранилище
+    // filteredListSliced.set([]);
+    clearTimeout(timer); // очищаем таймер
+    timer = setTimeout(() => {
+      // запускаем таймер
+      getBookmarks(); // запускаем загрузку анкоров
+    }, timeout); // задержка в мс перед загрузкой анкоров
   }
 
   onMount(() => {
@@ -268,7 +265,7 @@
 
   onDestroy(() => {
     // localStorage.setItem("maxVisits", "0");
-    filteredListSliced.set($filteredListSliced.slice(0,200));
+    filteredListSliced.set($filteredListSliced.slice(0, 200));
     console.log("destroy anchores");
   });
 </script>
@@ -410,14 +407,17 @@
   <!-- {#each hostItems as hostItem (hostItem)} -->
   <!-- <HostItem {hostItem} /> -->
   <!-- {/each} -->
-  <VirtualScroll let:data data={$filteredListSliced} key="key" pageMode={true}
-  topThreshold={5}
-  bottomThreshold={5}
+  <VirtualScroll
+    let:data
+    data={$filteredListSliced}
+    key="key"
+    pageMode={true}
+    topThreshold={5}
+    bottomThreshold={5}
   >
-   
     <div class="itemWrapper">
-      <HostItems {...data} /></div>
-   
+      <HostItems {...data} />
+    </div>
   </VirtualScroll>
   <!-- <InfiniteScroll window={true} threshold={1000} on:loadMore={() => page++} /> -->
   {#if loader}<loader><div class="lds-circle"><div /></div></loader>{/if}
@@ -487,33 +487,37 @@
    } */
   anchores {
     display: block;
+    box-sizing: border-box;
     /*  */
     position: relative;
-    width: 96%;
-    padding: 2%;
+    width: 100%;
+    /* margin: 20px; */
+    padding: 20px;
     height: auto;
     /* min-height: 500px; */
-    padding-top: 10px;
+    padding-top: 20px;
     z-index: 1;
     /* bottom: 0;
       left: 0; */
     /* margin-bottom: 40px; */
     background: rgb(20, 20, 20);
-    justify-content: flex-start;
+    transform: translateZ(0px);
+    /* justify-content: flex-start; */
 
     /* min-height: 700px; */
     /* display: grid;
       grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
       gap: 5px; */
   }
-  anchores:after {
+  /* anchores:after {
     height: 100px;
     display: block;
     position: absolute;
     left: 0;
     content: "";
     background: linear-gradient(0deg, rgba(20, 20, 20, 0), rgba(20, 20, 20, 1));
-  }
+
+  } */
   anchores .itemWrapper {
     display: flex;
     flex-wrap: wrap;
@@ -521,8 +525,10 @@
     align-content: flex-end;
     align-items: center;
     width: 100%;
-    min-height: 70px;
+    height: 150px;
     justify-content: center;
+    box-sizing: border-box;
+    transform: translateZ(0px);
   }
 
   .lds-circle {
