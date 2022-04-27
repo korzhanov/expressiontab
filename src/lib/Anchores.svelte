@@ -47,13 +47,8 @@
     windowWidth: number = 0,
     autoloader: any;
 
-  async function getBookmarks() {
-    //
-    console.log("get bookmark searchTerm", searchTerm);
-    loader = true;
-    // @todo фильтровать по имеющимся анкорам
-    // @todo догружать по мере поиска по истории
-    const promise = Promise.all([
+  async function getNodes(searchTerm: string): Promise<any> {
+    return Promise.all([
       // получаем историю посещений
       new Promise((resolve) => {
         chrome.history.search(
@@ -71,11 +66,17 @@
       }),
       chrome.bookmarks.search(searchTerm || "h"), // получаем массив закладок по запросу или по всем ссылкообразным закладкам если нет запроса
     ]);
-    const s = await promise; // получаем массив из двух объектов
-    let a: any = s[0]; // первый объект истории
-    let b: any = s[1]; // второй объект закладок
-    let arr1Length = a.length; // длина массива истории
-    let arr2Length = b.length; // длина массива закладок
+  }
+
+  async function getBookmarks() {
+
+    //
+    console.log("get bookmark searchTerm", searchTerm);
+    loader = true;
+    // @todo фильтровать по имеющимся анкорам
+    // @todo догружать по мере поиска по истории
+
+    const s = await getNodes(searchTerm); // получаем массив из двух объектов
     bookmarkList = new Map(); // очищаем карту анкоров
     let maxVisits: number = 1; // максимальное количество посещений
     // оптимизировать проход по массивам, совместить вычисления в один проход по длине массива
