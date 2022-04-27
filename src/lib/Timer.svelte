@@ -72,10 +72,13 @@
   }
   time-display {
     display: flex;
+    left: 0;
+    top: 0;
     justify-content: center;
-    font-weight: 300;
+    /* font-weight: 300; */
     color: #fff;
     font-size: 12vw;
+    /* transform: translateZ(0px); */
   }
   time-display,
   time-display p {
@@ -84,15 +87,15 @@
     /* transition: all 0.3s ease; */
     text-shadow: 0 0 50px #0000009d;
   }
-  time-display p:hover {
+  /* time-display p:hover { */
     /* transform: scale(1.03); */
-    transition: all 0.3s ease;
+    /* transition: all 0.3s ease; */
     /* text-shadow: 0 0 50px #0000009d; */
-  }
+  /* } */
   time-display p span {
     width: 1.5em;
     display: inline-block;
-    transition: all 0.3s ease;
+    transition: transition 0.3s ease;
   }
   /* // .toggle-pomodoro {
     //     display: flex;
