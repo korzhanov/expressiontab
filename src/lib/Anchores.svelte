@@ -173,50 +173,37 @@
 
   // разбиваем на чанки
 
+  async function makechanks(newNodesList) {
     const startTime = performance.now();
+    newNodesList = newNodesList || $nodesList;
     loader = true; // начали рендер
-
     // разбиваем bookmarkList на чанки по длине окна и радиусу анкоров
     let chankList: Array<any> = [];
-
     let ik = 1;
-
     bookmarkList.forEach((value, key, map) => {
       const last = chankList[chankList.length - 1];
-      // let value = bookmarkList.get(key);
-      // console.log("last");
-      // console.log("key",key);
-      // console.log("value");
-      // console.log(value);
-      console.log("last.width,last.width+130,windowWidth");
-      console.log(last?.width, last?.width + 130, windowWidth - 50);
+      let itemWidth =
+        value.weightVisitsRadius * 2 ||
+        newNodesList[value.nodes[0]].weightVisitsRadius * 2 ||
+        150;
+      // console.log("itemWidth",itemWidth);
       if (
-        !last ||
-        // last.width + value[0].weightVisitsRadius * 2 >= windowWidth
-        last.width + 130 >= windowWidth - 100
+        last &&
+        last.width + itemWidth <= windowWidth - 50
+        // last.width + 150 >= windowWidth - 100
       ) {
-        chankList.push({
-          key: ik,
-          value: [value],
-          // width: value[0].weightVisitsRadius * 2,
-          width: 130,
-        });
-        // console.log("value[0].weightVisitsRadius * 2",value[0].weightVisitsRadius * 2);
-        // console.log("last.width",last.width);
-        // console.log("last",last);
-        console.log("newline");
-      } else {
         last.value.push(value);
-        // last.width = last.width * 1 + value[0].weightVisitsRadius * 2;
-        last.width = last.width * 1 + 130;
-        // console.log("value[0].weightVisitsRadius * 2",value[0].weightVisitsRadius * 2);
-        // console.log("last.width",last.width);
-        // console.log("last",last);
-        console.log("add last");
+        last.width = last.width + itemWidth;
+      } else {
+        let newItem = {
+          key: ik,
+          value: [],
+          width: itemWidth,
+        };
+        newItem.value.push(value);
+        chankList.push(newItem);
       }
-      console.log(last);
       ik++;
-      console.log("chankList", chankList);
     });
     filteredListSliced.set(chankList); // получаем массив анкоров из карты анкоров
     // console.log("chankList", JSON.stringify(chankList));
