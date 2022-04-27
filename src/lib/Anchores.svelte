@@ -120,10 +120,10 @@
         // попытка получить хост из адреса
         host = new URL(c.url).host.split(":")[0]; // получаем хост
         c.host = host; // добавляем поле хоста в объект
-        c.img_data = online
-          ? // ? "https://s2.googleusercontent.com/s2/favicons?domain_url=" + encodeURIComponent(c.url)
-            "https://favicon.yandex.net/favicon/" + host
-          : localStorage.getItem("favicon_" + host);
+        // c.img_data = online
+        //   ? // ? "https://s2.googleusercontent.com/s2/favicons?domain_url=" + encodeURIComponent(c.url)
+        //     "https://favicon.yandex.net/favicon/" + host
+        //   : localStorage.getItem("favicon_" + host);
         if (bookmarkList.has(host)) {
           // если хост уже есть в карте
           let bmitems = bookmarkList.get(host); // получаем массив анкоров для хоста
