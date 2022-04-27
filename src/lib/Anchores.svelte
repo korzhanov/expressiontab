@@ -151,6 +151,7 @@
           c.weightVisitsRadius = Math.ceil(c.weightVisits * 10) + 10 + 50; // получаем примерный радиус анкора в зависимисти от веса посещений
           // bookmarkList.set(host, [c]); // добавляем в карту анкоров
           bookmarkList.set(host, { nodes: [newNodesList.length] }); // добавляем в карту анкоров
+          storeFavicon(c.url); // сохраняем иконку хоста в локальное хранилище
         }
         newNodesList.push(c);
       } catch (e) {
