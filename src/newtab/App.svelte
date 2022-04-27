@@ -7,22 +7,22 @@
   } from "@macfja/svelte-persistent-store";
   // import { slimscroll } from "svelte-slimscroll";
   import { fade } from "svelte/transition";
-  import { tweened } from "svelte/motion";
-  import { cubicOut } from "svelte/easing";
+  // import { tweened } from "svelte/motion";
+  // import { cubicOut } from "svelte/easing";
   import { writable } from "svelte/store";
   import firstbg from "../assets/expression-drops-xfactorial-com-copyright.jpg";
   import Anchores from "../lib/Anchores.svelte";
   import Timer from "../lib/Timer.svelte";
   import {toDataURL} from "../lib/utils";
-  let m = { x: 0, y: 0 };
+  // let m = { x: 0, y: 0 };
   let scrollY = 0;
-  let windowHeight = 0;
+  let windowHeight = 600;
 
-  const circleTransitiom = tweened(0, {
-    duration: 700,
-    easing: cubicOut,
-  });
-  circleTransitiom.set(10);
+  // const circleTransitiom = tweened(0, {
+  //   duration: 700,
+  //   easing: cubicOut,
+  // });
+  // circleTransitiom.set(10);
 
   let imgsrc: string =
     "https://source.unsplash.com/random/1920x1080/?mountains,water,cloud,night";
@@ -35,9 +35,9 @@
       $background = await toDataURL(imgsrc);
   }, 120000);
 
-  let ready = false;
-  onMount(() => (ready = true));
-  onDestroy(() => (ready = false));
+  // let ready = false;
+  // onMount(() => (ready = true));
+  // onDestroy(() => (ready = false));
 </script>
 
 <!-- {#if ready} -->
@@ -74,9 +74,11 @@
   main {
     text-align: center;
     margin: 0 auto;
+    left:0;
+    top:0;
     min-height: 100vh;
-    transition: all 0.5s ease;
-    font-weight: 300;
+    transition: width, opacity 0.3s ease;
+    // font-weight: 300;
   }
 
   spacer {
@@ -111,7 +113,7 @@
     width: 100%;
     min-height: 100vh;
     z-index: -2;
-    transition: all 0.3s ease;
+    transition: height, background-image 0.3s ease;
   }
 
   overlay {
