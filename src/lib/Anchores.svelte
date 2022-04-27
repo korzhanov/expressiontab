@@ -160,6 +160,9 @@
         console.log("Link without host: ", c.url, c.title);
       }
     }
+    nodesList.set(newNodesList); // присваиваем новый массив нод
+    // console.log("bookmarkList", bookmarkList);
+    // console.log("nodesList",$nodesList);
     await makechanks();
     // console.log("chankList",chankList);
     loader = false; // закончили загрузку
