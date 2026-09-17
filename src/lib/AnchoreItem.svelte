@@ -4,6 +4,7 @@
   import { fly, fade } from "svelte/transition";
   import { favicons } from "./stores";
   import * as Tooltip from "./components/ui/tooltip";
+  import BubblePop from "./BubblePop.svelte";
 
   export let anchor: any = {};
   export let unfold: boolean | null = null;
@@ -29,6 +30,8 @@
   let multiButton = false;
   let menuFlip = false;
   let deleted = false;
+  /** Идёт анимация лопания перед удалением из DOM */
+  let popping = false;
   let closeTimer: ReturnType<typeof setTimeout> | null = null;
   let anchorEl: HTMLElement;
 
@@ -102,16 +105,23 @@
   }
 
   async function deleteAnchore() {
+    if (popping || deleted) return;
     if (isBookmark) {
       chrome.bookmarks.remove(String(id));
       isBookmark = false;
     }
     try {
       chrome.history.deleteUrl({ url: url });
-      deleted = true;
     } catch (e) {
       console.log(e);
     }
+    // Сначала лопание пузырька (CodePen-мотив), потом убираем из списка
+    popping = true;
+    multiButton = false;
+    setTimeout(() => {
+      deleted = true;
+      popping = false;
+    }, 680);
   }
 </script>
 
@@ -131,10 +141,14 @@
       class:titleVisible
       class:nested={nested && titleVisible}
       class:menuFlip
+      class:popping
       on:contextmenu={openMenu}
       on:mouseleave={scheduleCloseMenu}
       on:mouseenter={showMenu}
     >
+      <div class="popLayer" aria-hidden="true">
+        <BubblePop active={popping} />
+      </div>
       {#if !titleVisible}
         <bgcircle
           style="
@@ -252,7 +266,25 @@
     padding-right: 0px;
     box-sizing: border-box;
     transition: transform 0.35s var(--ease-out), border-color 0.35s var(--ease-out),
-      background-color 0.35s var(--ease-out), box-shadow 0.35s var(--ease-out);
+      background-color 0.35s var(--ease-out), box-shadow 0.35s var(--ease-out),
+      opacity 0.35s var(--ease-out);
+  }
+  // Во время лопания прячем контент иконки — виден только BubblePop
+  anchor.popping {
+    pointer-events: none;
+    background-color: transparent !important;
+    border-color: transparent !important;
+  }
+  anchor.popping > :not(.popLayer) {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.12s ease;
+  }
+  .popLayer {
+    position: absolute;
+    inset: -4px;
+    z-index: 3000;
+    pointer-events: none;
   }
   anchor.titleVisible {
     width: 100%;
