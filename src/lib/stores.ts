@@ -1,7 +1,10 @@
-import { persist, indexedDBStorage } from "@macfja/svelte-persistent-store"
+import { persist, indexedDBStorage } from "@macfja/svelte-persistent-store";
 import { writable } from "svelte/store";
 
-export const filteredListSliced = persist(writable([]),indexedDBStorage(),'filteredListSliced');
-// export const chankList = writable([]);
+/** Row chunks for virtual scroll — in-memory only (rebuilt on each search). */
+export const filteredListSliced = writable([]);
+
 export const favicons = writable(new Map());
-export const nodesList = persist(writable([]),indexedDBStorage(),'nodesList');
+
+/** Flat list of history/bookmark nodes — persisted for faster cold start. */
+export const nodesList = persist(writable([]), indexedDBStorage(), "nodesList");
