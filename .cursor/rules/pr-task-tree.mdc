@@ -1,0 +1,62 @@
+---
+description: Update PRs as a task tree — checklist + links to issues and child feat/fix PRs
+alwaysApply: true
+---
+
+# PR как дерево задач (gitflow planning)
+
+Цель: **epic / feature / release PR** — живой узел плана. По линкам видно итерацию без чтения всего diff. Дополняет `issue-pr-progress-visual.mdc` и `branch-pr-not-direct-commit.mdc`.
+
+## Дерево
+
+```text
+epic / release PR (опционально)
+  ├─ issue epic / checklist item
+  │    ├─ feat/fix PR → main
+  │    └─ follow-up issue
+  └─ merge → main
+```
+
+Имена веток: `NNN-short-slug` / `feat/…` / `fix/…` от `main`.
+
+## Когда обновлять body PR
+
+Пересматривать и править описание PR (`gh pr edit`):
+
+1. При **открытии** feature/fix PR и при **merge** в базу.
+2. После **нескольких** коммитов / закрытия связанного issue.
+3. Когда появился **новый** child issue или child PR.
+4. Перед просьбой merge (чеклист актуален).
+
+## Что держать в body
+
+1. **Backlog / Acceptance** — чекбоксы; отмечать `[x]` только сделанное; невыполненное не удалять молча — либо оставить, либо «→ #NNN / PR #MM».
+2. **Связанные issues** — `Fixes` / `Closes` / `Related #…` (parent + children).
+3. Секция **Child PRs** (если epic):
+
+```markdown
+## Child PRs
+- [x] #3 fix searchbar → merged
+- [ ] #4 lined view → open
+- Related issues: #1, #2
+```
+
+## Агент: обязательные шаги
+
+1. Найти родительский/epic PR (если есть) и **feature PR** текущей ветки.
+2. `gh pr view` / `gh issue list` — сверить чеклист с фактом.
+3. `gh pr edit` — обновить чеклист и линки; при необходимости комментарий «дерево обновлено».
+4. В child PR — явный base `main` + `Related` / `Fixes` к issue.
+
+Не плодить дубли: один child PR ↔ один issue (или явный «часть #NNN»).
+
+## ❌ / ✅
+
+```text
+❌ Epic PR со старым чеклистом без линков на влитые feat-PR
+❌ Feat-PR без Related/Fixes к issue
+❌ Вычеркнул задачу из body без follow-up issue/PR
+
+✅ Чеклист + Child PRs + issues образуют дерево
+✅ После merge child — [x] и ссылка на PR в родителе
+```
