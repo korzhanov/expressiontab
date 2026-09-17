@@ -7,7 +7,8 @@
   "scripts": {
     "postinstall": "bun scripts/ensure-deps.mjs",
     "prebuild": "bun scripts/ensure-deps.mjs",
-    "dev": "nodemon --delay 1 -e js,ts,svelte,css --watch src --exec \"bun run build\"",
+    "dev": "bun scripts/ensure-deps.mjs && bun scripts/watch-build.mjs",
+    "preview": "bun scripts/ensure-deps.mjs && vite build && bunx --bun serve builds/expressiontab -l 4173",
     "build": "vite build",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "lint": "eslint \"src/**/*.{js,ts}\" \"vite.config.js\"",

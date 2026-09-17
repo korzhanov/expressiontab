@@ -35,8 +35,12 @@ export default defineConfig({
   assetsDir: "assets",
   build: {
     rollupOptions: {
-      input: {
-        manifest: resolve(__dirname, "src/manifest.json"),
+      // Getter: chrome-extension плагин delete'ит input.manifest —
+      // свежий объект при каждом чтении (см. issue #1 / watch-build.mjs)
+      get input() {
+        return {
+          manifest: resolve(__dirname, "src/manifest.json"),
+        };
       },
       output: {
         name: "expressiontab",
