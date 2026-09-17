@@ -115,11 +115,11 @@
 
 {#if !deleted && anchor && url && (url.startsWith("http://") || url.startsWith("https://"))}
   <Tooltip.Root
-    content={title || host}
+    content={nested ? url : title || host}
     side="bottom"
     delayDuration={450}
     block={titleVisible}
-    disabled={titleVisible}
+    disabled={titleVisible && !nested}
   >
     <anchor
       bind:this={anchorEl}
