@@ -82,17 +82,21 @@
   .tooltip-content {
     position: absolute;
     z-index: 1100;
-    max-width: min(280px, 70vw);
-    padding: 0.35rem 0.65rem;
+    /* max-content — иначе в узком dial shrink-to-fit даёт 1 символ/строку */
+    width: max-content;
+    min-width: 6rem;
+    max-width: min(320px, 80vw);
+    padding: 0.4rem 0.75rem;
     border-radius: 0.375rem;
     background: #fafafa;
     color: #141414;
     font-size: 12px;
     font-weight: 500;
-    line-height: 1.35;
+    line-height: 1.4;
     letter-spacing: 0.01em;
     white-space: normal;
-    word-break: break-word;
+    overflow-wrap: break-word;
+    word-break: normal;
     pointer-events: none;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
   }
