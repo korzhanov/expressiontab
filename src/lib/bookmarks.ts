@@ -30,12 +30,32 @@ export type BookmarkNode = {
 
 /** Returns true if the URL should be filtered out of the dial. */
 export function shouldIgnoreUrl(url: string | undefined | null): boolean {
-  if (!url) return true;
-  return ignoreUrl.some((prefix) => url.startsWith(prefix));
+  if (!url || typeof url !== "string") return true;
+  const trimmed = url.trim();
+  if (!trimmed) return true;
+  // В dial только http(s); chrome:/javascript:/relative и т.п. отсекаем
+  if (!/^https?:\/\//i.test(trimmed)) return true;
+  return ignoreUrl.some((prefix) => trimmed.startsWith(prefix));
 }
 
+/** Host из URL; при битой ссылке — localhost, без throw. */
 export function getHostFromUrl(url: string): string {
-  return new URL(url).host.split(":")[0] || "localhost";
+  try {
+    return new URL(url).host.split(":")[0] || "localhost";
+  } catch {
+    return "localhost";
+  }
+}
+
+/** Проверка, что строка — валидный абсолютный URL. */
+export function isValidHttpUrl(url: string | undefined | null): boolean {
+  if (!url || typeof url !== "string") return false;
+  try {
+    const u = new URL(url);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 export function computeWeightVisits(visitCount: number): number {

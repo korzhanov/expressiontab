@@ -37,12 +37,14 @@
     bookmarkListSize: number = 0,
     loader: boolean = false,
     titleVisible = false,
-    windowY: number = 0,
     hh: number = 0,
     ww: number = 0,
     visible = 200,
     windowHeight: number = 0,
     windowWidth: number = 0;
+
+  // Высота ряда ≈ max(anchorGroup с margin/border, крупные favicon) — без overflow:hidden
+  $: rowEstimate = titleVisible ? 56 : 220;
 
   const titleVisibleStore = writable(false);
   setContext("titleVisible", titleVisibleStore);
@@ -164,7 +166,6 @@
 </script>
 
 <svelte:window
-  bind:scrollY={windowY}
   bind:innerHeight={windowHeight}
   bind:innerWidth={windowWidth}
   bind:online
@@ -288,11 +289,13 @@
     data={$filteredListSliced}
     key="key"
     pageMode={true}
-    topThreshold={5}
-    bottomThreshold={5}
+    keeps={40}
+    estimateSize={rowEstimate}
+    topThreshold={2}
+    bottomThreshold={2}
   >
-    <div class="itemWrapper" class:lined={titleVisible}>
-      <HostItems {...data} />
+    <div class="itemWrapper" class:lined={titleVisible} style:min-height="{rowEstimate}px">
+      <HostItems value={data.value} />
     </div>
   </VirtualScroll>
   {#if loader}<loader><div class="lds-circle"><div /></div></loader>{/if}
@@ -363,20 +366,27 @@
     display: flex;
     flex-wrap: wrap;
     flex-direction: row;
-    align-content: flex-end;
+    align-content: center;
     align-items: center;
     width: 100%;
-    height: 150px;
+    height: 220px;
     justify-content: center;
     box-sizing: border-box;
+    /* visible — иначе круги с margin/scale обрезаются по mid-line */
+    overflow: visible;
+  }
+  /* Обёртка virtual-scroll тоже не должна клипать */
+  anchores :global(.virtual-scroll-item) {
+    overflow: visible;
   }
   anchores .itemWrapper.lined {
     height: auto;
-    min-height: 44px;
+    min-height: 56px;
     flex-direction: column;
     align-items: stretch;
     justify-content: flex-start;
     align-content: stretch;
+    overflow: visible;
   }
 
   .lds-circle {

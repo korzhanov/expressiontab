@@ -7,37 +7,35 @@
   import Timer from "../lib/Timer.svelte";
   import { bgOpacityFromScroll } from "../lib/utils";
 
-  let scrollY = 0;
   let windowHeight = 600;
   let bgOpacity = 1;
   let rafId = 0;
+  let lastOpacity = 1;
 
   let background = persist(writable(firstbg), localStorage(), "background");
 
+  // Пассивный scroll без bind:scrollY — меньше реактивных проходов Svelte на кадр
   function onScroll() {
     if (rafId) return;
     rafId = requestAnimationFrame(() => {
-      bgOpacity = bgOpacityFromScroll(scrollY, windowHeight);
+      const y = window.scrollY || 0;
+      const next = bgOpacityFromScroll(y, windowHeight);
+      // Обновляем DOM только при заметном изменении — без transition-борьбы
+      if (Math.abs(next - lastOpacity) > 0.02) {
+        lastOpacity = next;
+        bgOpacity = next;
+      }
       rafId = 0;
     });
   }
-
-  $: if (windowHeight) {
-    bgOpacity = bgOpacityFromScroll(scrollY, windowHeight);
-  }
 </script>
 
-<svelte:window
-  bind:innerHeight={windowHeight}
-  bind:scrollY
-  on:scroll={onScroll}
-/>
+<svelte:window bind:innerHeight={windowHeight} on:scroll={onScroll} />
 <main in:fade={{ duration: 1000 }} out:fade={{ duration: 1000 }}>
   <bg
     in:fade
     out:fade
-    style="background-image: url('{$background}');"
-    style:opacity={bgOpacity}
+    style="background-image: url('{$background}'); opacity: {bgOpacity};"
   />
   <spacer>
     <Timer />
@@ -61,7 +59,6 @@
     left: 0;
     top: 0;
     min-height: 100vh;
-    transition: width, opacity 0.3s ease;
   }
 
   spacer {
@@ -71,7 +68,6 @@
       rgba(20, 20, 20, 1)
     );
     height: 92vh;
-    transition: height 0.3s ease-in-out 1s;
     display: flex;
     width: 100%;
     position: relative;
@@ -93,6 +89,8 @@
     width: 100%;
     min-height: 100vh;
     z-index: -2;
-    transition: opacity 0.15s ease;
+    /* без transition на opacity — иначе фон «догоняет» скролл и интерфейс дёргается */
+    will-change: opacity;
+    pointer-events: none;
   }
 </style>

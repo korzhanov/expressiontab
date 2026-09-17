@@ -5,7 +5,6 @@
   import { nodesList } from "./stores";
   import { getUnfoldSlice, UNFOLD_PAGE_SIZE } from "./bookmarks";
 
-  export let key: any;
   export let hostItem: any;
 
   $: anchores = hostItem?.nodes || [];
@@ -46,6 +45,13 @@
     }
   }
 
+  /** Клик по группе: не трогаем <a>/кнопки — иначе ссылки не открываются */
+  function onGroupClick(e: MouseEvent) {
+    const el = e.target as HTMLElement | null;
+    if (el?.closest?.("a, button, .multiButton")) return;
+    toggleGroup(e);
+  }
+
   function showMore(e: Event) {
     e.preventDefault();
     e.stopPropagation();
@@ -56,12 +62,13 @@
 {#if hostItem}
   {#if anchores.length < 2}
     {#each anchores as item (item)}
-      <AnchoreItem
-        index={item}
-        anchor={$nodesList[item]}
-        childrenInvisible={true}
-        titleVisible={$titleVisibleStore}
-      />
+      {#if $nodesList[item]?.url}
+        <AnchoreItem
+          anchor={$nodesList[item]}
+          childrenInvisible={true}
+          titleVisible={$titleVisibleStore}
+        />
+      {/if}
     {/each}
   {:else}
     <anchorGroup
@@ -70,26 +77,28 @@
       use:longhover={700}
       on:longhover|stopPropagation|preventDefault={toggleGroup}
       on:contextmenu|stopPropagation|preventDefault={openGroup}
-      on:click|stopPropagation={toggleGroup}
+      on:click|stopPropagation={onGroupClick}
       class:unfold
-      title="{otherAnchores.length} more links — long-press, click or right-click"
+      title="{otherAnchores.length} more links — click icon to open, long-press or right-click to expand"
     >
-      <AnchoreItem
-        index={anchores[0]}
-        anchor={hostAnchore}
-        {unfold}
-        childrenInvisible={true}
-        titleVisible={$titleVisibleStore}
-      />
+      {#if hostAnchore?.url}
+        <AnchoreItem
+          anchor={hostAnchore}
+          {unfold}
+          childrenInvisible={true}
+          titleVisible={$titleVisibleStore}
+        />
+      {/if}
     </anchorGroup>
     {#if unfold}
       {#each unfoldSlice.visible as item (item)}
-        <AnchoreItem
-          index={item}
-          anchor={$nodesList[item]}
-          childrenInvisible={childrenInvisible}
-          titleVisible={$titleVisibleStore}
-        />
+        {#if $nodesList[item]?.url}
+          <AnchoreItem
+            anchor={$nodesList[item]}
+            childrenInvisible={childrenInvisible}
+            titleVisible={$titleVisibleStore}
+          />
+        {/if}
       {/each}
       {#if unfoldSlice.hasMore}
         <button class="showMore" type="button" on:click={showMore}>
@@ -110,13 +119,12 @@
     justify-content: center;
     align-items: baseline;
     flex-direction: row;
-    border: 20px solid #1b1b1bcf !important;
+    border: 12px solid #1b1b1bcf !important;
     filter: saturate(1.12);
     background-color: #6c519433;
     border-radius: 50%;
-    margin: 30px;
-    transition: border-color 0.3s ease, background-color 0.3s ease,
-      transform 0.3s ease;
+    margin: 16px;
+    transition: border-color 0.3s ease, background-color 0.3s ease;
   }
   anchorGroup.lined {
     width: 100%;
@@ -129,7 +137,7 @@
     padding: 4px 8px;
   }
   anchorGroup:hover {
-    border: 20px solid #1d1d1df2 !important;
+    border: 12px solid #1d1d1df2 !important;
   }
   anchorGroup.lined:hover {
     border-width: 2px !important;
@@ -166,7 +174,7 @@
     -webkit-font-smoothing: antialiased;
   }
   .hovicon.effect-8 {
-    transition: transform ease-out 0.1s, background 0.3s ease;
+    transition: background 0.2s ease;
   }
   .hovicon.effect-8:after {
     top: 0;
@@ -177,16 +185,14 @@
     transform: scale(0.9);
   }
   .hovicon.effect-8:hover {
-    transform: scale(0.93);
+    /* без scale — scale на скролле даёт дёрганье layout */
     background-color: #ffffffcf;
   }
   .hovicon.effect-8:hover:after {
-    animation: sonarEffect 2.77s cubic-bezier(0, 1.86, 0.93, -0.89) 0.33s;
-    animation-iteration-count: 2;
+    animation: none;
   }
   .unfold.hovicon.effect-8:hover:after {
-    animation: sonarEffect 0.8s ease-in 1s reverse;
-    animation-iteration-count: 1;
+    animation: none;
   }
   @keyframes sonarEffect {
     0% {

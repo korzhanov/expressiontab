@@ -17,6 +17,12 @@ describe("shouldIgnoreUrl", () => {
     expect(shouldIgnoreUrl("chrome-extension://abc")).toBe(true);
   });
 
+  it("rejects non-http schemes and blank", () => {
+    expect(shouldIgnoreUrl("   ")).toBe(true);
+    expect(shouldIgnoreUrl("about:blank")).toBe(true);
+    expect(shouldIgnoreUrl("not-a-url")).toBe(true);
+  });
+
   it("allows https urls", () => {
     expect(shouldIgnoreUrl("https://example.com")).toBe(false);
   });

@@ -4,7 +4,6 @@
   import { fly } from "svelte/transition";
   import { favicons } from "./stores";
 
-  export let index: number = 0;
   export let anchor: any = {};
   export let unfold: boolean | null = null;
   export let childrenInvisible: boolean | null = true;
@@ -101,11 +100,11 @@
   }
 </script>
 
-{#if !deleted && anchor}
+{#if !deleted && anchor && url && (url.startsWith("http://") || url.startsWith("https://"))}
   <anchor
     bind:this={anchorEl}
     {title}
-    style:margin={titleVisible ? "4px 0" : `${weightVisits * 10 + 10}px`}
+    style:margin={titleVisible ? "4px 0" : `${Math.min(weightVisits, 2) * 8 + 8}px`}
     class:isBookmark
     class:invisible={!childrenInvisible}
     class:titleVisible
@@ -117,13 +116,13 @@
     {#if !titleVisible}
       <bgcircle
         style="
-    transform: translateZ(0) scale({(weightVisits * 1 + 1).toFixed(2)});
+    transform: translateZ(0) scale({(Math.min(weightVisits, 2) * 0.35 + 1).toFixed(2)});
     background-image: url('{src}');
 "
       />
     {/if}
     <slot />
-    <a href={url}>
+    <a href={url} rel="noopener noreferrer" on:click|stopPropagation>
       <anchoricon style:background-image="url('{src}')" />
       {#if unfold === false && !titleVisible}
         <anchoricon
@@ -334,6 +333,10 @@
     align-items: center;
     flex-wrap: nowrap;
     align-content: flex-end;
+    position: relative;
+    z-index: 2;
+    pointer-events: auto;
+    cursor: pointer;
   }
   anchor.titleVisible a {
     width: 100%;
