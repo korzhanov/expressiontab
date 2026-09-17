@@ -9,9 +9,9 @@ export async function toDataURL(urll: string): Promise<string | undefined> {
         resolve(reader.result as string);
       };
     };
+    // CORS/offline — просто fallback (в CursorBrowser preview googleusercontent блокируется)
     xhr.onerror = function () {
       resolve(undefined);
-      console.error("** An error occurred during the XMLHttpRequest");
     };
     xhr.responseType = "blob";
     xhr.send();

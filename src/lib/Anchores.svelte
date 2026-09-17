@@ -14,15 +14,19 @@
     enqueueFavicon,
     type HostGroup,
   } from "./bookmarks";
+  import { isMockChrome } from "./chrome-mock";
 
   let online = true;
   let initialLoadDone = false;
   let searchInputEl: HTMLInputElement;
+  const previewMock = isMockChrome();
 
   let searchTerm: string = localStorage.searchTerm || "";
   let favicon_localhost = localStorage.favicon_localhost;
 
   (async () => {
+    // В preview (localhost) XHR к googleusercontent → CORS; в unpacked OK
+    if (previewMock) return;
     if (!favicon_localhost || favicon_localhost?.length == 0) {
       favicon_localhost = await toDataURL(
         "https://s2.googleusercontent.com/s2/favicons?domain_url=http://localhost"
@@ -81,18 +85,20 @@
     nodesList.set(built.nodesList);
     localStorage.maxVisits = built.maxVisits + "";
 
-    // enqueue favicons for new hosts (non-blocking)
-    for (const [host, group] of bookmarkList) {
-      const node = built.nodesList[group.nodes[0]];
-      if (node?.url) {
-        enqueueFavicon(node.url, toDataURL, favicon_localhost).then((data) => {
-          if (data) {
-            favicons.update((map) => {
-              map.set(host, data);
-              return map;
-            });
-          }
-        });
+    // Favicon queue только в расширении — в CursorBrowser CORS на s2.googleusercontent
+    if (!previewMock) {
+      for (const [host, group] of bookmarkList) {
+        const node = built.nodesList[group.nodes[0]];
+        if (node?.url) {
+          enqueueFavicon(node.url, toDataURL, favicon_localhost).then((data) => {
+            if (data) {
+              favicons.update((map) => {
+                map.set(host, data);
+                return map;
+              });
+            }
+          });
+        }
       }
     }
 
@@ -172,6 +178,11 @@
 />
 
 <filterBar class="text-white">
+  {#if previewMock}
+    <span class="previewBanner" title="Нет chrome.history — демо-данные">
+      Preview · mock data
+    </span>
+  {/if}
   <input
     class="text-white"
     type="search"
@@ -345,6 +356,14 @@
     padding: 0 32px;
     opacity: 1;
     z-index: 2;
+  }
+  filterBar .previewBanner {
+    font-size: 11px;
+    color: #f0c040;
+    border: 1px solid #665522;
+    border-radius: 4px;
+    padding: 2px 8px;
+    white-space: nowrap;
   }
   filterBar .status {
     font-size: 12px;
