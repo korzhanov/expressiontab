@@ -1,7 +1,9 @@
 import { resolve } from "path";
 import { defineConfig } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
-import { chromeExtension, simpleReloader } from "vite-plugin-chrome-extension";
+import { chromeExtension } from "vite-plugin-chrome-extension";
+// simpleReloader — опционально для HMR unpacked; не подключаем в текущей сборке
+// import { chromeExtension, simpleReloader } from "vite-plugin-chrome-extension";
 import { createHtmlPlugin } from 'vite-plugin-html';
 
 const mode = "development"; // production // development

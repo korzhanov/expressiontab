@@ -1,21 +1,22 @@
 {
   "name": "expressiontab",
-  "author": "Oleg Korzhanov @drug_z",
+  "author": "Oleg @Korzhanov",
   "license": "ISC",
   "version": "0.1.0",
   "description": "Expression New Tab-page for Google Chrome Browser. Spead-dial page extension",
   "scripts": {
-    "dev": "nodemon --delay 1 -e js,ts,svelte,css --watch src --exec \"yarn build\"",
+    "dev": "nodemon --delay 1 -e js,ts,svelte,css --watch src --exec \"bun run build\"",
     "build": "vite build",
     "check": "svelte-check --tsconfig ./tsconfig.json",
-    "test": "eslint ."
+    "lint": "eslint \"src/**/*.{js,ts}\" \"vite.config.js\"",
+    "test": "bun test"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^1.0.0-next.15",
     "@tsconfig/svelte": "^2.0.1",
     "@types/chrome": "^0.0.145",
-    "@typescript-eslint/eslint-plugin": "^4.29.0",
-    "@typescript-eslint/parser": "^4.29.0",
+    "@typescript-eslint/eslint-plugin": "^5.62.0",
+    "@typescript-eslint/parser": "^5.62.0",
     "autoprefixer": "^10.3.0",
     "eslint": "^7.32.0",
     "postcss-load-config": "^3.1.0",
