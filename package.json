@@ -5,6 +5,8 @@
   "version": "0.1.0",
   "description": "Expression New Tab-page for Google Chrome Browser. Spead-dial page extension",
   "scripts": {
+    "postinstall": "bun scripts/ensure-deps.mjs",
+    "prebuild": "bun scripts/ensure-deps.mjs",
     "dev": "nodemon --delay 1 -e js,ts,svelte,css --watch src --exec \"bun run build\"",
     "build": "vite build",
     "check": "svelte-check --tsconfig ./tsconfig.json",
@@ -18,6 +20,8 @@
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
     "autoprefixer": "^10.3.0",
+    "browserslist": "^4.29.0",
+    "caniuse-lite": "^1.0.30001810",
     "eslint": "^7.32.0",
     "postcss-load-config": "^3.1.0",
     "postcss-nested": "^5.0.5",

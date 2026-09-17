@@ -117,3 +117,5 @@ dist
 # Локальные скрины для PR (в git только .gitkeep)
 docs/pr-evidence/**
 !docs/pr-evidence/.gitkeep
+yarn.lock
+package-lock.json

@@ -3,76 +3,27 @@ import { defineConfig } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { chromeExtension } from "vite-plugin-chrome-extension";
 // simpleReloader — опционально для HMR unpacked; не подключаем в текущей сборке
-// import { chromeExtension, simpleReloader } from "vite-plugin-chrome-extension";
-import { createHtmlPlugin } from 'vite-plugin-html';
+import { createHtmlPlugin } from "vite-plugin-html";
+import { linkNewtabCss } from "./vite-plugin-link-newtab-css.js";
 
 const mode = "development"; // production // development
-const isProduction = mode === 'production'; // boolean
+const isProduction = mode === "production";
 
 // https://vitejs.dev/config/
 export default defineConfig({
   mode: mode,
-  // optimizeDeps: {
-  //   include: ["svelte-hero-icons"],
-  // },
   logLevel: isProduction ? "silent" : "info",
-  // logLevel: "info",
   plugins: [
     svelte({
-      // emitCss: isProduction,
+      // Отдельный CSS-файл (не CSS-in-JS) — быстрее на new-tab
       emitCss: true,
     }),
     createHtmlPlugin({
-      // minify: true,
-      // pages : [ 
-      //   {
-      // entry: "src/newtab/index.js",
-      // template: "src/newtab/index.html",
-      inject: {
-        // data: {
-        //   injectStylesheet: `<link rel="stylesheet" type="text/css" href="main.css" />`,
-        //   injectScript: `<script type="module" src="main.js"></script>`,
-        // },
-        // tags: [
-        //   {
-        //     injectTo: 'head',
-        //     tag: 'link',
-        //     attrs: {
-        //       href: 'main.css',
-        //       rel: "stylesheet",
-        //       type: "text/css"
-        //     },
-        //   },
-        //   {
-        //     injectTo: 'body',
-        //     tag: 'script',
-        //     attrs: {
-        //       src: 'main.js',
-        //       type: "module"
-        //     },
-        //   },
-        // ],
-      },
-      // }],
+      inject: {},
     }),
-    chromeExtension(
-      {
-        // verbose: true,
-        // dynamicImportWrapper: true,
-        // contentScriptWrapper: false,
-      }
-    ),
-    // {
-    //   name: 'disable-treeshake',
-    //   transform(code, id) {
-    //     if (id.endsWith('.html')) {
-    //       console.log(id);
-    //       return { moduleSideEffects: 'no-treeshake' };
-    //     }
-    //   },
-    // },
-
-    // simpleReloader(),
+    chromeExtension({}),
+    // После chrome-extension: линк на main.css / main.<hash>.css в index.html
+    linkNewtabCss(isProduction),
   ],
   resolve: {
     alias: {
@@ -81,7 +32,7 @@ export default defineConfig({
   },
   emptyOutDir: false,
   cssCodeSplit: true,
-  assetsDir: 'assets',
+  assetsDir: "assets",
   build: {
     rollupOptions: {
       input: {
@@ -90,20 +41,17 @@ export default defineConfig({
       output: {
         name: "expressiontab",
         entryFileNames: "[name].js",
-        assetFileNames: "[name].[ext]"
+        assetFileNames: "[name].[ext]",
+      },
+      // eval из транзитивных deps — не шумим в билде
+      onwarn(warning, warn) {
+        if (warning.code === "EVAL") return;
+        warn(warning);
       },
     },
-    // watch: {
-    //   buildDelay: 1000,
-    //   chokidar: true,
-    //   clearScreen: false,
-    //   include: resolve(__dirname + "/src/**"),
-    //   skipWrite: true,
-    // },
     outDir: "builds/expressiontab",
     external: true,
-    // sourcemap: 'inline',
     assetsInlineLimit: 0,
-    minify: 'terser',
+    minify: "terser",
   },
 });

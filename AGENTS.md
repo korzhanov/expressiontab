@@ -18,7 +18,7 @@
 - **Стек**: Svelte 3 + TypeScript + Vite 2, `vite-plugin-chrome-extension`, PostCSS/SCSS, `@macfja/svelte-persistent-store`, `svelte-virtual-scroll-list`.
 - **Точка входа**: `src/newtab/main.js` → `App.svelte` → `Anchores.svelte` → `HostItems` / `HostItem` / `AnchoreItem`.
 - **Данные**: `chrome.history.search` + `chrome.bookmarks.search` → `src/lib/bookmarks.ts` (`buildBookmarkIndex`, `makeChunks`) → stores `nodesList` / `filteredListSliced`.
-- **Сборка**: `bun run build` / `yarn build` → артефакт в `builds/expressiontab`; локально: Chrome → Extensions → Load unpacked → эта папка; Options → Enable.
+- **Сборка**: `bun run build` → артефакт в `builds/expressiontab`. Если `vite-plugin-chrome-extension` не находится — `npm install` (или `bun run prebuild`); bun иногда ставит пакет без `lib/`.
 - **Dev**: предпочтительно `bun`; в README ещё упоминается `yarn` + nodemon full rebuild (можно заменить на vite HMR позже).
 - **Тесты**: `bun test` (unit в `src/lib/*.test.ts`); E2E Playwright — при наличии конфига.
 - **Protected base**: `main` / `master` — только через PR (`branch-pr-not-direct-commit.mdc`).
