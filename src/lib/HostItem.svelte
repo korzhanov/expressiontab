@@ -1,7 +1,7 @@
 <script lang="ts">
   import { getContext } from "svelte";
   import AnchoreItem from "./AnchoreItem.svelte";
-  import { longhover } from "./longhover";
+  import { longhover, GROUP_LONGHOVER_MS } from "./longhover";
   import { nodesList } from "./stores";
   import { getUnfoldSlice, UNFOLD_PAGE_SIZE } from "./bookmarks";
 
@@ -74,12 +74,12 @@
     <anchorGroup
       class="hovicon effect-8"
       class:lined={$titleVisibleStore}
-      use:longhover={700}
-      on:longhover|stopPropagation|preventDefault={toggleGroup}
+      use:longhover={GROUP_LONGHOVER_MS}
+      on:longhover|stopPropagation|preventDefault={openGroup}
       on:contextmenu|stopPropagation|preventDefault={openGroup}
       on:click|stopPropagation={onGroupClick}
       class:unfold
-      title="{otherAnchores.length} more links — click icon to open, long-press or right-click to expand"
+      title="{otherAnchores.length} more links — click icon to open, hover 3s or right-click to expand"
     >
       {#if hostAnchore?.url}
         <AnchoreItem
@@ -159,6 +159,7 @@
 
   .hovicon {
     cursor: pointer;
+    position: relative;
   }
   .hovicon:after {
     pointer-events: none;
@@ -185,12 +186,14 @@
     transform: scale(0.9);
   }
   .hovicon.effect-8:hover {
-    /* без scale — scale на скролле даёт дёрганье layout */
+    /* без scale на самом элементе — иначе дёрганье при скролле */
     background-color: #ffffffcf;
   }
+  /* Пульсация (sonar) при наведении */
   .hovicon.effect-8:hover:after {
-    animation: none;
+    animation: sonarEffect 1.4s ease-out 0s infinite;
   }
+  /* В раскрытом виде пульс не крутим — меньше шума */
   .unfold.hovicon.effect-8:hover:after {
     animation: none;
   }

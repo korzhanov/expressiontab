@@ -35,33 +35,43 @@
     anchor?.img_data ||
     globe;
 
-  function openMenu(e: MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
+  /** Показать меню действий (hover / ПКМ); клик по ссылке не блокируем — pointer-events:none на оверлее */
+  function showMenu() {
     if (closeTimer) {
       clearTimeout(closeTimer);
       closeTimer = null;
     }
     if (anchorEl) {
       const rect = anchorEl.getBoundingClientRect();
-      menuFlip = rect.left < 120;
+      // По умолчанию кнопки справа сверху; у правого края — зеркало влево
+      menuFlip =
+        typeof window !== "undefined" &&
+        rect.right > window.innerWidth - 140;
     }
     multiButton = true;
   }
 
+  function openMenu(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    showMenu();
+  }
+
   function scheduleCloseMenu() {
     if (closeTimer) clearTimeout(closeTimer);
+    // Небольшая задержка — успеть доехать курсором до кнопок меню
     closeTimer = setTimeout(() => {
       multiButton = false;
     }, 280);
   }
 
+  /** Курсор на кнопках меню — не закрывать */
   function keepMenuOpen() {
+    if (!multiButton) return;
     if (closeTimer) {
       clearTimeout(closeTimer);
       closeTimer = null;
     }
-    multiButton = true;
   }
 
   async function copyToBuffer(e: Event, copyText: string) {
@@ -111,7 +121,7 @@
     class:menuFlip
     on:contextmenu={openMenu}
     on:mouseleave={scheduleCloseMenu}
-    on:mouseenter={keepMenuOpen}
+    on:mouseenter={showMenu}
   >
     {#if !titleVisible}
       <bgcircle
@@ -253,18 +263,21 @@
   .multiButton {
     z-index: 1000;
     position: absolute;
-    top: 1.25rem;
-    left: 1.25rem;
+    // Смещаем ось круга вправо-вверх — кнопки не на пути курсора к иконке
+    top: 0.35rem;
+    left: 2.1rem;
     border-radius: 100%;
     width: 10rem;
     height: 10rem;
     opacity: 1;
     transform: translate(-50%, -50%);
-    pointer-events: auto;
+    // Пустая зона не перехватывает клик — открывается <a> под меню
+    pointer-events: none;
   }
   .multiButton.menuFlip {
+    // У правого края viewport — круг слева от иконки
     left: auto;
-    right: 1.25rem;
+    right: 2.1rem;
     transform: translate(50%, -50%);
   }
   .multiButton button {
@@ -277,6 +290,8 @@
     border-radius: 100%;
     background: var(--background);
     color: var(--text);
+    // Только кнопки ловят клик (контейнер pointer-events: none)
+    pointer-events: auto;
     transform: translateZ(0) translate(-50%, -50%);
     cursor: pointer;
     transition: left 0.2s ease, top 0.2s ease;
@@ -287,23 +302,7 @@
       box-shadow: 0 0 1rem -0.25rem var(--background);
       z-index: 1000;
     }
-    &:first-child:nth-last-child(3),
-    &:first-child:nth-last-child(3) ~ * {
-      &:nth-child(1) {
-        left: 50%;
-        top: 15.625%;
-      }
-      &:nth-child(2) {
-        left: 25%;
-        top: 25%;
-      }
-      &:nth-child(3) {
-        left: 15.625%;
-        top: 50%;
-      }
-    }
-  }
-  .multiButton.menuFlip button {
+    // Дуга справа-сверху (★ / copy / delete) — не перекрывает подход мыши слева
     &:first-child:nth-last-child(3),
     &:first-child:nth-last-child(3) ~ * {
       &:nth-child(1) {
@@ -316,6 +315,24 @@
       }
       &:nth-child(3) {
         left: 84.375%;
+        top: 50%;
+      }
+    }
+  }
+  .multiButton.menuFlip button {
+    // Зеркало: дуга слева
+    &:first-child:nth-last-child(3),
+    &:first-child:nth-last-child(3) ~ * {
+      &:nth-child(1) {
+        left: 50%;
+        top: 15.625%;
+      }
+      &:nth-child(2) {
+        left: 25%;
+        top: 25%;
+      }
+      &:nth-child(3) {
+        left: 15.625%;
         top: 50%;
       }
     }

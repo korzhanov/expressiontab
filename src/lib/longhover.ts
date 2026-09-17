@@ -7,6 +7,7 @@ export function longhover(
 
   const handleMouseover = () => {
     clearTimeout(timer);
+    // Долгое наведение → CustomEvent longhover
     timer = setTimeout(() => {
       node.dispatchEvent(new CustomEvent("longhover"));
     }, duration);
@@ -32,3 +33,6 @@ export function longhover(
     },
   };
 }
+
+/** Удержание курсора перед раскрытием группы ссылок домена */
+export const GROUP_LONGHOVER_MS = 3000;
