@@ -4,12 +4,14 @@
   import { longhover, GROUP_LONGHOVER_MS } from "./longhover";
   import { nodesList } from "./stores";
   import { getUnfoldSlice, UNFOLD_PAGE_SIZE } from "./bookmarks";
+  import * as Tooltip from "./components/ui/tooltip";
 
   export let hostItem: any;
 
   $: anchores = hostItem?.nodes || [];
   $: hostAnchore = $nodesList[anchores[0]] || {};
   $: otherAnchores = anchores[1] ? anchores.slice(1) : [];
+  $: groupHint = `${otherAnchores.length} more links — click icon to open, hover 3s or right-click to expand`;
 
   let unfold = false;
   let childrenInvisible = false;
@@ -71,25 +73,31 @@
       {/if}
     {/each}
   {:else}
-    <anchorGroup
-      class="hovicon effect-8"
-      class:lined={$titleVisibleStore}
-      use:longhover={GROUP_LONGHOVER_MS}
-      on:longhover|stopPropagation|preventDefault={openGroup}
-      on:contextmenu|stopPropagation|preventDefault={openGroup}
-      on:click|stopPropagation={onGroupClick}
-      class:unfold
-      title="{otherAnchores.length} more links — click icon to open, hover 3s or right-click to expand"
+    <Tooltip.Root
+      content={groupHint}
+      side="bottom"
+      delayDuration={550}
+      block={!!$titleVisibleStore}
     >
-      {#if hostAnchore?.url}
-        <AnchoreItem
-          anchor={hostAnchore}
-          {unfold}
-          childrenInvisible={true}
-          titleVisible={$titleVisibleStore}
-        />
-      {/if}
-    </anchorGroup>
+      <anchorGroup
+        class="hovicon effect-8"
+        class:lined={$titleVisibleStore}
+        use:longhover={GROUP_LONGHOVER_MS}
+        on:longhover|stopPropagation|preventDefault={openGroup}
+        on:contextmenu|stopPropagation|preventDefault={openGroup}
+        on:click|stopPropagation={onGroupClick}
+        class:unfold
+      >
+        {#if hostAnchore?.url}
+          <AnchoreItem
+            anchor={hostAnchore}
+            {unfold}
+            childrenInvisible={true}
+            titleVisible={$titleVisibleStore}
+          />
+        {/if}
+      </anchorGroup>
+    </Tooltip.Root>
     {#if unfold}
       <div
         class="groupChildren"

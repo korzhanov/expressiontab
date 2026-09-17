@@ -15,6 +15,7 @@
     type HostGroup,
   } from "./bookmarks";
   import { isMockChrome } from "./chrome-mock";
+  import * as Tooltip from "./components/ui/tooltip";
 
   let online = true;
   let initialLoadDone = false;
@@ -179,115 +180,131 @@
 
 <filterBar class="text-white">
   {#if previewMock}
-    <span class="previewBanner" title="Нет chrome.history — демо-данные">
-      Preview · mock data
-    </span>
+    <Tooltip.Root
+      content="Нет chrome.history — демо-данные"
+      side="bottom"
+      delayDuration={300}
+    >
+      <span class="previewBanner">Preview · mock data</span>
+    </Tooltip.Root>
   {/if}
-  <input
-    class="text-white"
-    type="search"
-    id="search"
-    bind:this={searchInputEl}
-    bind:value={searchTerm}
-    on:keydown={onSearchKeydown}
-    title="Type to filter. Esc clears. Press / to focus."
-    placeholder="Search history & bookmarks"
-    autocomplete="off"
-  />
+  <Tooltip.Root
+    content="Type to filter. Esc clears. Press / to focus."
+    side="bottom"
+    delayDuration={500}
+    block
+  >
+    <input
+      class="text-white"
+      type="search"
+      id="search"
+      bind:this={searchInputEl}
+      bind:value={searchTerm}
+      on:keydown={onSearchKeydown}
+      placeholder="Search history & bookmarks"
+      autocomplete="off"
+    />
+  </Tooltip.Root>
   <Keydown
     pauseOnInput
     on:Delete={clearSearch}
     on:Escape={clearSearch}
     on:key={onGlobalKey}
   />
-  <label id="changeView" title={titleVisible ? "Bubble view" : "Lined list view"}>
-    <input type="checkbox" bind:checked={titleVisible} />
-    <icon>
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        class="feather feather-stop-circle"
-      >
-        {#if titleVisible}
-          <circle
-            cx="12"
-            cy="12"
-            r="10"
-            transition:draw={{
-              duration: 500,
-              delay: 0,
-              easing: cubicOut,
-            }}
-          />
-          <circle
-            cx="12"
-            cy="12"
-            r="2"
-            transition:draw={{
-              duration: 200,
-              delay: 200,
-              easing: cubicOut,
-            }}
-          />
-          <rect
-            x="6"
-            y="6"
-            width="12"
-            height="12"
-            transition:draw={{
-              duration: 100,
-              delay: 0,
-              easing: cubicOut,
-            }}
-          />
-        {:else}
-          <line
-            x1="8"
-            y1="6"
-            x2="21"
-            y2="6"
-            transition:draw={{
-              duration: 300,
-              delay: 100,
-              easing: cubicOut,
-            }}
-          />
-          <line
-            x1="8"
-            y1="12"
-            x2="21"
-            y2="12"
-            transition:draw={{
-              duration: 300,
-              delay: 200,
-              easing: quintOut,
-            }}
-          />
-          <line
-            x1="8"
-            y1="18"
-            x2="21"
-            y2="18"
-            transition:draw={{
-              duration: 400,
-              delay: 200,
-              easing: cubicOut,
-            }}
-          />
-          <line x1="3" y1="6" x2="3.01" y2="6" />
-          <line x1="3" y1="12" x2="3.01" y2="12" />
-          <line x1="3" y1="18" x2="3.01" y2="18" />
-        {/if}
-      </svg>
-    </icon>
-  </label>
+  <Tooltip.Root
+    content={titleVisible ? "Bubble view" : "Lined list view"}
+    side="bottom"
+    delayDuration={350}
+  >
+    <label id="changeView">
+      <input type="checkbox" bind:checked={titleVisible} />
+      <icon>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="feather feather-stop-circle"
+        >
+          {#if titleVisible}
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+              transition:draw={{
+                duration: 500,
+                delay: 0,
+                easing: cubicOut,
+              }}
+            />
+            <circle
+              cx="12"
+              cy="12"
+              r="2"
+              transition:draw={{
+                duration: 200,
+                delay: 200,
+                easing: cubicOut,
+              }}
+            />
+            <rect
+              x="6"
+              y="6"
+              width="12"
+              height="12"
+              transition:draw={{
+                duration: 100,
+                delay: 0,
+                easing: cubicOut,
+              }}
+            />
+          {:else}
+            <line
+              x1="8"
+              y1="6"
+              x2="21"
+              y2="6"
+              transition:draw={{
+                duration: 300,
+                delay: 100,
+                easing: cubicOut,
+              }}
+            />
+            <line
+              x1="8"
+              y1="12"
+              x2="21"
+              y2="12"
+              transition:draw={{
+                duration: 300,
+                delay: 200,
+                easing: quintOut,
+              }}
+            />
+            <line
+              x1="8"
+              y1="18"
+              x2="21"
+              y2="18"
+              transition:draw={{
+                duration: 400,
+                delay: 200,
+                easing: cubicOut,
+              }}
+            />
+            <line x1="3" y1="6" x2="3.01" y2="6" />
+            <line x1="3" y1="12" x2="3.01" y2="12" />
+            <line x1="3" y1="18" x2="3.01" y2="18" />
+          {/if}
+        </svg>
+      </icon>
+    </label>
+  </Tooltip.Root>
   <span class="status">
     {#if searchTerm}“{searchTerm}” · {/if}
     {bookmarkListSize} sites
@@ -322,10 +339,16 @@
     border: 0px;
     border-bottom: 2px solid #b5b5b5;
     height: 30px;
-    width: 98%;
+    width: 100%;
     text-align: center;
     font-size: 30px;
     padding: 10px 0px;
+  }
+  /* Tooltip-обёртка поиска — на всю ширину filter bar */
+  filterBar :global(.tooltip-root.block) {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 98%;
   }
   #search:focus {
     border-bottom: 2px solid #395e9d;
