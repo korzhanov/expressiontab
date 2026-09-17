@@ -263,22 +263,22 @@
   .multiButton {
     z-index: 1000;
     position: absolute;
-    // Смещаем ось круга вправо-вверх — кнопки не на пути курсора к иконке
-    top: 0.35rem;
-    left: 2.1rem;
+    // Центр над иконкой — дуга сверху, не заезжает на соседний dial справа
+    top: 0.15rem;
+    left: 1.25rem;
     border-radius: 100%;
-    width: 10rem;
-    height: 10rem;
+    width: 6.5rem;
+    height: 6.5rem;
     opacity: 1;
     transform: translate(-50%, -50%);
     // Пустая зона не перехватывает клик — открывается <a> под меню
     pointer-events: none;
   }
   .multiButton.menuFlip {
-    // У правого края viewport — круг слева от иконки
-    left: auto;
-    right: 2.1rem;
-    transform: translate(50%, -50%);
+    // У края экрана чуть сдвигаем, дуга остаётся сверху
+    left: 1.25rem;
+    right: auto;
+    transform: translate(-50%, -50%);
   }
   .multiButton button {
     display: grid;
@@ -296,46 +296,52 @@
     cursor: pointer;
     transition: left 0.2s ease, top 0.2s ease;
     box-shadow: 0 0 0rem -0.25rem var(--background);
+    z-index: 1001;
     &:hover {
       background: var(--text);
       color: var(--background);
       box-shadow: 0 0 1rem -0.25rem var(--background);
-      z-index: 1000;
+      z-index: 1002;
     }
-    // Дуга справа-сверху (★ / copy / delete) — не перекрывает подход мыши слева
+    // Дуга сверху: ★ слева-вверху, copy в зените, delete справа-вверху
     &:first-child:nth-last-child(3),
     &:first-child:nth-last-child(3) ~ * {
       &:nth-child(1) {
-        left: 50%;
-        top: 15.625%;
+        left: 22%;
+        top: 28%;
       }
       &:nth-child(2) {
-        left: 75%;
-        top: 25%;
+        left: 50%;
+        top: 8%;
       }
       &:nth-child(3) {
-        left: 84.375%;
-        top: 50%;
+        left: 78%;
+        top: 28%;
       }
     }
   }
   .multiButton.menuFlip button {
-    // Зеркало: дуга слева
+    // Та же верхняя дуга (симметрия не нужна — соседи слева/справа одинаково)
     &:first-child:nth-last-child(3),
     &:first-child:nth-last-child(3) ~ * {
       &:nth-child(1) {
-        left: 50%;
-        top: 15.625%;
+        left: 22%;
+        top: 28%;
       }
       &:nth-child(2) {
-        left: 25%;
-        top: 25%;
+        left: 50%;
+        top: 8%;
       }
       &:nth-child(3) {
-        left: 15.625%;
-        top: 50%;
+        left: 78%;
+        top: 28%;
       }
     }
+  }
+  // Hovered dial выше соседей — кнопки не «под» соседней иконкой
+  anchor:hover,
+  anchor.menuFlip {
+    z-index: 50;
   }
   anchor a {
     color: #ddd;

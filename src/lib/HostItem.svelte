@@ -161,6 +161,10 @@
     cursor: pointer;
     position: relative;
   }
+  .hovicon:hover {
+    // Меню/пульс поверх соседних dial в ряду
+    z-index: 40;
+  }
   .hovicon:after {
     pointer-events: none;
     position: absolute;
