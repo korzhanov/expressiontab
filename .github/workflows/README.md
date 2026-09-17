@@ -10,7 +10,7 @@ Workflow [`project-auto-triage.yml`](./project-auto-triage.yml) автомати
 
 `pull_request_target` читает workflow с **base** ветки (часто `main`). Файл обязан существовать там, иначе автодобавление не сработает.
 
-### Требуемый секрет
+### Требуемый секрет (публичный репо)
 
 `GITHUB_TOKEN` **не** имеет доступа к user-owned Projects v2.
 
@@ -18,13 +18,15 @@ Workflow [`project-auto-triage.yml`](./project-auto-triage.yml) автомати
 
 | Name | Value |
 |------|--------|
-| `PROJECT_TOKEN` | Classic PAT со scope **`project`** (для private repo ещё **`repo`**) |
+| `PROJECT_TOKEN` | Classic PAT **только** со scope **`project`** |
 
-Создание PAT: GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token → отметить `project`.
+Репо **публичный** — scope `repo` **не** нужен. Не коммитить PAT в git / issue / PR. Полные правила: [`.cursor/rules/public-repo-security.mdc`](../../.cursor/rules/public-repo-security.mdc).
+
+Создание PAT: GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token → отметить **только** `project`.
 
 ### После настройки
 
-1. Убедиться, что секрет `PROJECT_TOKEN` задан в **korzhanov/expressiontab**.
+1. Убедиться, что секрет `PROJECT_TOKEN` задан в **korzhanov/expressiontab** (значение нигде больше не дублировать).
 2. Actions → **project auto triage** → Run workflow → backfill = true (один раз для уже открытых PR).
 3. Новые PR (`opened` / `reopened` / `ready_for_review`) попадут в проект сами.
 

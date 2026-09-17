@@ -37,7 +37,14 @@ Fixes: #(Issue Number)
 3. Chrome → Extensions → Load unpacked → `builds/expressiontab`
 4. Open new tab / Options → Enable
 
+## Security checklist (public repo)
+
+- [ ] No secrets / PAT / `.env` in the diff
+- [ ] No new broad `permissions` / `host_permissions` without justification
+- [ ] No remote code execution / silent exfiltration of history or bookmarks
+
 ## Other information
 
 <!-- Screenshots of new-tab UI before/after if UI changed. -->
 <!-- Скрины new-tab до/после при изменении UI. -->
+<!-- Do not paste tokens or Authorization headers. -->

@@ -33,7 +33,7 @@ jobs:
           PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN }}
         run: |
           if [ -z "$PROJECT_TOKEN" ]; then
-            echo "::error::Secret PROJECT_TOKEN is not set. Create a classic PAT with scope 'project' (+ 'repo' if private) and add it as repo secret PROJECT_TOKEN."
+            echo "::error::Secret PROJECT_TOKEN is not set. Create a classic PAT with scope 'project' only (public repo) and add it as repo secret PROJECT_TOKEN. Never commit the token."
             exit 1
           fi
 
