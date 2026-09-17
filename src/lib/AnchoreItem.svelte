@@ -1,13 +1,15 @@
 <script lang="ts">
   import Icon, { Star, Trash, Duplicate } from "svelte-hero-icons";
   import globe from "../assets/Globe.svg";
-  import { fly } from "svelte/transition";
+  import { fly, fade } from "svelte/transition";
   import { favicons } from "./stores";
 
   export let anchor: any = {};
   export let unfold: boolean | null = null;
   export let childrenInvisible: boolean | null = true;
   export let titleVisible: boolean = false;
+  /** Вложенная ссылка группы в lined — отступ слева */
+  export let nested: boolean = false;
 
   $: id = anchor?.id || 0;
   $: isBookmark = anchor?.isBookmark || false;
@@ -114,10 +116,11 @@
   <anchor
     bind:this={anchorEl}
     {title}
-    style:margin={titleVisible ? "4px 0" : `${Math.min(weightVisits, 2) * 8 + 8}px`}
+    style:margin={titleVisible ? "2px 0" : `${Math.min(weightVisits, 2) * 8 + 8}px`}
     class:isBookmark
     class:invisible={!childrenInvisible}
     class:titleVisible
+    class:nested={nested && titleVisible}
     class:menuFlip
     on:contextmenu={openMenu}
     on:mouseleave={scheduleCloseMenu}
@@ -159,6 +162,8 @@
       <div
         class="multiButton"
         class:menuFlip
+        class:lined={titleVisible}
+        transition:fade={{ duration: 160 }}
         on:mouseenter={keepMenuOpen}
         on:mouseleave={scheduleCloseMenu}
       >
@@ -213,6 +218,7 @@
   anchor {
     --background: #fff;
     --text: black;
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
     position: relative;
     width: 50px;
     height: 50px;
@@ -223,16 +229,33 @@
     display: block;
     padding-right: 0px;
     box-sizing: border-box;
-    transition: transform 0.3s ease, border-color 0.3s ease;
+    transition: transform 0.35s var(--ease-out), border-color 0.35s var(--ease-out),
+      background-color 0.35s var(--ease-out), box-shadow 0.35s var(--ease-out);
   }
   anchor.titleVisible {
     width: 100%;
     height: auto;
-    min-height: 36px;
-    border-radius: 8px;
-    border-width: 2px;
-    margin: 4px 0;
-    padding: 4px 8px;
+    min-height: 40px;
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.06);
+    margin: 2px 0;
+    padding: 8px 12px;
+    background-color: rgba(255, 255, 255, 0.03);
+  }
+  // Вложенные URL группы — визуальная иерархия списка
+  anchor.titleVisible.nested {
+    background-color: transparent;
+    border-color: transparent;
+    padding: 6px 10px;
+    min-height: 34px;
+  }
+  anchor.titleVisible:hover {
+    background-color: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+  anchor.titleVisible.nested:hover {
+    background-color: rgba(255, 255, 255, 0.05);
   }
   anchor bgcircle {
     width: 30px;
@@ -249,9 +272,7 @@
     filter: brightness(1) contrast(1) saturate(1.3);
     transform: translateZ(0);
     box-shadow: 5px 5px 10px #222;
-  }
-  anchor:hover bgcircle {
-    will-change: transform, opacity;
+    transition: transform 0.45s var(--ease-out), opacity 0.35s var(--ease-out);
   }
   anchor.isBookmark {
     background-color: #484848;
@@ -260,10 +281,16 @@
     border-style: solid;
     padding: 3px;
   }
+  anchor.titleVisible.isBookmark {
+    border-width: 1px !important;
+    border-color: rgba(240, 192, 64, 0.35);
+    background-color: rgba(240, 192, 64, 0.06);
+    padding: 8px 12px;
+  }
   .multiButton {
     z-index: 1000;
     position: absolute;
-    // Центр над иконкой — дуга сверху, не заезжает на соседний dial справа
+    // Центр над иконкой — дуга сверху (bubble view)
     top: 0.15rem;
     left: 1.25rem;
     border-radius: 100%;
@@ -275,10 +302,28 @@
     pointer-events: none;
   }
   .multiButton.menuFlip {
-    // У края экрана чуть сдвигаем, дуга остаётся сверху
     left: 1.25rem;
     right: auto;
     transform: translate(-50%, -50%);
+  }
+  // Lined list: кнопки справа в ряд — не перекрывают заголовок и соседей
+  .multiButton.lined {
+    top: 50%;
+    left: auto;
+    right: 10px;
+    width: auto;
+    height: auto;
+    border-radius: 0;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+  }
+  .multiButton.lined.menuFlip {
+    right: 10px;
+    left: auto;
+    transform: translateY(-50%);
   }
   .multiButton button {
     display: grid;
@@ -294,7 +339,9 @@
     pointer-events: auto;
     transform: translateZ(0) translate(-50%, -50%);
     cursor: pointer;
-    transition: left 0.2s ease, top 0.2s ease;
+    transition: left 0.28s var(--ease-out), top 0.28s var(--ease-out),
+      background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease,
+      transform 0.28s var(--ease-out);
     box-shadow: 0 0 0rem -0.25rem var(--background);
     z-index: 1001;
     &:hover {
@@ -303,7 +350,7 @@
       box-shadow: 0 0 1rem -0.25rem var(--background);
       z-index: 1002;
     }
-    // Дуга сверху: ★ слева-вверху, copy в зените, delete справа-вверху
+    // Дуга сверху: ★ / copy / delete (bubble)
     &:first-child:nth-last-child(3),
     &:first-child:nth-last-child(3) ~ * {
       &:nth-child(1) {
@@ -320,8 +367,23 @@
       }
     }
   }
+  .multiButton.lined button {
+    position: static;
+    transform: none;
+    width: 1.75rem;
+    height: 1.75rem;
+    flex-shrink: 0;
+    &:first-child:nth-last-child(3),
+    &:first-child:nth-last-child(3) ~ * {
+      &:nth-child(1),
+      &:nth-child(2),
+      &:nth-child(3) {
+        left: auto;
+        top: auto;
+      }
+    }
+  }
   .multiButton.menuFlip button {
-    // Та же верхняя дуга (симметрия не нужна — соседи слева/справа одинаково)
     &:first-child:nth-last-child(3),
     &:first-child:nth-last-child(3) ~ * {
       &:nth-child(1) {
@@ -365,6 +427,8 @@
     width: 100%;
     height: auto;
     min-height: 28px;
+    padding-right: 6.5rem; // место под ряд кнопок справа
+    color: rgba(255, 255, 255, 0.88);
   }
   anchor a span {
     display: block;

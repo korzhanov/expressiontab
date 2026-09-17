@@ -48,7 +48,7 @@
     windowWidth: number = 0;
 
   // Высота ряда ≈ max(anchorGroup с margin/border, крупные favicon) — без overflow:hidden
-  $: rowEstimate = titleVisible ? 56 : 220;
+  $: rowEstimate = titleVisible ? 48 : 220;
 
   const titleVisibleStore = writable(false);
   setContext("titleVisible", titleVisibleStore);
@@ -400,12 +400,14 @@
   }
   anchores .itemWrapper.lined {
     height: auto;
-    min-height: 56px;
+    min-height: 48px;
     flex-direction: column;
     align-items: stretch;
     justify-content: flex-start;
     align-content: stretch;
     overflow: visible;
+    gap: 2px;
+    padding: 4px 8px;
   }
 
   .lds-circle {

@@ -91,26 +91,33 @@
       {/if}
     </anchorGroup>
     {#if unfold}
-      {#each unfoldSlice.visible as item (item)}
-        {#if $nodesList[item]?.url}
-          <AnchoreItem
-            anchor={$nodesList[item]}
-            childrenInvisible={childrenInvisible}
-            titleVisible={$titleVisibleStore}
-          />
+      <div
+        class="groupChildren"
+        class:lined={$titleVisibleStore}
+      >
+        {#each unfoldSlice.visible as item (item)}
+          {#if $nodesList[item]?.url}
+            <AnchoreItem
+              anchor={$nodesList[item]}
+              childrenInvisible={childrenInvisible}
+              titleVisible={$titleVisibleStore}
+              nested={!!$titleVisibleStore}
+            />
+          {/if}
+        {/each}
+        {#if unfoldSlice.hasMore}
+          <button class="showMore" type="button" on:click={showMore}>
+            +{otherAnchores.length - unfoldSlice.visible.length} more
+          </button>
         {/if}
-      {/each}
-      {#if unfoldSlice.hasMore}
-        <button class="showMore" type="button" on:click={showMore}>
-          +{otherAnchores.length - unfoldSlice.visible.length} more
-        </button>
-      {/if}
+      </div>
     {/if}
   {/if}
 {/if}
 
 <style lang="scss">
   anchorGroup {
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
     width: 50px;
     height: 50px;
     display: flex;
@@ -124,37 +131,68 @@
     background-color: #6c519433;
     border-radius: 50%;
     margin: 16px;
-    transition: border-color 0.3s ease, background-color 0.3s ease;
+    transition: border-color 0.35s var(--ease-out),
+      background-color 0.35s var(--ease-out);
   }
   anchorGroup.lined {
     width: 100%;
     height: auto;
-    min-height: 40px;
-    border-radius: 8px;
-    border-width: 2px !important;
-    margin: 4px 0;
+    min-height: 44px;
+    border-radius: 10px;
+    border-width: 1px !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    margin: 2px 0;
     justify-content: flex-start;
-    padding: 4px 8px;
+    padding: 0;
+    filter: none;
+    background-color: rgba(255, 255, 255, 0.03);
   }
   anchorGroup:hover {
     border: 12px solid #1d1d1df2 !important;
   }
   anchorGroup.lined:hover {
-    border-width: 2px !important;
+    border-width: 1px !important;
+    border-color: rgba(255, 255, 255, 0.14) !important;
+  }
+
+  // Вложенные ссылки группы в lined — отступ + направляющая слева
+  .groupChildren.lined {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 2px 0 10px 14px;
+    padding: 4px 0 4px 14px;
+    border-left: 2px solid rgba(255, 255, 255, 0.12);
+    animation: groupReveal 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @keyframes groupReveal {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   .showMore {
-    background: #333;
-    color: #ddd;
-    border: 1px solid #555;
-    border-radius: 6px;
+    background: transparent;
+    color: #aaa;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
     padding: 6px 12px;
-    margin: 8px;
+    margin: 4px 0;
     cursor: pointer;
     font-size: 12px;
+    align-self: flex-start;
+    transition: background-color 0.25s ease, color 0.25s ease,
+      border-color 0.25s ease;
   }
   .showMore:hover {
-    background: #444;
+    background: rgba(255, 255, 255, 0.06);
+    color: #eee;
+    border-color: rgba(255, 255, 255, 0.2);
   }
 
   .hovicon {
@@ -179,7 +217,7 @@
     -webkit-font-smoothing: antialiased;
   }
   .hovicon.effect-8 {
-    transition: background 0.2s ease;
+    transition: background 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   }
   .hovicon.effect-8:after {
     top: 0;
@@ -193,13 +231,18 @@
     /* без scale на самом элементе — иначе дёрганье при скролле */
     background-color: #ffffffcf;
   }
-  /* Пульсация (sonar) при наведении */
+  /* Пульсация (sonar) при наведении — только bubble view */
   .hovicon.effect-8:hover:after {
     animation: sonarEffect 1.4s ease-out 0s infinite;
   }
-  /* В раскрытом виде пульс не крутим — меньше шума */
+  /* Lined: без sonar и без белой вспышки — читаемый текст */
+  .hovicon.effect-8.lined:hover {
+    background-color: rgba(255, 255, 255, 0.07);
+  }
+  .hovicon.effect-8.lined:hover:after,
   .unfold.hovicon.effect-8:hover:after {
     animation: none;
+    opacity: 0;
   }
   @keyframes sonarEffect {
     0% {
