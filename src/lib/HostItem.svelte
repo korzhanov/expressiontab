@@ -1,5 +1,6 @@
 <script lang="ts">
   import { getContext } from "svelte";
+  import Icon, { ChevronDown } from "svelte-hero-icons";
   import AnchoreItem from "./AnchoreItem.svelte";
   import { longhover, GROUP_LONGHOVER_MS } from "./longhover";
   import { nodesList } from "./stores";
@@ -11,7 +12,10 @@
   $: anchores = hostItem?.nodes || [];
   $: hostAnchore = $nodesList[anchores[0]] || {};
   $: otherAnchores = anchores[1] ? anchores.slice(1) : [];
-  $: groupHint = `${otherAnchores.length} more links — click icon to open, hover 3s or right-click to expand`;
+  $: groupHint = `${otherAnchores.length} more — arrow toggles, hover 3s or right-click`;
+  $: toggleLabel = unfold
+    ? `Hide ${otherAnchores.length} more links`
+    : `Show ${otherAnchores.length} more links`;
 
   let unfold = false;
   let childrenInvisible = false;
@@ -96,6 +100,22 @@
             titleVisible={$titleVisibleStore}
           />
         {/if}
+        <!-- Явная кнопка раскрытия группы (стандартный button + chevron) -->
+        <Tooltip.Root content={toggleLabel} side="left" delayDuration={250}>
+          <button
+            type="button"
+            class="groupToggle"
+            class:lined={$titleVisibleStore}
+            aria-expanded={unfold}
+            aria-label={toggleLabel}
+            on:click|stopPropagation={toggleGroup}
+          >
+            <Icon src={ChevronDown} solid size={$titleVisibleStore ? "18" : "16"} />
+            {#if $titleVisibleStore}
+              <span class="groupToggleCount">{otherAnchores.length}</span>
+            {/if}
+          </button>
+        </Tooltip.Root>
       </anchorGroup>
     </Tooltip.Root>
     {#if unfold}
@@ -151,9 +171,74 @@
     border-color: rgba(255, 255, 255, 0.08) !important;
     margin: 2px 0;
     justify-content: flex-start;
-    padding: 0;
+    align-items: center;
+    padding: 0 8px 0 0;
     filter: none;
     background-color: rgba(255, 255, 255, 0.03);
+    gap: 4px;
+  }
+  // В lined родительская строка растягивается, стрелка справа
+  anchorGroup.lined :global(.tooltip-root.block) {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .groupToggle {
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    flex-shrink: 0;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    margin: 0;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #eee;
+    line-height: 0;
+    cursor: pointer;
+    z-index: 5;
+    transition: background-color 0.25s var(--ease-out), border-color 0.25s var(--ease-out),
+      transform 0.25s var(--ease-out), color 0.25s ease;
+  }
+  .groupToggle:hover {
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.28);
+  }
+  .groupToggle :global(svg) {
+    display: block;
+    margin: 0;
+    transition: transform 0.3s var(--ease-out);
+  }
+  .groupToggle[aria-expanded="true"] :global(svg) {
+    transform: rotate(180deg);
+  }
+  // Bubble: компактный бейдж на группе
+  .groupToggle:not(.lined) {
+    position: absolute;
+    right: -2px;
+    bottom: -2px;
+    width: 1.5rem;
+    height: 1.5rem;
+    background: #1f1f1f;
+    border-color: rgba(255, 255, 255, 0.25);
+  }
+  .groupToggle.lined {
+    width: auto;
+    min-width: 2.25rem;
+    height: 2rem;
+    padding: 0 8px;
+    border-radius: 8px;
+    margin-right: 4px;
+  }
+  .groupToggleCount {
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    color: rgba(255, 255, 255, 0.75);
   }
   anchorGroup:hover {
     border: 12px solid #1d1d1df2 !important;

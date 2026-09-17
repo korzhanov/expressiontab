@@ -19,6 +19,8 @@
   $: visitCount = anchor?.visitCount || 1;
   $: hostVisitCount = anchor?.hostVisitCount || 0;
   $: host = anchor?.host || "localhost";
+  // В lined кнопки меньше — иконки тоже, иначе съезжают
+  $: actionIconSize = titleVisible ? "14" : "18";
   $: weightVisits = Math.log10(
     Math.max(unfold ? visitCount : hostVisitCount, visitCount) * 1 || 1
   );
@@ -178,23 +180,29 @@
             <button
               class:isBookmark
               type="button"
+              aria-label="Bookmark"
               on:click={() => changeBookmark()}
             >
-              <Icon src={Star} solid size="22" />
+              <Icon src={Star} solid size={actionIconSize} />
             </button>
           </Tooltip.Root>
           <Tooltip.Root content="Copy url" side="top" delayDuration={200}>
             <button
               class="copyToBuffer"
               type="button"
+              aria-label="Copy url"
               on:click={(e) => copyToBuffer(e, url)}
             >
-              <Icon src={Duplicate} solid size="22" />
+              <Icon src={Duplicate} solid size={actionIconSize} />
             </button>
           </Tooltip.Root>
           <Tooltip.Root content="Delete" side="top" delayDuration={200}>
-            <button type="button" on:click={() => deleteAnchore()}>
-              <Icon src={Trash} solid size="22" />
+            <button
+              type="button"
+              aria-label="Delete"
+              on:click={() => deleteAnchore()}
+            >
+              <Icon src={Trash} solid size={actionIconSize} />
             </button>
           </Tooltip.Root>
         </div>
@@ -340,15 +348,19 @@
     transform: translateY(-50%);
   }
   .multiButton button {
-    display: grid;
-    place-items: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     position: static;
     width: 2rem;
     height: 2rem;
+    padding: 0;
+    margin: 0;
     border: none;
     border-radius: 100%;
     background: var(--background);
     color: var(--text);
+    line-height: 0;
     // Только кнопки ловят клик (контейнер pointer-events: none)
     pointer-events: auto;
     transform: none;
@@ -362,6 +374,12 @@
       color: var(--background);
       box-shadow: 0 0 1rem -0.25rem var(--background);
       z-index: 1002;
+    }
+    // Центр иконки внутри круга (svelte-hero-icons / svg)
+    :global(svg) {
+      display: block;
+      margin: 0;
+      flex-shrink: 0;
     }
   }
   // Дуга сверху: позиции на обёртках Tooltip (не на button)
