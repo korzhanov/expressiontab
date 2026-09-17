@@ -1,104 +1,79 @@
 <script lang="ts">
-  import { onMount, onDestroy, tick, getContext, hasContext } from "svelte";
-  import Icon, {
-    Star,
-    Trash,
-    Pencil,
-    Duplicate,
-    ClipboardCopy,
-    Globe,
-  } from "svelte-hero-icons";
+  import Icon, { Star, Trash, Duplicate } from "svelte-hero-icons";
   import globe from "../assets/Globe.svg";
-  import { fly, scale, slide } from "svelte/transition";
-  import { quintOut } from "svelte/easing";
-  import { filteredListSliced, nodesList } from "./stores";
+  import { fly } from "svelte/transition";
+  import { favicons } from "./stores";
 
   export let index: number = 0;
-  console.log("index", index);
-  // let index: number = anchor.index || 0;
-  export let anchor: any = $nodesList[index] || {};
-  // console.log("$nodesList", $nodesList);
-  // console.log("$nodesList[index]", $nodesList[index]);
-  // console.log("anchor", anchor);
-  let now = new Date();
-  // let dateAdded: number = anchor.dateAdded || now.getTime();
-  // let dateGroupModified: number = anchor.dateGroupModified || now.getTime();
-  // let lastVisitTime: number = anchor.lastVisitTime || now.getTime();
-  let id: number = anchor.id || 0;
+  export let anchor: any = {};
   export let unfold: boolean | null = null;
-  export let childrenInvisible: boolean | null = null;
-  let typedCount: number = anchor.typedCount || 0;
-  let parentId: number | null = anchor.parentId || null;
-  let isBookmark: boolean = anchor.isBookmark || false;
-  let title: string = anchor.title || "";
-  let url: string = anchor.url || "";
-  let visitCount: number = anchor.visitCount || 1;
-  let hostVisitCount: any = anchor.hostVisitCount || 0;
-  let multiButton: boolean = false;
-  let deleted: boolean = false;
-  let maxVisits: number = localStorage?.maxVisits * 1 || 500;
+  export let childrenInvisible: boolean | null = true;
+  export let titleVisible: boolean = false;
 
-  export let weightVisits: number =
-    // anchor.weightVisits ||
-    Math.log10(Math.max(unfold ? visitCount : hostVisitCount, visitCount) * 1);
-  let weightVisitsRadius: any = anchor.weightVisitsRadius || 50;
+  $: id = anchor?.id || 0;
+  $: isBookmark = anchor?.isBookmark || false;
+  $: title = anchor?.title || "";
+  $: url = anchor?.url || "";
+  $: visitCount = anchor?.visitCount || 1;
+  $: hostVisitCount = anchor?.hostVisitCount || 0;
+  $: host = anchor?.host || "localhost";
+  $: weightVisits = Math.log10(
+    Math.max(unfold ? visitCount : hostVisitCount, visitCount) * 1 || 1
+  );
+  $: weightVisitsRadius = anchor?.weightVisitsRadius || 50;
 
-  let ping = "";
-  try {
-    let tmping: URL = new URL(url);
-    tmping.searchParams.append("utm_network", "ExpressionTab_ChromeExtension");
-    ping = tmping.href;
-  } catch (e) {
-    console.error(url);
-    console.error(e);
-  }
-  export let host = "";
-  host = host || anchor.host || "localhost";
-  // try {
-  //     host = new URL(url).host.split(":")[0] || "localhost";
-  // } catch (e) {
-  //     console.log("No favicon for url: ", url);
-  // }
+  let multiButton = false;
+  let menuFlip = false;
+  let deleted = false;
+  let closeTimer: ReturnType<typeof setTimeout> | null = null;
+  let anchorEl: HTMLElement;
 
-  // @todo если нет сохраненного фавикона
-  // показать сначала по прямой ссылке
-  // в следующий раз можно показать и кэшированный
-  // let src: string = "https://s2.googleusercontent.com/s2/favicons?domain_url=" + host;
-  let src: string = globe;
-  let img_data: string =
-    // localStorage.getItem("favicon_" + host) ||
-    anchor.img_data || "https://favicon.yandex.net/favicon/" + host;
-  // @todo написать поиск фавикон по url.path
+  $: src =
+    $favicons.get(host) ||
+    (typeof localStorage !== "undefined"
+      ? localStorage.getItem("favicon_" + host)
+      : null) ||
+    anchor?.img_data ||
+    globe;
 
-  if (img_data.length > 0) {
-    src = img_data;
+  function openMenu(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (closeTimer) {
+      clearTimeout(closeTimer);
+      closeTimer = null;
+    }
+    if (anchorEl) {
+      const rect = anchorEl.getBoundingClientRect();
+      menuFlip = rect.left < 120;
+    }
+    multiButton = true;
   }
 
-  // function remove(todo) {
-  // 	todos = todos.filter(t => t !== todo);
-  // }
+  function scheduleCloseMenu() {
+    if (closeTimer) clearTimeout(closeTimer);
+    closeTimer = setTimeout(() => {
+      multiButton = false;
+    }, 280);
+  }
 
-  // Чтобы получить значок для домена, используйте:
-  // https://s2.googleusercontent.com/s2/favicons?domain=www.stackoverflow.com
-  // http://www.google.com/s2/favicons?domain=somedomain.com
-
-  // Чтобы получить значок для URL-адреса, используйте:
-  // https://s2.googleusercontent.com/s2/favicons?domain_url=https://www.stackoverflow.com
-  // chrome://favicon2/?size=16&scale_factor=1x&page_url=https%3A%2F%2Fdocs.google.com%2Fforms%2Fd%2Fe%2F1FAIpQLSckRt0pts60MaYbNv73y5tiIMjLsfpuEdHwrsFXr9v6Bi21fg%2Fviewform&allow_google_server_fallback=0
+  function keepMenuOpen() {
+    if (closeTimer) {
+      clearTimeout(closeTimer);
+      closeTimer = null;
+    }
+    multiButton = true;
+  }
 
   async function copyToBuffer(e: Event, copyText: string) {
     e.preventDefault();
-    document.addEventListener(
-      "copy",
-      function(e) {
-        e.clipboardData?.setData("text/plain", copyText);
-        e.preventDefault();
-      },
-      true
-    );
-    document.execCommand("copy");
-    // console.log("copied text : ", copyText);
+    try {
+      await navigator.clipboard.writeText(copyText);
+    } catch (err) {
+      console.error(err);
+    }
   }
+
   async function changeBookmark() {
     if (isBookmark) {
       chrome.bookmarks.remove(String(id));
@@ -111,6 +86,7 @@
       isBookmark = true;
     }
   }
+
   async function deleteAnchore() {
     if (isBookmark) {
       chrome.bookmarks.remove(String(id));
@@ -125,65 +101,31 @@
   }
 </script>
 
-{#if !deleted}
-  <!-- {@debug url} -->
-  <!-- {@debug weightVisits}} -->
-  <!-- {#if !new RegExp("^" + ignoreUrl.join("|")).test(url)}
-        class:titleVisible -->
-  <!-- transition:scale="{{duration: 500, delay: 500, opacity: 0.5, start: 0.5, easing: quintOut}}" -->
-  <!-- 
-
-        width:{weightVisits * 100 + 50}px;
-        height:{weightVisits * 100 + 50}px;
-        z-index: -{Math.ceil(weightVisits * 1000)};  
-
-        on:contextmenu|stopPropagation|preventDefault="{() => {
-				adjusting = !adjusting;
-				if (adjusting) selected = circle;
-			}}"
-    class="rounded-full"
-    on:mouseover={() => (multiButton = true)}
-    on:mouseleave={() => (multiButton = false)}
-    in:slide={{ duration: 700, delay: 300 }}
-    out:slide={{ duration: 700, delay: 300 }}
-    out:scale={{duration: 330, delay: 20, opacity: 0.1, start: 0.5, easing: quintOut}}
-    in:fly={{ x: -90, y: -20, duration: 350 }}
-
-
-    in:scale={{ duration: 330, opacity: 0.5, start: 0.5 }}
-    out:fly={{ x: -70, y: -20, duration: 350 }}
-
-  -->
-  <!-- -->
+{#if !deleted && anchor}
   <anchor
+    bind:this={anchorEl}
     {title}
-    style:margin="{weightVisits * 10 + 10}px;"
+    style:margin={titleVisible ? "4px 0" : `${weightVisits * 10 + 10}px`}
     class:isBookmark
     class:invisible={!childrenInvisible}
-    on:contextmenu|stopPropagation|preventDefault={() => (multiButton = true)}
-    on:mouseleave|stopPropagation|preventDefault={() => (multiButton = false)}
+    class:titleVisible
+    class:menuFlip
+    on:contextmenu={openMenu}
+    on:mouseleave={scheduleCloseMenu}
+    on:mouseenter={keepMenuOpen}
   >
-    <bgcircle
-      style="
+    {#if !titleVisible}
+      <bgcircle
+        style="
     transform: translateZ(0) scale({(weightVisits * 1 + 1).toFixed(2)});
     background-image: url('{src}');
 "
-    />
-    <!-- style="background-image: url('{src}');" -->
+      />
+    {/if}
     <slot />
-    <a {ping} href={url}>
-      <!-- 
-        transition:scale={{
-          duration: 500,
-          delay: 50,
-          opacity: 0.5,
-          start: 0.5,
-          easing: quintOut,
-        }} -->
-
+    <a href={url}>
       <anchoricon style:background-image="url('{src}')" />
-      <!-- style="background-image: url('{src}');" -->
-      {#if unfold === false}
+      {#if unfold === false && !titleVisible}
         <anchoricon
           class="subicon"
           in:fly={{ x: 95, duration: 300 }}
@@ -199,32 +141,25 @@
         />
       {/if}
 
-      <span>
-        <strong>{title}</strong> | {isBookmark ? "⭐" : visitCount + " visits"}
+      <span class:showTitle={titleVisible}>
+        <strong>{title || host}</strong>
+        | {isBookmark ? "bookmark" : visitCount + " visits"}
       </span>
     </a>
     {#if multiButton}
-        <!-- in:fly={{ x: 5, duration: 300 }}
-        out:fly={{ x: 5, duration: 300 }} -->
       <div
-        class:multiButton
-        on:mouseenter|stopPropagation|preventDefault={() => {}}
+        class="multiButton"
+        class:menuFlip
+        on:mouseenter={keepMenuOpen}
+        on:mouseleave={scheduleCloseMenu}
       >
         <button
           class:isBookmark
           title="Bookmark"
-          on:click={(e) => changeBookmark()}
+          on:click={() => changeBookmark()}
         >
           <Icon src={Star} solid size="22" />
         </button>
-        <!-- {#if isBookmark}
-      {:else}
-        {/if}
-          {#if isBookmark}
-              <button class="fas fa-comment" title="Edit">
-                  <Icon src={Pencil} solid size="22" />
-              </button>
-          {/if} -->
         <button
           class="copyToBuffer"
           title="Copy url"
@@ -245,14 +180,6 @@
     display: none;
   }
 
-  @keyframes width-grow {
-    0% {
-      width: 0px;
-    }
-    100% {
-      width: auto;
-    }
-  }
   anchoricon {
     height: 18px;
     width: 18px;
@@ -285,12 +212,18 @@
     border: 10px solid transparent;
     text-overflow: ellipsis;
     display: block;
-    position: relative;
     padding-right: 0px;
     box-sizing: border-box;
-    animation: -global-width-grow-anchor 1s
-      cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
-    transition: all 0.6s ease;
+    transition: transform 0.3s ease, border-color 0.3s ease;
+  }
+  anchor.titleVisible {
+    width: 100%;
+    height: auto;
+    min-height: 36px;
+    border-radius: 8px;
+    border-width: 2px;
+    margin: 4px 0;
+    padding: 4px 8px;
   }
   anchor bgcircle {
     width: 30px;
@@ -304,24 +237,13 @@
     left: 0;
     top: 0;
     z-index: -1;
-    filter: brightness(1) contrast(1) saturate(1.3) blur(5px);
+    filter: brightness(1) contrast(1) saturate(1.3);
     transform: translateZ(0);
     box-shadow: 5px 5px 10px #222;
-    // animation: pulseEffect 3s both infinite;
-    // }
-
-    // $percent: 1%;
-    // @for $i from 1 through 20 {
-    // :global(* bgcircle:nth-of-type(#{$i}) ) {
-    // bgcircle {
-    will-change: transform, filter, opacity;
-    // animation: pulseEffect infinite;
-    // animation-duration: 10s;
-    // transition-delay: 10s;
-    // animation-delay: 10s;
   }
-  // }
-
+  anchor:hover bgcircle {
+    will-change: transform, opacity;
+  }
   anchor.isBookmark {
     background-color: #484848;
     border-width: 7px !important;
@@ -330,19 +252,21 @@
     padding: 3px;
   }
   .multiButton {
-    z-index: -1000;
+    z-index: 1000;
     position: absolute;
     top: 1.25rem;
     left: 1.25rem;
     border-radius: 100%;
-    width: 0rem;
-    height: 0rem;
-    opacity: 0;
+    width: 10rem;
+    height: 10rem;
+    opacity: 1;
     transform: translate(-50%, -50%);
-    transition: 0.25s cubic-bezier(0.25, 0, 0, 1) 1.5s;
+    pointer-events: auto;
   }
-  .multiButton:hover {
-    z-index: 1000;
+  .multiButton.menuFlip {
+    left: auto;
+    right: 1.25rem;
+    transform: translate(50%, -50%);
   }
   .multiButton button {
     display: grid;
@@ -356,8 +280,7 @@
     color: var(--text);
     transform: translateZ(0) translate(-50%, -50%);
     cursor: pointer;
-    // transition: 0.25s cubic-bezier(0.25, 0, 0, 1) 1.5s;
-    transition: left, top 0.25s cubic-bezier(0.25, 0, 0, 1) 1.5s;
+    transition: left 0.2s ease, top 0.2s ease;
     box-shadow: 0 0 0rem -0.25rem var(--background);
     &:hover {
       background: var(--text);
@@ -365,29 +288,8 @@
       box-shadow: 0 0 1rem -0.25rem var(--background);
       z-index: 1000;
     }
-    &:first-child:nth-last-child(1),
-    &:first-child:nth-last-child(1) ~ * {
-      //If there is 1 child
-      &:nth-child(1) {
-        left: 25%;
-        top: 25%;
-      }
-    }
-    &:first-child:nth-last-child(2),
-    &:first-child:nth-last-child(2) ~ * {
-      //If there are 2 children
-      &:nth-child(1) {
-        left: 37.5%;
-        top: 18.75%;
-      }
-      &:nth-child(2) {
-        left: 18.75%;
-        top: 37.5%;
-      }
-    }
     &:first-child:nth-last-child(3),
     &:first-child:nth-last-child(3) ~ * {
-      //If there are 3 children
       &:nth-child(1) {
         left: 50%;
         top: 15.625%;
@@ -401,34 +303,23 @@
         top: 50%;
       }
     }
-    &:first-child:nth-last-child(4), //If there are 4 children, if first child is also 4th item from bottom get self, and
-                &:first-child:nth-last-child(4) ~ * {
-      //If there are 4 children, if first child is also 4th item from bottom get siblings
+  }
+  .multiButton.menuFlip button {
+    &:first-child:nth-last-child(3),
+    &:first-child:nth-last-child(3) ~ * {
       &:nth-child(1) {
-        left: 62.5%;
-        top: 18.75%;
+        left: 50%;
+        top: 15.625%;
       }
       &:nth-child(2) {
-        left: 37.5%;
-        top: 18.75%;
+        left: 75%;
+        top: 25%;
       }
       &:nth-child(3) {
-        left: 18.75%;
-        top: 37.5%;
-      }
-      &:nth-child(4) {
-        left: 18.75%;
-        top: 62.5%;
+        left: 84.375%;
+        top: 50%;
       }
     }
-  }
-
-  anchor:hover .multiButton,
-  .multiButton:focus-within {
-    z-index: 100;
-    width: 10rem;
-    height: 10rem;
-    opacity: 1;
   }
   anchor a {
     color: #ddd;
@@ -444,15 +335,10 @@
     flex-wrap: nowrap;
     align-content: flex-end;
   }
-  anchor:hover a {
-    opacity: 1;
-  }
-  .titleVisible anchor a span {
-    display: block;
-    min-width: 100px;
-    width: auto;
-    opacity: 1;
-    transition: width 0.6s ease, opacity 1s linear;
+  anchor.titleVisible a {
+    width: 100%;
+    height: auto;
+    min-height: 28px;
   }
   anchor a span {
     display: block;
@@ -460,24 +346,16 @@
     overflow: hidden;
     opacity: 0;
   }
-
-  @keyframes -global-width-grow-anchor {
-    0% {
-      width: 50px;
-    }
-    100% {
-      width: auto;
-    }
-  }
-  @keyframes pulseEffect {
-    0% {
-      opacity: 1;
-    }
-    40% {
-      opacity: 0.7;
-    }
-    100% {
-      opacity: 1;
-    }
+  anchor a span.showTitle {
+    display: block;
+    min-width: 100px;
+    width: auto;
+    flex: 1;
+    opacity: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+    margin-left: 8px;
   }
 </style>
