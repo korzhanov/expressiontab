@@ -1,8 +1,9 @@
 /node_modules/
 /dist/
 /builds/
-/.vscode/
 /.history/
+docs/pr-evidence/**
+!docs/pr-evidence/.gitkeep
 .DS_Store
 
 # Logs
@@ -112,3 +113,9 @@ dist
 
 # Idea
 .idea/
+
+# Локальные скрины для PR (в git только .gitkeep)
+docs/pr-evidence/**
+!docs/pr-evidence/.gitkeep
+yarn.lock
+package-lock.json

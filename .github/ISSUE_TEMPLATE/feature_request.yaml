@@ -1,0 +1,30 @@
+name: "💡 Feature Request"
+description: Request a new feature for ExpressionTab
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to propose a new idea
+  - type: textarea
+    id: problem
+    attributes:
+      label: Describe the problem
+      description: Please provide a clear and concise description of the problem this feature would solve.
+      placeholder: I would like to...
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Describe the proposed solution
+      description: Description or design of what you would like to be implemented
+      placeholder: I would like to see...
+    validations:
+      required: true
+  - type: checkboxes
+    id: searched
+    attributes:
+      label: Have you checked if this issue has already been raised?
+      options:
+        - label: I did not find any similar issues
+          required: true

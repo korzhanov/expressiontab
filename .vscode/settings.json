@@ -1,0 +1,10 @@
+{
+  "npm.packageManager": "bun",
+  "npm.scriptRunner": "bun",
+  "bun.enable": true,
+  "bun.test.enable": true,
+  "playwright.env": {},
+  "terminal.integrated.cwd": "${workspaceFolder}",
+  "css.lint.unknownAtRules": "ignore",
+  "scss.lint.unknownAtRules": "ignore"
+}

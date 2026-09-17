@@ -1,126 +1,123 @@
 <script lang="ts">
-  import { setContext, getContext, hasContext, tick } from "svelte";
-  import { children } from "svelte/internal";
-  import { fly, scale, slide } from "svelte/transition";
-
+  import { getContext } from "svelte";
   import AnchoreItem from "./AnchoreItem.svelte";
-  import { longhover } from "./longhover";
-  import { toDataURL } from "./utils";
-  import { filteredListSliced, nodesList } from "./stores";
+  import { longhover, GROUP_LONGHOVER_MS } from "./longhover";
+  import { nodesList } from "./stores";
+  import { getUnfoldSlice, UNFOLD_PAGE_SIZE } from "./bookmarks";
 
-  export let key: any;
   export let hostItem: any;
-  let anchores = hostItem.nodes || [];
-  // console.log("anchores",anchores);
-  // console.log("hostitem $nodesList",$nodesList);
-  let hostAnchore = $nodesList[anchores[0]] || [];
-  //   let domain = new URL(anchores[0].url).host.split(":")[0]  ;
-  let otherAnchores = anchores[1] ? anchores.slice(1) : [];
-  // console.log("otherAnchores",otherAnchores);
-  let tweenOtherAnchores: Array<any> = [];
+
+  $: anchores = hostItem?.nodes || [];
+  $: hostAnchore = $nodesList[anchores[0]] || {};
+  $: otherAnchores = anchores[1] ? anchores.slice(1) : [];
+
   let unfold = false;
   let childrenInvisible = false;
+  let visibleChildCount = UNFOLD_PAGE_SIZE;
 
-  let favicon_localhost = localStorage.favicon_localhost;
+  $: unfoldSlice = getUnfoldSlice(otherAnchores, visibleChildCount);
 
-  async function tweenAnchores() {
-    unfold = !unfold;
-    childrenInvisible = !childrenInvisible;
-    // let changedHost = $filteredListSliced[key];
-    // filteredListSliced.update((value)=>{
-    //   value[key] = changedHost;
-    //   return value;
-    // });
-    // if (unfold == true) { // если выпадает
-    //   let minLenght: number = otherAnchores.length; // минимальная длина массива
-    //   if (otherAnchores.length > 50) { // если больше 50 элементов
-    //     minLenght = Math.min(Math.floor(otherAnchores.length / 2), 50); // минимальная длина массива
-    //   }
-    //   for (let i = 0; i < minLenght; i++) { // проходим по массиву и добавляем в массив твинов
-    //     let newItem = otherAnchores[i];
-    //     // setTimeout(async function() {
-    //       tweenOtherAnchores[i] = newItem;
-    //     // }, 150);
-    //     // tweenOtherAnchores[i] = newItem;
-    //   }
-    //   if (otherAnchores.length > 50) { // если больше 50 элементов
-    //     setTimeout(async function() {
-    //       await tick();
-    //       tweenOtherAnchores = otherAnchores;
-    //     }, 350);
-    //   }
-    //   console.log("minLengh = " + minLenght);
-    // } else {
-    //   console.log("unfold ", unfold);
-    //   tweenOtherAnchores = tweenOtherAnchores.slice(
-    //     0,
-    //     Math.min(Math.floor(tweenOtherAnchores.length / 3), 100)
-    //   );
-    //   for (let j = 0; j < tweenOtherAnchores.length; j++) {
-    //     setTimeout(async function(j: number) {
-    //       tweenOtherAnchores.pop();
-    //       // tweenOtherAnchores.slice(
-    //       //    tweenOtherAnchores.length - 2, 1
-    //       // );
-    //       tweenOtherAnchores = tweenOtherAnchores;
-    //     }, 300);
-    //   }
-    // }
-    hostAnchore = hostAnchore;
+  const titleVisibleStore = getContext("titleVisible");
+
+  function openGroup(e?: Event) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (!unfold) {
+      unfold = true;
+      childrenInvisible = true;
+      visibleChildCount = UNFOLD_PAGE_SIZE;
+    }
   }
 
-  // let maxVisits = hostAnchore.hostVisitCount;
-  // if (hasContext('maxVisits')) {
-  // 	maxVisits = Math.max(getContext('maxVisits'), maxVisits);
-  // }
-  // setContext('maxVisits', maxVisits);
+  function toggleGroup(e?: Event) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (unfold) {
+      unfold = false;
+      childrenInvisible = false;
+      visibleChildCount = UNFOLD_PAGE_SIZE;
+    } else {
+      openGroup();
+    }
+  }
 
+  /** Клик по группе: не трогаем <a>/кнопки — иначе ссылки не открываются */
+  function onGroupClick(e: MouseEvent) {
+    const el = e.target as HTMLElement | null;
+    if (el?.closest?.("a, button, .multiButton")) return;
+    toggleGroup(e);
+  }
 
+  function showMore(e: Event) {
+    e.preventDefault();
+    e.stopPropagation();
+    visibleChildCount = unfoldSlice.nextCount;
+  }
 </script>
 
 {#if hostItem}
   {#if anchores.length < 2}
     {#each anchores as item (item)}
-      <!-- <AnchoreItem anchor={$nodesList[item]} {host} childrenInvisible={false} /> -->
-      <AnchoreItem index={item}  childrenInvisible={false} />
+      {#if $nodesList[item]?.url}
+        <AnchoreItem
+          anchor={$nodesList[item]}
+          childrenInvisible={true}
+          titleVisible={$titleVisibleStore}
+        />
+      {/if}
     {/each}
   {:else}
     <anchorGroup
       class="hovicon effect-8"
-      use:longhover={3000}
-      on:longhover|stopPropagation|preventDefault={tweenAnchores}
-      on:contextmenu={() => (unfold = true)}
+      class:lined={$titleVisibleStore}
+      use:longhover={GROUP_LONGHOVER_MS}
+      on:longhover|stopPropagation|preventDefault={openGroup}
+      on:contextmenu|stopPropagation|preventDefault={openGroup}
+      on:click|stopPropagation={onGroupClick}
       class:unfold
-      title={otherAnchores.length}
+      title="{otherAnchores.length} more links — click icon to open, hover 3s or right-click to expand"
     >
-      <!-- <AnchoreItem
-        anchor={hostAnchore}
-        {host}
-        {unfold}
-        childrenInvisible={true}
-      /> -->
-      <AnchoreItem
-        index={anchores[0]}
-        {unfold}
-        childrenInvisible={true}
-      />
+      {#if hostAnchore?.url}
+        <AnchoreItem
+          anchor={hostAnchore}
+          {unfold}
+          childrenInvisible={true}
+          titleVisible={$titleVisibleStore}
+        />
+      {/if}
     </anchorGroup>
     {#if unfold}
-      <!-- <div class="otherAnchores"> -->
-      {#each otherAnchores as item (item)}
-        <!-- <AnchoreItem anchor={$nodesList[item]} {host} {childrenInvisible} /> -->
-        <AnchoreItem index={item}  {childrenInvisible} />
-      {/each}
-      <!-- </div> -->
+      <div
+        class="groupChildren"
+        class:lined={$titleVisibleStore}
+      >
+        {#each unfoldSlice.visible as item (item)}
+          {#if $nodesList[item]?.url}
+            <AnchoreItem
+              anchor={$nodesList[item]}
+              childrenInvisible={childrenInvisible}
+              titleVisible={$titleVisibleStore}
+              nested={!!$titleVisibleStore}
+            />
+          {/if}
+        {/each}
+        {#if unfoldSlice.hasMore}
+          <button class="showMore" type="button" on:click={showMore}>
+            +{otherAnchores.length - unfoldSlice.visible.length} more
+          </button>
+        {/if}
+      </div>
     {/if}
-    <!-- {#each otherAnchores as item (item)}
-      <AnchoreItem anchor={item} {host} {childrenInvisible}/>
-    {/each} -->
   {/if}
 {/if}
 
 <style lang="scss">
   anchorGroup {
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
     width: 50px;
     height: 50px;
     display: flex;
@@ -129,29 +126,82 @@
     justify-content: center;
     align-items: baseline;
     flex-direction: row;
-    width: 50px;
-    height: 50px;
-    display: flex;
-    flex-wrap: wrap;
-    align-content: center;
-    justify-content: center;
-    align-items: baseline;
-    flex-direction: row;
-    border: 20px solid #1b1b1bcf !important;
+    border: 12px solid #1b1b1bcf !important;
     filter: saturate(1.12);
     background-color: #6c519433;
     border-radius: 50%;
-    margin: 30px;
-    transition: all 1s ease;
+    margin: 16px;
+    transition: border-color 0.35s var(--ease-out),
+      background-color 0.35s var(--ease-out);
+  }
+  anchorGroup.lined {
+    width: 100%;
+    height: auto;
+    min-height: 44px;
+    border-radius: 10px;
+    border-width: 1px !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    margin: 2px 0;
+    justify-content: flex-start;
+    padding: 0;
+    filter: none;
+    background-color: rgba(255, 255, 255, 0.03);
   }
   anchorGroup:hover {
-    transition: all 1s ease;
-    /* // border: 1px dashed rgb(58, 42, 42) !important; */
-    border: 20px solid #1d1d1df2 !important;
+    border: 12px solid #1d1d1df2 !important;
+  }
+  anchorGroup.lined:hover {
+    border-width: 1px !important;
+    border-color: rgba(255, 255, 255, 0.14) !important;
+  }
+
+  // Вложенные ссылки группы в lined — отступ + направляющая слева
+  .groupChildren.lined {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 2px 0 10px 14px;
+    padding: 4px 0 4px 14px;
+    border-left: 2px solid rgba(255, 255, 255, 0.12);
+    animation: groupReveal 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @keyframes groupReveal {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .showMore {
+    background: transparent;
+    color: #aaa;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    padding: 6px 12px;
+    margin: 4px 0;
+    cursor: pointer;
+    font-size: 12px;
+    align-self: flex-start;
+    transition: background-color 0.25s ease, color 0.25s ease,
+      border-color 0.25s ease;
+  }
+  .showMore:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #eee;
+    border-color: rgba(255, 255, 255, 0.2);
   }
 
   .hovicon {
     cursor: pointer;
+    position: relative;
+  }
+  .hovicon:hover {
+    // Меню/пульс поверх соседних dial в ряду
+    z-index: 40;
   }
   .hovicon:after {
     pointer-events: none;
@@ -160,22 +210,16 @@
     height: 50px;
     border-radius: 50%;
     content: "";
-    -webkit-box-sizing: content-box;
-    -moz-box-sizing: content-box;
     box-sizing: content-box;
   }
   .hovicon:before {
     display: block;
     -webkit-font-smoothing: antialiased;
   }
-  /* Effect 8 */
   .hovicon.effect-8 {
-    will-change: transform, opacity;
-    transition: transform ease-out 0.1s, background;
-    transition: all ease-out 0.7s;
+    transition: background 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   }
   .hovicon.effect-8:after {
-    will-change: transform, opacity;
     top: 0;
     left: 0;
     z-index: -1;
@@ -184,20 +228,21 @@
     transform: scale(0.9);
   }
   .hovicon.effect-8:hover {
-    will-change: transform;
-    transform: scale(0.93);
+    /* без scale на самом элементе — иначе дёрганье при скролле */
     background-color: #ffffffcf;
-    transition: all 0.3;
   }
+  /* Пульсация (sonar) при наведении — только bubble view */
   .hovicon.effect-8:hover:after {
-    will-change: transform;
-    animation: sonarEffect 2.77s cubic-bezier(0, 1.86, 0.93, -0.89) 0.33s;
-    animation-iteration-count: 3;
+    animation: sonarEffect 1.4s ease-out 0s infinite;
   }
+  /* Lined: без sonar и без белой вспышки — читаемый текст */
+  .hovicon.effect-8.lined:hover {
+    background-color: rgba(255, 255, 255, 0.07);
+  }
+  .hovicon.effect-8.lined:hover:after,
   .unfold.hovicon.effect-8:hover:after {
-    will-change: transform;
-    animation: sonarEffect 0.8s ease-in 1s reverse;
-    animation-iteration-count: 3;
+    animation: none;
+    opacity: 0;
   }
   @keyframes sonarEffect {
     0% {

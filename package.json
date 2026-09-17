@@ -1,22 +1,28 @@
 {
   "name": "expressiontab",
-  "author": "Oleg Korzhanov @drug_z",
+  "author": "Oleg @Korzhanov",
   "license": "ISC",
   "version": "0.1.0",
   "description": "Expression New Tab-page for Google Chrome Browser. Spead-dial page extension",
   "scripts": {
-    "dev": "nodemon --delay 1 -e js,ts,svelte,css --watch src --exec \"yarn build\"",
+    "postinstall": "bun scripts/ensure-deps.mjs",
+    "prebuild": "bun scripts/ensure-deps.mjs",
+    "dev": "bun scripts/ensure-deps.mjs && bun scripts/watch-build.mjs",
+    "preview": "bun scripts/ensure-deps.mjs && vite build && bunx --bun serve builds/expressiontab -l 4173",
     "build": "vite build",
     "check": "svelte-check --tsconfig ./tsconfig.json",
-    "test": "eslint ."
+    "lint": "eslint \"src/**/*.{js,ts}\" \"vite.config.js\"",
+    "test": "bun test"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^1.0.0-next.15",
     "@tsconfig/svelte": "^2.0.1",
     "@types/chrome": "^0.0.145",
-    "@typescript-eslint/eslint-plugin": "^4.29.0",
-    "@typescript-eslint/parser": "^4.29.0",
+    "@typescript-eslint/eslint-plugin": "^5.62.0",
+    "@typescript-eslint/parser": "^5.62.0",
     "autoprefixer": "^10.3.0",
+    "browserslist": "^4.29.0",
+    "caniuse-lite": "^1.0.30001810",
     "eslint": "^7.32.0",
     "postcss-load-config": "^3.1.0",
     "postcss-nested": "^5.0.5",
