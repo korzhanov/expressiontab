@@ -40,6 +40,14 @@ export type BubbleNode = SimulationNodeDatum & {
   lastVisitTime?: number;
   /** Порядковый индекс для spawn-delay */
   spawnIndex: number;
+  /** Последний из пачки: остаток ссылок раскрывается из него */
+  isOverflowGroup?: boolean;
+  /** Индексы nodesList, ещё не показанные (хвост после лимита) */
+  overflowChildIndexes?: number[];
+  /** Сколько ссылок спрятано в overflow (+N на бейдже) */
+  overflowCount?: number;
+  /** Сессия вкладок — отдельный визуал */
+  isSession?: boolean;
 };
 
 /** Зазор между ячейками сетки (разграничение ≈ gap/2). */
@@ -47,8 +55,10 @@ export const PACK_GAP = 12;
 
 /** Временно: выключить «гравитацию» (стягивание по X/Y). */
 export const BUBBLE_GRAVITY = true;
-/** Сила связей родитель↔дети (слабее — иначе схлопывает unfold). */
-export const BUBBLE_LINK_STRENGTH = 0.5;
+/** Сила связей родитель↔дети (слабее — меньше пружинит по полю). */
+export const BUBBLE_LINK_STRENGTH = 0.35;
+/** Базовое трение: выше — быстрее успокаиваются после толчка. */
+export const BUBBLE_VELOCITY_DECAY = 0.38;
 
 export type BubbleLink = SimulationLinkDatum<BubbleNode> & {
   id: string;
@@ -66,8 +76,8 @@ export type BubbleWorld = {
 const VIEWPORT_PAD = 120;
 /** Жёсткий потолок тел-хостов в симуляции — защита new-tab */
 export const BUBBLE_SIM_CAP = 400;
-/** Макс. детей на один unfold (раньше 24 — молчаливая обрезка). */
-export const GROUP_MAX_CHILDREN = 500;
+/** Макс. детей на один unfold; хвост → overflow-группа на последнем шаре. */
+export const GROUP_MAX_CHILDREN = 100;
 
 function hostId(host: string): string {
   return `host:${host}`;
@@ -181,6 +191,7 @@ export function buildHostBubbles({
       isBookmark: d.n.isBookmark,
       lastVisitTime: d.group.hostLastVisitTime ?? d.n.lastVisitTime,
       spawnIndex: i,
+      isSession: !!(d.group.isSession || d.n.isSession),
       x,
       y,
       vx: 0,
@@ -271,8 +282,8 @@ export function createBubbleWorld({
     .force("link", linkForce)
     // Как быстро «остывает» движение после толчка (выше — раньше останавливается)
     .alphaDecay(0.022)
-    // Трение: гасит скорость шаров (выше — меньше скольжения)
-    .velocityDecay(0.28);
+    // Трение: гасит скорость шаров (выше — меньше скольжения / пружины)
+    .velocityDecay(BUBBLE_VELOCITY_DECAY);
 
   return { width, height, nodes, links, simulation, linkForce };
 }
@@ -303,7 +314,7 @@ export function beginSoftRadiusAdjust(world: BubbleWorld): void {
 
 /** Вернуть обычное трение и остудить цель активности. */
 export function endSoftRadiusAdjust(world: BubbleWorld): void {
-  world.simulation.velocityDecay(0.28).alphaTarget(0);
+  world.simulation.velocityDecay(BUBBLE_VELOCITY_DECAY).alphaTarget(0);
 }
 
 /**
@@ -313,13 +324,14 @@ export function endSoftRadiusAdjust(world: BubbleWorld): void {
  */
 export function beginDragCollisions(world: BubbleWorld): void {
   world.linkForce.strength(0);
-  world.simulation.velocityDecay(0.35).alphaTarget(0.22).restart();
+  // Чуть выше базового decay — соседи не «летят» за курсором
+  world.simulation.velocityDecay(0.42).alphaTarget(0.18).restart();
 }
 
 /** Конец drag: вернуть links и остудить цель активности. */
 export function endDragCollisions(world: BubbleWorld): void {
   world.linkForce.strength(BUBBLE_LINK_STRENGTH);
-  world.simulation.velocityDecay(0.28).alphaTarget(0);
+  world.simulation.velocityDecay(BUBBLE_VELOCITY_DECAY).alphaTarget(0);
 }
 
 export function resizeWorld(world: BubbleWorld, width: number, height: number): void {
@@ -398,13 +410,11 @@ export function expandHost({
   const parent = world.nodes.find((n) => n.id === hostId(host));
   if (!parent) return 0;
 
-  const existing = new Set(
-    world.nodes.filter((n) => n.parentId === parent.id).map((n) => n.nodeIndex)
-  );
-  const slice = childIndexes
-    .filter((i) => !existing.has(i))
-    .slice(0, maxChildren);
-  if (!slice.length) return 0;
+  const existingNodes = world.nodes.filter((n) => n.parentId === parent.id);
+  const existing = new Set(existingNodes.map((n) => n.nodeIndex));
+  // Все ещё не созданные индексы (без потолка — хвост уйдёт в overflow)
+  const pending = childIndexes.filter((i) => !existing.has(i));
+  if (!pending.length) return 0;
 
   // groupR = сложенный; linkR = вес своей ссылки
   parent.groupR = parent.groupR ?? parent.baseR ?? parent.r;
@@ -423,8 +433,17 @@ export function expandHost({
   const px = parent.x ?? world.width / 2;
   const py = parent.y ?? world.height / 2;
 
+  // Учитываем уже созданных (stagger) — слотов не больше maxChildren
+  const slotsLeft = Math.max(0, maxChildren - existingNodes.length);
+  if (!slotsLeft) return 0;
+  // Если больше лимита — показываем slotsLeft, последний несёт хвост как группу
+  const needsOverflow = pending.length > slotsLeft;
+  const directCount = needsOverflow ? slotsLeft : pending.length;
+  const direct = pending.slice(0, directCount);
+  const overflowTail = needsOverflow ? pending.slice(directCount) : [];
+
   let ci = 0;
-  slice.forEach((nodeIndex) => {
+  direct.forEach((nodeIndex, idx) => {
     const n = nodesList[nodeIndex];
     if (!n?.url) return;
     const visitCount = n.visitCount || 1;
@@ -432,15 +451,20 @@ export function expandHost({
     // Под родителем + лёгкий jitter — физика разнесёт
     const jx = ((ci * 17) % 9) - 4;
     const jy = ((ci * 23) % 9) - 4;
+    const isLast = idx === direct.length - 1;
+    // Последний в пачке + хвост → групповой overflow-шар
+    const makeOverflow = needsOverflow && isLast && overflowTail.length > 0;
     const child: BubbleNode = {
       id: childId(host, nodeIndex),
       kind: "child",
       host,
       nodeIndex,
-      r,
+      r: makeOverflow ? Math.max(r, 36) : r,
       baseR: r,
-      visitCount,
-      title: n.title || host,
+      visitCount: makeOverflow ? visitCount + overflowTail.length : visitCount,
+      title: makeOverflow
+        ? `${n.title || host} (+${overflowTail.length})`
+        : n.title || host,
       url: n.url,
       isBookmark: n.isBookmark,
       lastVisitTime: n.lastVisitTime as number | undefined,
@@ -450,6 +474,9 @@ export function expandHost({
       y: py + jy,
       vx: jx * 0.4,
       vy: jy * 0.4,
+      isOverflowGroup: makeOverflow || undefined,
+      overflowChildIndexes: makeOverflow ? overflowTail : undefined,
+      overflowCount: makeOverflow ? overflowTail.length : undefined,
     };
     world.nodes.push(child);
     world.links.push({
@@ -465,6 +492,113 @@ export function expandHost({
   // keepParentR (stagger) — мягкий толчок; полный expand — чуть сильнее
   if (keepParentR) nudgeSim(world, 0.15);
   else reheat(world, 0.35);
+  return ci;
+}
+
+/**
+ * Раскрыть overflow-шар: дети из overflowChildIndexes (снова с лимитом 100).
+ * Родитель — сам overflow-узел (не host).
+ */
+export function expandOverflowNode({
+  world,
+  parent,
+  nodesList,
+  maxChildren = GROUP_MAX_CHILDREN,
+  spawnIndexBase = 0,
+}: {
+  world: BubbleWorld;
+  parent: BubbleNode;
+  nodesList: BookmarkNode[];
+  maxChildren?: number;
+  spawnIndexBase?: number;
+}): number {
+  const pending = parent.overflowChildIndexes || [];
+  if (!pending.length) return 0;
+
+  const existing = new Set(
+    world.nodes.filter((n) => n.parentId === parent.id).map((n) => n.nodeIndex)
+  );
+  const fresh = pending.filter((i) => !existing.has(i));
+  if (!fresh.length) {
+    parent.isOverflowGroup = false;
+    parent.overflowChildIndexes = [];
+    parent.overflowCount = 0;
+    return 0;
+  }
+
+  const px = parent.x ?? world.width / 2;
+  const py = parent.y ?? world.height / 2;
+  const needsOverflow = fresh.length > maxChildren;
+  const directCount = needsOverflow ? maxChildren : fresh.length;
+  const direct = fresh.slice(0, directCount);
+  const overflowTail = needsOverflow ? fresh.slice(directCount) : [];
+
+  // Родитель после unfold — вес своей ссылки
+  parent.linkR =
+    parent.linkR ??
+    bubbleRadiusFromVisits({ visitCount: nodesList[parent.nodeIndex]?.visitCount || 1 });
+  parent.r = parent.linkR;
+  parent.isOverflowGroup = overflowTail.length > 0;
+  parent.overflowChildIndexes = overflowTail;
+  parent.overflowCount = overflowTail.length;
+  if (!parent.isOverflowGroup) {
+    parent.title = nodesList[parent.nodeIndex]?.title || parent.host;
+  }
+
+  let ci = 0;
+  direct.forEach((nodeIndex, idx) => {
+    const n = nodesList[nodeIndex];
+    if (!n?.url) return;
+    const visitCount = n.visitCount || 1;
+    const r = bubbleRadiusFromVisits({ visitCount });
+    const jx = ((ci * 17) % 9) - 4;
+    const jy = ((ci * 23) % 9) - 4;
+    const isLast = idx === direct.length - 1;
+    const makeOverflow = needsOverflow && isLast && overflowTail.length > 0;
+    const child: BubbleNode = {
+      id: childId(parent.host, nodeIndex),
+      kind: "child",
+      host: parent.host,
+      nodeIndex,
+      r: makeOverflow ? Math.max(r, 36) : r,
+      baseR: r,
+      visitCount: makeOverflow ? visitCount + overflowTail.length : visitCount,
+      title: makeOverflow
+        ? `${n.title || parent.host} (+${overflowTail.length})`
+        : n.title || parent.host,
+      url: n.url,
+      isBookmark: n.isBookmark,
+      lastVisitTime: n.lastVisitTime as number | undefined,
+      parentId: parent.id,
+      spawnIndex: spawnIndexBase + ci,
+      x: px + jx,
+      y: py + jy,
+      vx: jx * 0.4,
+      vy: jy * 0.4,
+      isOverflowGroup: makeOverflow || undefined,
+      overflowChildIndexes: makeOverflow ? overflowTail : undefined,
+      overflowCount: makeOverflow ? overflowTail.length : undefined,
+    };
+    world.nodes.push(child);
+    world.links.push({
+      id: `link:${parent.id}:${child.id}`,
+      source: parent.id,
+      target: child.id,
+    });
+    ci += 1;
+  });
+
+  // Хвост переехал на дочерний overflow — у родителя очищаем
+  if (needsOverflow) {
+    parent.isOverflowGroup = false;
+    parent.overflowChildIndexes = [];
+    parent.overflowCount = 0;
+    parent.title = nodesList[parent.nodeIndex]?.title || parent.host;
+  }
+
+  world.simulation.nodes(world.nodes);
+  world.linkForce.links(world.links);
+  nudgeSim(world, 0.15);
   return ci;
 }
 
@@ -870,11 +1004,19 @@ export function visibleBubbles({
 }): BubbleNode[] {
   const top = scrollY - pad;
   const bottom = scrollY + viewH + pad;
+  // Родители раскрытых детей — тоже не cull'ить (иначе тряска при bounce)
+  const stickyParents = new Set<string>();
+  for (const n of nodes) {
+    if (n.parentId) stickyParents.add(n.parentId);
+  }
   return nodes.filter((n) => {
     // Пин во время drag всегда в DOM
     if (pinnedId && n.id === pinnedId) return true;
     // fx/fy — зафиксирован симуляцией (drag), тоже держим
     if (n.fx != null || n.fy != null) return true;
+    // Дети и их родители всегда в DOM — cull при bounce трясёт поле
+    if (n.parentId) return true;
+    if (stickyParents.has(n.id)) return true;
     const y = n.y ?? 0;
     const r = n.r || 40;
     return y + r >= top && y - r <= bottom;

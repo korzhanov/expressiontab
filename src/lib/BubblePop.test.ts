@@ -18,6 +18,17 @@ describe("BubblePop", () => {
     expect(src).toContain("popping");
   });
 
+  it("BubbleDot shows Bookmark Copy Delete menu and larger favicon", () => {
+    const src = readFileSync(join(import.meta.dir, "BubbleDot.svelte"), "utf8");
+    expect(src).toContain('aria-label="Bookmark"');
+    expect(src).toContain('aria-label="Copy url"');
+    expect(src).toContain('aria-label="Delete"');
+    expect(src).toContain("onToggleBookmark");
+    expect(src).toContain("onDelete");
+    expect(src).toContain('width="22"');
+    expect(src).toContain("multiButton");
+  });
+
   it("bookmark uses white shine and gold star under favicon", () => {
     const src = readFileSync(join(import.meta.dir, "BubbleDot.svelte"), "utf8");
     // Нет жёлтого блика / hue на весь шар
@@ -25,18 +36,26 @@ describe("BubblePop", () => {
     expect(src).not.toMatch(/\.bubbleDot\.bookmark\s*\{[^}]*--hue:\s*42/);
     // Золотая звезда под фавиконом закладок
     expect(src).toContain("bubbleDot__star");
-    expect(src).toContain("starred={bubble.isBookmark}");
-    expect(src).toContain("#f0c040");
+    expect(src).toContain("starred={localBookmark}");
+    // Контур: прозрачный fill + жёлтая обводка
+    expect(src).toContain("fill: transparent");
+    expect(src).toContain("stroke: #f0c040");
+    expect(src).toContain("width: 44px");
   });
 
   it("BubbleField spawns children before pop, then shrinks to linkR; fold pops kids", () => {
     const src = readFileSync(join(import.meta.dir, "BubbleField.svelte"), "utf8");
     const fnAt = src.indexOf("function commitExpandPop");
     expect(fnAt).toBeGreaterThan(0);
-    const body = src.slice(fnAt, fnAt + 2800);
+    const body = src.slice(fnAt, fnAt + 4500);
     // Spawn раньше присвоения poppingId; LEAD_MS и shrink к linkR
-    expect(body.indexOf("expandHost({")).toBeGreaterThan(0);
-    expect(body.indexOf("expandHost({")).toBeLessThan(body.indexOf("poppingId = b.id"));
+    expect(body).toContain("expandHost({");
+    expect(body).toContain("expandOverflowNode");
+    // Хост-путь: последний expandHost до ближайшего poppingId после него
+    const hostExpand = body.lastIndexOf("expandHost({");
+    const popAssign = body.indexOf("poppingId = b.id", hostExpand);
+    expect(hostExpand).toBeGreaterThan(0);
+    expect(popAssign).toBeGreaterThan(hostExpand);
     expect(body).toContain("GROUP_SPAWN_LEAD_MS");
     expect(body).toContain("startShrinkToWeight");
     expect(body).toContain("b.linkR");

@@ -8,6 +8,8 @@ export type HostGroup = {
   host?: string;
   /** Максимальный lastVisitTime среди URL хоста */
   hostLastVisitTime?: number;
+  /** Группа открытых вкладок (session) — верх ряда, другой цвет */
+  isSession?: boolean;
 };
 
 export type ChunkRow = {
@@ -29,8 +31,13 @@ export type BookmarkNode = {
   isBookmark?: boolean;
   id?: number | string;
   img_data?: string;
+  /** Узел из открытых вкладок */
+  isSession?: boolean;
   [key: string]: unknown;
 };
+
+/** Служебный host для группы открытых вкладок окна. */
+export const SESSION_HOST_KEY = "__session-tabs__";
 
 /** Returns true if the URL should be filtered out of the dial. */
 export function shouldIgnoreUrl(url: string | undefined | null): boolean {

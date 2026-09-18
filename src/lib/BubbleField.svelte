@@ -16,6 +16,7 @@
     ENTER_FALL_MS,
     ENTER_RISE_MS,
     expandHost,
+    expandOverflowNode,
     fieldScrollFromRectTop,
     flightPosition,
     GROUP_ABSORB_MS,
@@ -367,8 +368,14 @@
   }
 
   function toggleExpand(b: BubbleNode) {
-    if (!world || b.kind !== "host") return;
+    if (!world) return;
     if (poppingId || collapsingId) return;
+    // Overflow-группа: раскрыть хвост
+    if (b.isOverflowGroup && (b.overflowChildIndexes?.length || 0) > 0) {
+      onInflateStart(b, true, 420);
+      return;
+    }
+    if (b.kind !== "host") return;
     const group = bookmarkList.get(b.host);
     if (!group || group.nodes.length < 2) return;
 
@@ -390,8 +397,37 @@
     autoCommit = false,
     durationMs = GROUP_INFLATE_MS
   ) {
-    if (!world || b.kind !== "host") return;
+    if (!world) return;
     if (poppingId || collapsingId || (inflate && inflate.id !== b.id)) return;
+
+    // Overflow-шар: inflate + expandOverflowNode
+    if (b.isOverflowGroup && (b.overflowChildIndexes?.length || 0) > 0) {
+      if (inflate?.id === b.id) {
+        if (autoCommit) inflate.autoCommit = true;
+        return;
+      }
+      const r0 = b.r;
+      const r1 = Math.max((b.linkR ?? r0) * 0.85, 28);
+      const now =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
+      inflate = {
+        id: b.id,
+        node: b,
+        r0,
+        r1,
+        t0: now,
+        dur: durationMs,
+        raf: 0,
+        autoCommit,
+        mode: "unfold",
+      };
+      pinBubbleAt(b, b.x ?? 0, b.y ?? 0, world.width, world.height);
+      beginSoftRadiusAdjust(world);
+      ensureInflateLoop();
+      return;
+    }
+
+    if (b.kind !== "host") return;
     if (isHostExpanded(world, b.host)) return;
     const group = bookmarkList.get(b.host);
     if (!group || group.nodes.length < 2) return;
@@ -503,6 +539,14 @@
           childStaggerTimer = null;
           return;
         }
+        // Близко к лимиту + хвост — flush (последний станет overflow-группой)
+        if (
+          childSpawnSeq >= GROUP_MAX_CHILDREN - 1 &&
+          pendingChildIndexes.length > 1
+        ) {
+          flushPendingChildren(b);
+          return;
+        }
         const idx = pendingChildIndexes.shift()!;
         expandHost({
           world,
@@ -511,6 +555,7 @@
           nodesList,
           keepParentR: true,
           spawnIndexBase: childSpawnSeq,
+          maxChildren: GROUP_MAX_CHILDREN,
         });
         childSpawnSeq += 1;
         expandedHosts[b.host] = true;
@@ -539,6 +584,7 @@
       nodesList,
       keepParentR: true,
       spawnIndexBase: base,
+      maxChildren: GROUP_MAX_CHILDREN,
     });
     expandedHosts[b.host] = true;
     expandedHosts = { ...expandedHosts };
@@ -667,8 +713,24 @@
 
   /** Longhover 3с: оставшиеся дети сразу + лопание / shrink. */
   function onExpandCommit(b: BubbleNode) {
-    if (!world || b.kind !== "host") return;
+    if (!world) return;
     if (poppingId) return;
+    // Overflow: commit expand хвоста
+    if (b.isOverflowGroup && (b.overflowChildIndexes?.length || 0) > 0) {
+      if (inflate && inflate.id === b.id) {
+        if (inflate.raf && typeof cancelAnimationFrame !== "undefined") {
+          cancelAnimationFrame(inflate.raf);
+        }
+        inflate.node.r = inflate.r1;
+        const node = inflate.node;
+        inflate = null;
+        commitExpandPop(node, { skipSpawn: false });
+        return;
+      }
+      onInflateStart(b, true);
+      return;
+    }
+    if (b.kind !== "host") return;
     // Hover-рост на раскрытой → longhover сворачивает группу
     if (
       isHostExpanded(world, b.host) &&
@@ -720,6 +782,45 @@
   function commitExpandPop(b: BubbleNode, { skipSpawn = false } = {}) {
     if (!world || poppingId || collapsingId) return;
     clearHoverChildSpawn();
+
+    // Overflow-группа: раскрыть хвост из этого шара
+    if (b.isOverflowGroup && (b.overflowChildIndexes?.length || 0) > 0) {
+      if (!skipSpawn) {
+        expandOverflowNode({
+          world,
+          parent: b,
+          nodesList,
+          maxChildren: GROUP_MAX_CHILDREN,
+        });
+        refreshVisible();
+      }
+      if (expandTimer) clearTimeout(expandTimer);
+      expandTimer = setTimeout(() => {
+        expandTimer = null;
+        if (!world) return;
+        const rExpanded = b.r;
+        const rLink =
+          b.linkR ??
+          bubbleRadiusFromVisits({
+            visitCount: nodesList[b.nodeIndex]?.visitCount || 1,
+          });
+        b.linkR = rLink;
+        poppingId = b.id;
+        inflateTick += 1;
+        startShrinkToWeight(b, rExpanded, rLink);
+        expandTimer = setTimeout(() => {
+          expandTimer = null;
+          if (!world) return;
+          b.r = rLink;
+          unpinBubble(b);
+          poppingId = null;
+          inflateTick += 1;
+          refreshVisible();
+        }, GROUP_POP_MS);
+      }, GROUP_SPAWN_LEAD_MS);
+      return;
+    }
+
     const group = bookmarkList.get(b.host);
     if (
       !skipSpawn &&
@@ -992,6 +1093,75 @@
     }
   }
 
+  /** Star: создать / снять закладку в chrome.bookmarks. */
+  function onBubbleToggleBookmark(b: BubbleNode) {
+    try {
+      if (typeof chrome === "undefined" || !chrome.bookmarks) return;
+      if (b.isBookmark && b.nodeIndex != null) {
+        const node = nodesList[b.nodeIndex];
+        const id = node?.id;
+        if (id != null) chrome.bookmarks.remove(String(id));
+        b.isBookmark = false;
+      } else {
+        chrome.bookmarks.create({ url: b.url, title: b.title }, (created) => {
+          b.isBookmark = true;
+          const node = nodesList[b.nodeIndex];
+          if (node && created?.id) {
+            node.isBookmark = true;
+            node.id = created.id;
+          }
+        });
+        b.isBookmark = true;
+      }
+      inflateTick += 1;
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  /** Delete: pop → убрать из симуляции + history/bookmarks. */
+  function onBubbleDelete(b: BubbleNode) {
+    if (!world || poppingId) return;
+    poppingId = b.id;
+    inflateTick += 1;
+    const url = b.url;
+    const node = nodesList[b.nodeIndex];
+    setTimeout(() => {
+      if (!world) return;
+      const drop = new Set<string>([b.id]);
+      for (const n of world.nodes) {
+        if (n.parentId === b.id) drop.add(n.id);
+      }
+      world.nodes = world.nodes.filter((n) => !drop.has(n.id));
+      world.links = world.links.filter((l) => {
+        const s = typeof l.source === "object" ? (l.source as BubbleNode).id : l.source;
+        const t = typeof l.target === "object" ? (l.target as BubbleNode).id : l.target;
+        return !drop.has(String(s)) && !drop.has(String(t));
+      });
+      world.simulation.nodes(world.nodes);
+      world.linkForce.links(world.links);
+      poppingId = null;
+      inflateTick += 1;
+      refreshVisible();
+      try {
+        if (typeof chrome !== "undefined") {
+          if (node?.isBookmark && node.id != null) {
+            chrome.bookmarks.remove(String(node.id));
+          }
+          chrome.history?.deleteUrl?.({ url });
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }, GROUP_POP_MS);
+  }
+
+  /** Host с >1 URL или overflow-хвост — groupable. */
+  function isGroupableBubble(b: BubbleNode): boolean {
+    if (b.isOverflowGroup && (b.overflowChildIndexes?.length || 0) > 0) return true;
+    return b.kind === "host" && (bookmarkList.get(b.host)?.nodes.length || 0) > 1;
+  }
+
   $: {
     const key = `${bookmarkList.size}:${nodesList.length}`;
     if (bookmarkList.size && key !== builtKey) {
@@ -1063,11 +1233,13 @@
       inflating={inflate?.id === b.id}
       popping={poppingId === b.id || !!poppingChildIds[b.id]}
       enterAnim={enterAnimById[b.id] || "initial"}
-      groupable={b.kind === "host" && (bookmarkList.get(b.host)?.nodes.length || 0) > 1}
+      groupable={isGroupableBubble(b)}
+      session={!!b.isSession}
       expanded={!!expandedHosts[b.host] && b.kind === "host"}
       onInflateStart={() => {
         // Раскрытая группа — медленный рост; иначе unfold-сжатие
-        if (world && isHostExpanded(world, b.host)) onExpandedHoverGrow(b);
+        if (world && b.kind === "host" && isHostExpanded(world, b.host))
+          onExpandedHoverGrow(b);
         else onInflateStart(b, false);
       }}
       onInflateCancel={() => onInflateCancel(b)}
@@ -1075,6 +1247,8 @@
       onExpandRequest={() => onExpandRequest(b)}
       onPointerDown={(e) => onBubblePointerDown(b, e)}
       onLinkClick={onBubbleClick}
+      onDelete={() => onBubbleDelete(b)}
+      onToggleBookmark={() => onBubbleToggleBookmark(b)}
     />
   {/each}
 </section>

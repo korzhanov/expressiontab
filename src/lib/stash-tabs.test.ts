@@ -4,9 +4,13 @@ import {
   planStash,
   stashFolderTitle,
   stashOpenTabs,
+  buildOpenTabsSession,
+  mergeSessionIntoIndex,
+  primaryHostFromTabs,
   type StashChrome,
   type TabLike,
 } from "./stash-tabs";
+import { SESSION_HOST_KEY } from "./bookmarks";
 
 const tabs: TabLike[] = [
   { id: 1, url: "chrome-extension://abc/newtab/index.html", title: "NT", windowId: 1 },
@@ -36,10 +40,14 @@ describe("isStashableTab / planStash", () => {
 });
 
 describe("stashFolderTitle", () => {
-  it("labels window vs all with a timestamp", () => {
+  it("labels dated folder with primary host and tab count", () => {
     const now = new Date(2026, 8, 18, 3, 5);
-    expect(stashFolderTitle(false, now)).toBe("ExpressionTab · окно · 2026-09-18 03:05");
-    expect(stashFolderTitle(true, now)).toBe("ExpressionTab · все · 2026-09-18 03:05");
+    expect(stashFolderTitle(false, now, { primaryHost: "google.com", tabCount: 160 })).toBe(
+      "2026.09.18 google.com and 160+ tabs"
+    );
+    expect(stashFolderTitle(true, now, { primaryHost: "a.example", tabCount: 12 })).toBe(
+      "2026.09.18 a.example and 12+ tabs (all)"
+    );
   });
 });
 
@@ -84,7 +92,7 @@ describe("stashOpenTabs", () => {
     });
     expect(result.bookmarked).toBe(1);
     expect(result.closed).toBe(2);
-    expect(fake.created[0].title).toBe("ExpressionTab · окно · 2026-09-18 03:05");
+    expect(fake.created[0].title).toBe("2026.09.18 a.example and 2+ tabs");
     expect(fake.created[1].url).toBe("https://a.example/one");
     expect(fake.created[1].parentId).toBe(fake.created[0].id);
     expect(fake.removed).toEqual([2, 3]);
@@ -110,5 +118,48 @@ describe("stashOpenTabs", () => {
     expect(result).toEqual({ bookmarked: 0, closed: 0, skipped: 2 });
     expect(fake.created).toEqual([]);
     expect(fake.removed).toEqual([]);
+  });
+});
+
+describe("open tabs session", () => {
+  it("primaryHostFromTabs picks the most common host", () => {
+    expect(
+      primaryHostFromTabs([
+        { url: "https://a.example/1" },
+        { url: "https://b.example/1" },
+        { url: "https://a.example/2" },
+      ])
+    ).toBe("a.example");
+  });
+
+  it("buildOpenTabsSession skips current and non-http", () => {
+    const session = buildOpenTabsSession({
+      tabs,
+      currentTabId: 1,
+    });
+    expect(session).toBeTruthy();
+    expect(session!.group.isSession).toBe(true);
+    expect(session!.group.host).toBe(SESSION_HOST_KEY);
+    // tabs 2,3,6 stashable-ish; 4 chrome, 5 pinned still included if http
+    // buildOpenTabsSession only skips current + shouldIgnoreUrl (pinned OK for display)
+    expect(session!.nodes.length).toBeGreaterThanOrEqual(3);
+    expect(session!.nodes[0].title).toContain("Open tabs");
+  });
+
+  it("mergeSessionIntoIndex prepends session and shifts indexes", () => {
+    const session = buildOpenTabsSession({
+      tabs: [
+        { id: 10, url: "https://x.test/", title: "X" },
+        { id: 11, url: "https://y.test/", title: "Y" },
+      ],
+    })!;
+    const bookmarkList = new Map([
+      ["old.test", { nodes: [0], hostVisitCount: 1, host: "old.test" }],
+    ]);
+    const nodesList = [{ url: "https://old.test/", title: "Old" }];
+    const merged = mergeSessionIntoIndex({ bookmarkList, nodesList, session });
+    expect([...merged.bookmarkList.keys()][0]).toBe(SESSION_HOST_KEY);
+    expect(merged.bookmarkList.get("old.test")!.nodes[0]).toBe(session.nodes.length);
+    expect(merged.nodesList[0].isSession).toBe(true);
   });
 });

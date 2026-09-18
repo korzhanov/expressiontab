@@ -428,17 +428,20 @@ describe("bubble-physics", () => {
     stopWorld(world);
   });
 
-  it("expandHost spawns more than old 24-child cap", async () => {
+  it("expandHost caps at GROUP_MAX_CHILDREN with overflow on last", async () => {
     const {
       buildHostBubbles,
       createBubbleWorld,
       expandHost,
+      expandOverflowNode,
+      GROUP_MAX_CHILDREN,
       stopWorld,
     } = await import("./bubble-physics");
+    expect(GROUP_MAX_CHILDREN).toBe(100);
     const nodesList: any[] = [
       { url: "https://c.test/0", title: "c0", visitCount: 80 },
     ];
-    for (let i = 1; i <= 40; i++) {
+    for (let i = 1; i <= 150; i++) {
       nodesList.push({
         url: `https://c.test/${i}`,
         title: `c${i}`,
@@ -450,7 +453,7 @@ describe("bubble-physics", () => {
         "c.test",
         {
           nodes: nodesList.map((_, i) => i),
-          hostVisitCount: 160,
+          hostVisitCount: 300,
           hostLastVisitTime: 1,
         },
       ],
@@ -468,9 +471,33 @@ describe("bubble-physics", () => {
       childIndexes: nodesList.map((_, i) => i).slice(1),
       nodesList,
     });
-    expect(n).toBe(40);
-    expect(world.nodes.filter((x) => x.kind === "child").length).toBe(40);
+    // Ровно 100 прямых детей; последний — overflow с хвостом
+    expect(n).toBe(100);
+    const kids = world.nodes.filter((x) => x.kind === "child");
+    expect(kids.length).toBe(100);
+    const overflow = kids.find((k) => k.isOverflowGroup);
+    expect(overflow).toBeTruthy();
+    expect(overflow!.overflowCount).toBe(50);
+    // Раскрыть overflow — ещё пачка
+    const added = expandOverflowNode({
+      world,
+      parent: overflow!,
+      nodesList,
+    });
+    expect(added).toBe(50);
+    expect(world.nodes.filter((x) => x.kind === "child").length).toBe(150);
     stopWorld(world);
+  });
+
+  it("visibleBubbles keeps children even outside pad", async () => {
+    const { visibleBubbles } = await import("./bubble-physics");
+    const nodes = [
+      { id: "host:a", kind: "host", y: 100, r: 40 },
+      { id: "child:a:1", kind: "child", parentId: "host:a", y: 900, r: 20 },
+    ] as any;
+    const vis = visibleBubbles({ nodes, scrollY: 0, viewH: 200, pad: 40 });
+    expect(vis.map((n) => n.id)).toContain("child:a:1");
+    expect(vis.map((n) => n.id)).toContain("host:a");
   });
 
   it("collide keeps nodes from overlapping after ticks", async () => {
@@ -544,18 +571,18 @@ describe("bubble-physics", () => {
       height: 400,
     });
     beginDragCollisions(world);
-    expect(world.simulation.alphaTarget()).toBe(0.22);
+    expect(world.simulation.alphaTarget()).toBe(0.18);
     // Links выкл — иначе drag схлопывает unfold к центру
     expect((world.linkForce.strength() as () => number)()).toBe(0);
     endDragCollisions(world);
     expect(world.simulation.alphaTarget()).toBe(0);
-    expect((world.linkForce.strength() as () => number)()).toBe(0.45);
+    expect((world.linkForce.strength() as () => number)()).toBe(0.35);
     // Soft radius: больше трения, низкая цель — без взрыва поля
     beginSoftRadiusAdjust(world);
     expect(world.simulation.alphaTarget()).toBe(0.05);
     expect(world.simulation.velocityDecay()).toBe(0.55);
     endSoftRadiusAdjust(world);
-    expect(world.simulation.velocityDecay()).toBe(0.28);
+    expect(world.simulation.velocityDecay()).toBe(0.38);
     expect(world.simulation.alphaTarget()).toBe(0);
     world.simulation.alpha(0.01);
     nudgeSim(world, 0.1);

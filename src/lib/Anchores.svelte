@@ -15,7 +15,7 @@
     type HostGroup,
   } from "./bookmarks";
   import { isMockChrome } from "./chrome-mock";
-  import { stashOpenTabs, type StashChrome } from "./stash-tabs";
+  import { stashOpenTabs, loadOpenTabsForSession, mergeSessionIntoIndex, type StashChrome } from "./stash-tabs";
   import {
     downloadLinksCsv,
     importLinksFromCsvText,
@@ -128,7 +128,30 @@
     loader = true;
 
     const s = await getNodes(searchTerm);
-    const built = buildBookmarkIndex(s[0] || [], s[1] || []);
+    let built = buildBookmarkIndex(s[0] || [], s[1] || []);
+
+    // Открытые вкладки — сверху как session-группа (другой цвет)
+    const api = stashChrome();
+    if (api && !searchTerm.trim()) {
+      try {
+        const session = await loadOpenTabsForSession(api);
+        if (session) {
+          const merged = mergeSessionIntoIndex({
+            bookmarkList: built.bookmarkList,
+            nodesList: built.nodesList,
+            session,
+          });
+          built = {
+            ...built,
+            bookmarkList: merged.bookmarkList,
+            nodesList: merged.nodesList,
+          };
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
     bookmarkList = built.bookmarkList;
     nodesList.set(built.nodesList);
     localStorage.maxVisits = built.maxVisits + "";

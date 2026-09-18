@@ -20,8 +20,8 @@
   $: visitCount = anchor?.visitCount || 1;
   $: hostVisitCount = anchor?.hostVisitCount || 0;
   $: host = anchor?.host || "localhost";
-  // В lined кнопки меньше — иконки тоже, иначе съезжают
-  $: actionIconSize = titleVisible ? "14" : "18";
+  // В lined кнопки чуть меньше ряда; в bubble — крупнее
+  $: actionIconSize = titleVisible ? "16" : "22";
   $: weightVisits = Math.log10(
     Math.max(unfold ? visitCount : hostVisitCount, visitCount) * 1 || 1
   );
@@ -231,17 +231,18 @@
   }
 
   anchoricon {
-    height: 18px;
-    width: 18px;
-    margin: 6px;
-    transform: translateZ(0) scale(1.2);
+    height: 24px;
+    width: 24px;
+    margin: 4px 8px 4px 4px;
+    transform: translateZ(0) scale(1);
     background-repeat: no-repeat;
     background-position: center;
-    border-radius: 2px;
+    border-radius: 4px;
     background-image: url("../assets/Globe.svg");
     background-size: contain;
     box-sizing: border-box;
-    filter: drop-shadow(3px 1px 4px rgba(20, 20, 20, 0.52));
+    filter: drop-shadow(2px 1px 3px rgba(20, 20, 20, 0.45));
+    flex-shrink: 0;
   }
   anchoricon.subicon {
     position: absolute;
@@ -289,27 +290,28 @@
   anchor.titleVisible {
     width: 100%;
     height: auto;
-    min-height: 40px;
-    border-radius: 10px;
+    min-height: 44px;
+    border-radius: 12px;
     border-width: 1px;
-    border-color: rgba(255, 255, 255, 0.06);
-    margin: 2px 0;
-    padding: 8px 12px;
-    background-color: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.07);
+    margin: 3px 0;
+    padding: 10px 14px;
+    background-color: rgba(255, 255, 255, 0.035);
   }
   // Вложенные URL группы — визуальная иерархия списка
   anchor.titleVisible.nested {
     background-color: transparent;
     border-color: transparent;
-    padding: 6px 10px;
-    min-height: 34px;
+    padding: 7px 12px 7px 8px;
+    min-height: 36px;
+    border-radius: 8px;
   }
   anchor.titleVisible:hover {
-    background-color: rgba(255, 255, 255, 0.07);
-    border-color: rgba(255, 255, 255, 0.12);
+    background-color: rgba(255, 255, 255, 0.075);
+    border-color: rgba(255, 255, 255, 0.14);
   }
   anchor.titleVisible.nested:hover {
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: rgba(255, 255, 255, 0.055);
   }
   anchor bgcircle {
     width: 30px;
@@ -433,8 +435,8 @@
     top: 28%;
   }
   .multiButton.lined button {
-    width: 1.75rem;
-    height: 1.75rem;
+    width: 2rem;
+    height: 2rem;
     flex-shrink: 0;
   }
   .multiButton.lined :global(.tooltip-root) {
@@ -469,8 +471,9 @@
     width: 100%;
     height: auto;
     min-height: 28px;
-    padding-right: 6.5rem; // место под ряд кнопок справа
-    color: rgba(255, 255, 255, 0.88);
+    padding-right: 7rem; // место под ряд кнопок справа
+    color: rgba(255, 255, 255, 0.9);
+    gap: 2px;
   }
   anchor a span {
     display: block;
@@ -488,6 +491,13 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     text-align: left;
-    margin-left: 8px;
+    margin-left: 10px;
+    font-size: 14px;
+    line-height: 1.35;
+    letter-spacing: 0.01em;
+  }
+  anchor a span.showTitle strong {
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.95);
   }
 </style>
