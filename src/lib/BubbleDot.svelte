@@ -2,21 +2,51 @@
   /**
    * Один пузырёк в BubbleField — позиция из d3-force, spawn CSS.
    */
+  import globe from "../assets/Globe.svg";
   import * as Tooltip from "./components/ui/tooltip";
+  import { longhover, GROUP_LONGHOVER_MS } from "./longhover";
+  import { favicons } from "./stores";
   import type { BubbleNode } from "./bubble-physics";
 
   export let bubble: BubbleNode;
   export let expanded: boolean = false;
-  export let expandable: boolean = false;
+  /** Несколько URL на хост — цвет-маркер, expand без «+» */
+  export let groupable: boolean = false;
   export let onToggleExpand: (b: BubbleNode) => void = () => {};
   /** Кадр physics — пересчёт transform без remount */
   export let frame: number = 0;
+  export let onPointerDown: (e: PointerEvent) => void = () => {};
+  export let onPointerMove: (e: PointerEvent) => void = () => {};
+  export let onPointerUp: (e: PointerEvent) => void = () => {};
+  export let onLinkClick: (e: MouseEvent) => void = () => {};
 
   $: size = bubble.r * 2;
   $: delay = Math.min(bubble.spawnIndex, 48) * 0.035;
   // frame в зависимости — иначе Svelte не видит мутации x/y от d3
   $: tx = frame >= 0 ? (bubble.x || 0) - bubble.r : 0;
   $: ty = frame >= 0 ? (bubble.y || 0) - bubble.r : 0;
+
+  $: host = bubble.host;
+  $: faviconSrc =
+    $favicons.get(host) ||
+    (typeof localStorage !== "undefined"
+      ? localStorage.getItem("favicon_" + host)
+      : null) ||
+    globe;
+
+  /** Текст tooltip: title · visits · дата последнего визита */
+  $: visitLine = `${bubble.visitCount} visit${bubble.visitCount === 1 ? "" : "s"}`;
+  $: lastVisitLine =
+    bubble.lastVisitTime != null && bubble.lastVisitTime > 0
+      ? new Date(bubble.lastVisitTime).toLocaleDateString(undefined, {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : "";
+  $: tooltipText = [bubble.title, visitLine, lastVisitLine]
+    .filter(Boolean)
+    .join(" · ");
 </script>
 
 <!-- Обёртка двигает физикой; внутренний .bubbleDot — только spawn scale -->
@@ -24,32 +54,45 @@
   class="bubbleWrap"
   style="transform: translate({tx}px, {ty}px); width: {size}px; height: {size}px;"
 >
-  <Tooltip.Root content={bubble.title} side="bottom" delayDuration={400}>
+  <Tooltip.Root content={tooltipText} side="bottom" delayDuration={400}>
     <a
       class="bubbleDot"
       class:child={bubble.kind === "child"}
       class:host={bubble.kind === "host"}
+      class:groupable
       class:expanded
       class:bookmark={bubble.isBookmark}
       href={bubble.url}
       rel="noopener noreferrer"
       style="animation-delay: {delay}s;"
-      on:contextmenu|preventDefault={() => {
-        if (expandable) onToggleExpand(bubble);
+      use:longhover={groupable && bubble.kind === "host"
+        ? GROUP_LONGHOVER_MS
+        : 86400000}
+      on:longhover|preventDefault={() => {
+        if (groupable) onToggleExpand(bubble);
       }}
+      on:contextmenu|preventDefault={() => {
+        if (groupable) onToggleExpand(bubble);
+      }}
+      on:pointerdown={onPointerDown}
+      on:pointermove={onPointerMove}
+      on:pointerup={onPointerUp}
+      on:pointercancel={onPointerUp}
+      on:click={onLinkClick}
     >
       <span class="bubbleDot__shine" />
-      {#if expandable}
-        <button
-          type="button"
-          class="bubbleDot__expand"
-          aria-label={expanded ? "Collapse group" : "Expand group"}
-          aria-expanded={expanded}
-          on:click|preventDefault|stopPropagation={() => onToggleExpand(bubble)}
-        >
-          {expanded ? "−" : "+"}
-        </button>
+      {#if groupable}
+        <span class="bubbleDot__groupRing" aria-hidden="true" />
       {/if}
+      <img
+        class="bubbleDot__favicon"
+        src={faviconSrc}
+        alt=""
+        width="16"
+        height="16"
+        loading="lazy"
+        draggable="false"
+      />
     </a>
   </Tooltip.Root>
 </div>
@@ -69,7 +112,6 @@
     pointer-events: auto;
   }
 
-  /* Появление: мотив cassierossall — scale(0) → 1 */
   @keyframes bubbleSpawn {
     from {
       opacity: 0;
@@ -101,12 +143,22 @@
       0 0.35em 0.75em hsla(0, 0%, 0%, 0.35);
     animation: bubbleSpawn 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
     cursor: pointer;
+    touch-action: none;
   }
   .bubbleDot.child {
     --hue: 165;
   }
   .bubbleDot.bookmark {
     --hue: 42;
+  }
+  .bubbleDot.groupable {
+    --hue: 280;
+  }
+  .bubbleDot.bookmark.groupable {
+    box-shadow:
+      inset 0 -0.15em 0.35em hsla(0, 0%, 0%, 0.25),
+      0 0 0 2px hsl(280, 75%, 58%),
+      0 0.35em 0.75em hsla(0, 0%, 0%, 0.35);
   }
   .bubbleDot.expanded {
     box-shadow:
@@ -131,24 +183,23 @@
     );
     pointer-events: none;
   }
-  .bubbleDot__expand {
+  .bubbleDot__groupRing {
     position: absolute;
-    right: 4%;
-    bottom: 4%;
-    width: 1.35rem;
-    height: 1.35rem;
-    border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.35);
-    background: rgba(20, 20, 20, 0.55);
-    color: #fff;
-    font-size: 14px;
-    line-height: 1;
-    padding: 0;
-    cursor: pointer;
-    display: grid;
-    place-items: center;
+    inset: 6%;
+    border-radius: 50%;
+    border: 2px solid hsla(280, 90%, 75%, 0.55);
+    pointer-events: none;
   }
-  .bubbleDot__expand:hover {
-    background: rgba(20, 20, 20, 0.8);
+  .bubbleDot__favicon {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    transform: translate(-50%, -50%);
+    object-fit: contain;
+    border-radius: 2px;
+    pointer-events: none;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
   }
 </style>

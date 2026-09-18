@@ -12,10 +12,12 @@
     expandHost,
     isHostExpanded,
     resizeWorld,
-    clampBubblesToWorld,
+    bounceBubblesAtWorldEdges,
+    reheat,
     stopWorld,
     visibleBubbles,
     worldHeightForCount,
+    BUBBLE_SIM_CAP,
     type BubbleNode,
     type BubbleWorld,
   } from "./bubble-physics";
@@ -36,6 +38,13 @@
   let expandedHosts: Record<string, boolean> = {};
   let builtKey = "";
 
+  /** Drag: fx/fy на узле d3; ссылку не открываем после реального drag */
+  let dragBubbleId: string | null = null;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let dragMoved = false;
+  const DRAG_THRESHOLD_PX = 8;
+
   /** scrollY в координатах поля (0 = верх section.bubbleField) */
   function fieldScrollY(): number {
     if (!fieldEl || typeof window === "undefined") return 0;
@@ -43,10 +52,15 @@
     return (window.scrollY || 0) - top;
   }
 
+  function simHostCount(): number {
+    return Math.min(bookmarkList.size, BUBBLE_SIM_CAP);
+  }
+
   function rebuild() {
     stopWorld(world);
     const w = Math.max(width || 800, 320);
-    worldH = worldHeightForCount(bookmarkList.size, w);
+    const count = simHostCount();
+    worldH = worldHeightForCount(count, w);
     const nodes = buildHostBubbles({
       bookmarkList,
       nodesList,
@@ -60,7 +74,9 @@
   }
 
   function onTick() {
-    if (world) clampBubblesToWorld(world.nodes, world.width, world.height);
+    if (world) {
+      bounceBubblesAtWorldEdges(world.nodes, world.width, world.height);
+    }
     frame += 1;
     if (frame % 2 === 0) refreshVisible();
   }
@@ -85,7 +101,7 @@
     viewH = window.innerHeight;
     if (world) {
       const w = Math.max(width || window.innerWidth, 320);
-      worldH = worldHeightForCount(bookmarkList.size, w);
+      worldH = worldHeightForCount(simHostCount(), w);
       resizeWorld(world, w, worldH);
     }
     refreshVisible();
@@ -111,6 +127,61 @@
     }
     expandedHosts = { ...expandedHosts };
     refreshVisible();
+  }
+
+  function fieldPointFromClient(clientX: number, clientY: number): {
+    x: number;
+    y: number;
+  } {
+    if (!fieldEl) return { x: clientX, y: clientY };
+    const rect = fieldEl.getBoundingClientRect();
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top + fieldScrollY(),
+    };
+  }
+
+  function onBubblePointerDown(b: BubbleNode, e: PointerEvent) {
+    if (e.button !== 0 || !world) return;
+    dragBubbleId = b.id;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    dragMoved = false;
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+  }
+
+  function onBubblePointerMove(b: BubbleNode, e: PointerEvent) {
+    if (dragBubbleId !== b.id || !world) return;
+    const dx = e.clientX - dragStartX;
+    const dy = e.clientY - dragStartY;
+    if (!dragMoved && Math.hypot(dx, dy) >= DRAG_THRESHOLD_PX) {
+      dragMoved = true;
+    }
+    if (dragMoved) {
+      const pt = fieldPointFromClient(e.clientX, e.clientY);
+      b.fx = pt.x;
+      b.fy = pt.y;
+      reheat(world, 0.35);
+      e.preventDefault();
+    }
+  }
+
+  function onBubblePointerUp(b: BubbleNode, e: PointerEvent) {
+    if (dragBubbleId !== b.id || !world) return;
+    b.fx = null;
+    b.fy = null;
+    reheat(world, 0.25);
+    dragBubbleId = null;
+    if (dragMoved) {
+      e.preventDefault();
+    }
+  }
+
+  function onBubbleClick(e: MouseEvent) {
+    if (dragMoved) {
+      e.preventDefault();
+      dragMoved = false;
+    }
   }
 
   $: {
@@ -146,9 +217,13 @@
     <BubbleDot
       bubble={b}
       frame={frame}
-      expandable={b.kind === "host" && (bookmarkList.get(b.host)?.nodes.length || 0) > 1}
+      groupable={b.kind === "host" && (bookmarkList.get(b.host)?.nodes.length || 0) > 1}
       expanded={!!expandedHosts[b.host] && b.kind === "host"}
       onToggleExpand={toggleExpand}
+      onPointerDown={(e) => onBubblePointerDown(b, e)}
+      onPointerMove={(e) => onBubblePointerMove(b, e)}
+      onPointerUp={(e) => onBubblePointerUp(b, e)}
+      onLinkClick={onBubbleClick}
     />
   {/each}
 </section>

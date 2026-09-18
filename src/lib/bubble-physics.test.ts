@@ -2,7 +2,9 @@ import { describe, expect, it } from "bun:test";
 import {
   BUBBLE_SIM_CAP,
   buildHostBubbles,
+  bounceBubblesAtWorldEdges,
   clampBubblesToWorld,
+  gridSpawnXY,
   visibleBubbles,
   worldHeightForCount,
 } from "./bubble-physics";
@@ -56,10 +58,28 @@ describe("bubble-physics", () => {
     expect(nodes[1].y).toBe(200);
   });
 
-  it("worldHeightForCount grows with count", () => {
+  it("worldHeightForCount grows with sim count not full bookmark map", () => {
     expect(worldHeightForCount(200, 800)).toBeGreaterThan(
       worldHeightForCount(20, 800)
     );
+    // 2000 hosts capped — высота как для 400, не раздувается
+    expect(worldHeightForCount(2000, 800)).toBe(worldHeightForCount(400, 800));
+  });
+
+  it("bounceBubblesAtWorldEdges reflects velocity at walls", () => {
+    const nodes = [
+      { id: "l", x: 2, y: 200, r: 40, vx: -5, vy: 0 },
+      { id: "r", x: 798, y: 200, r: 40, vx: 5, vy: 0 },
+    ] as any;
+    bounceBubblesAtWorldEdges(nodes, 800, 560);
+    expect(nodes[0].vx).toBeGreaterThan(0);
+    expect(nodes[1].vx).toBeLessThan(0);
+  });
+
+  it("gridSpawnXY spreads indices vertically for tall world", () => {
+    const a = gridSpawnXY({ index: 0, count: 40, width: 800, height: 2400, r: 40 });
+    const b = gridSpawnXY({ index: 20, count: 40, width: 800, height: 2400, r: 40 });
+    expect(b.y).toBeGreaterThan(a.y);
   });
 
   it("focusYForWorld stays in upper band", async () => {

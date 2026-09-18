@@ -31,6 +31,8 @@ export type BubbleNode = SimulationNodeDatum & {
   url: string;
   isBookmark?: boolean;
   parentId?: string;
+  /** Последний визит (ms), для tooltip */
+  lastVisitTime?: number;
   /** Порядковый индекс для spawn-delay */
   spawnIndex: number;
 };
@@ -60,6 +62,35 @@ function childId(host: string, nodeIndex: number): string {
   return `child:${host}:${nodeIndex}`;
 }
 
+/** Позиция в сетке по индексу — равномерно по ширине и высоте мира. */
+export function gridSpawnXY({
+  index,
+  count,
+  width,
+  height,
+  r,
+}: {
+  index: number;
+  count: number;
+  width: number;
+  height: number;
+  r: number;
+}): { x: number; y: number } {
+  const pad = r + 16;
+  const cols = Math.max(1, Math.floor((width - pad * 2) / (r * 2 + 12)));
+  const rows = Math.max(1, Math.ceil(count / cols));
+  const cellW = Math.max((width - pad * 2) / cols, r * 2 + 8);
+  const cellH = Math.max((height - pad * 2) / rows, r * 2 + 8);
+  const col = index % cols;
+  const row = (index / cols) | 0;
+  const jitterX = ((index * 53) % 17) - 8;
+  const jitterY = ((index * 71) % 17) - 8;
+  return {
+    x: pad + col * cellW + cellW * 0.5 + jitterX,
+    y: pad + row * cellH + cellH * 0.5 + jitterY,
+  };
+}
+
 /** Собрать host-пузыри из индекса закладок (без children). */
 export function buildHostBubbles({
   bookmarkList,
@@ -73,6 +104,7 @@ export function buildHostBubbles({
   height: number;
 }): BubbleNode[] {
   const nodes: BubbleNode[] = [];
+  const cap = Math.min(bookmarkList.size, BUBBLE_SIM_CAP);
   let i = 0;
   for (const [host, group] of bookmarkList) {
     if (nodes.length >= BUBBLE_SIM_CAP) break;
@@ -81,10 +113,7 @@ export function buildHostBubbles({
     if (!n?.url) continue;
     const visitCount = group.hostVisitCount || n.visitCount || 1;
     const r = bubbleRadiusFromVisits({ visitCount });
-    // Старт в верхней зоне поля (рядом с focusY), не по всей высоте мира
-    const focusY = focusYForWorld(height);
-    const x = (width * 0.12 + ((i * 97) % Math.max(width * 0.76, 1))) | 0;
-    const y = (focusY * 0.55 + ((i * 37) % Math.max(focusY * 0.9, 1))) | 0;
+    const { x, y } = gridSpawnXY({ index: i, count: cap, width, height, r });
     nodes.push({
       id: hostId(host),
       kind: "host",
@@ -95,6 +124,7 @@ export function buildHostBubbles({
       title: n.title || host,
       url: n.url,
       isBookmark: n.isBookmark,
+      lastVisitTime: group.hostLastVisitTime ?? n.lastVisitTime,
       spawnIndex: i,
       x,
       y,
@@ -111,11 +141,12 @@ export function focusYForWorld(height: number): number {
   return Math.min(240, Math.max(160, height * 0.22));
 }
 
-/** Высота мира от числа пузырей (чтобы скроллить при 1000). */
+/** Высота мира от числа узлов в симуляции (cap), не от полного bookmarkList. */
 export function worldHeightForCount(count: number, width: number): number {
-  const area = count * Math.PI * 55 * 55;
-  const packed = Math.ceil(area / Math.max(width, 320)) + 280;
-  // Минимум ≈ один экран dial, без искусственных 900px для 10 сайтов
+  const simCount = Math.min(Math.max(count, 1), BUBBLE_SIM_CAP);
+  const avgR = 55;
+  const area = simCount * Math.PI * avgR * avgR * 1.15;
+  const packed = Math.ceil(area / Math.max(width, 320)) + 240;
   return Math.max(packed, 560);
 }
 
@@ -138,7 +169,7 @@ export function createBubbleWorld({
     })
     .strength(0.55);
 
-  const focusY = focusYForWorld(height);
+  const anchorY = height * 0.5;
   const simulation = forceSimulation<BubbleNode>(nodes)
     .force(
       "collide",
@@ -148,9 +179,9 @@ export function createBubbleWorld({
         .iterations(2)
     )
     .force("charge", forceManyBody<BubbleNode>().strength(-22).distanceMax(240))
-    .force("x", forceX(width / 2).strength(0.045))
-    // Тянем к верху dial-поля, не к height/2
-    .force("y", forceY(focusY).strength(0.06))
+    .force("x", forceX(width / 2).strength(0.035))
+    // Слабый якорь по центру высоты — не кластеризуем всё у focusY
+    .force("y", forceY(anchorY).strength(0.018))
     .force("link", linkForce)
     .alphaDecay(0.028)
     .velocityDecay(0.35);
@@ -166,9 +197,9 @@ export function reheat(world: BubbleWorld, alpha = 0.6): void {
 export function resizeWorld(world: BubbleWorld, width: number, height: number): void {
   world.width = width;
   world.height = height;
-  const focusY = focusYForWorld(height);
-  world.simulation.force("x", forceX(width / 2).strength(0.045));
-  world.simulation.force("y", forceY(focusY).strength(0.06));
+  const anchorY = height * 0.5;
+  world.simulation.force("x", forceX(width / 2).strength(0.035));
+  world.simulation.force("y", forceY(anchorY).strength(0.018));
   reheat(world, 0.35);
 }
 
@@ -216,6 +247,7 @@ export function expandHost({
       title: n.title || host,
       url: n.url,
       isBookmark: n.isBookmark,
+      lastVisitTime: n.lastVisitTime as number | undefined,
       parentId: parent.id,
       spawnIndex: world.nodes.length + i,
       x: px + Math.cos(angle) * dist * 0.35,
@@ -277,7 +309,47 @@ export function visibleBubbles({
   });
 }
 
-/** Держим пузыри в поле — иначе они закрашивают часы и filter bar. */
+/** Отражение скорости у границ мира (мягкий bounce вместо жёсткого clamp). */
+export function bounceBubblesAtWorldEdges(
+  nodes: BubbleNode[],
+  width: number,
+  height: number,
+  damp = 0.82
+): void {
+  const pad = 4;
+  for (const n of nodes) {
+    if (n.fx != null || n.fy != null) continue;
+    const r = n.r || 40;
+    const minX = r + pad;
+    const maxX = width - r - pad;
+    const minY = r + pad;
+    const maxY = height - r - pad;
+    let x = n.x ?? 0;
+    let y = n.y ?? 0;
+    let vx = n.vx ?? 0;
+    let vy = n.vy ?? 0;
+    if (x < minX) {
+      x = minX;
+      vx = Math.abs(vx) * damp;
+    } else if (x > maxX) {
+      x = maxX;
+      vx = -Math.abs(vx) * damp;
+    }
+    if (y < minY) {
+      y = minY;
+      vy = Math.abs(vy) * damp;
+    } else if (y > maxY) {
+      y = maxY;
+      vy = -Math.abs(vy) * damp;
+    }
+    n.x = x;
+    n.y = y;
+    n.vx = vx;
+    n.vy = vy;
+  }
+}
+
+/** Жёсткий clamp — для тестов и аварийного удержания внутри поля. */
 export function clampBubblesToWorld(
   nodes: BubbleNode[],
   width: number,

@@ -6,6 +6,8 @@ export type HostGroup = {
   weightVisits?: number;
   weightVisitsRadius?: number;
   host?: string;
+  /** Максимальный lastVisitTime среди URL хоста */
+  hostLastVisitTime?: number;
 };
 
 export type ChunkRow = {
@@ -18,6 +20,8 @@ export type BookmarkNode = {
   url?: string;
   title?: string;
   visitCount?: number;
+  /** chrome.history lastVisitTime (ms) */
+  lastVisitTime?: number;
   hostVisitCount?: number;
   weightVisits?: number;
   weightVisitsRadius?: number;
@@ -143,12 +147,20 @@ export function buildBookmarkIndex(
     }
 
     c.host = host;
+    const visitTs =
+      typeof c.lastVisitTime === "number" ? c.lastVisitTime : undefined;
 
     if (bookmarkList.has(host)) {
       const bmitems = bookmarkList.get(host) as HostGroup;
       bmitems.hostVisitCount =
         (bmitems.hostVisitCount ? bmitems.hostVisitCount * 1 : 1) +
         (c.visitCount || 1);
+      if (visitTs != null) {
+        bmitems.hostLastVisitTime = Math.max(
+          bmitems.hostLastVisitTime || 0,
+          visitTs
+        );
+      }
       maxVisits = Math.max(maxVisits, bmitems.hostVisitCount);
       c.weightVisits = computeWeightVisits(
         Math.max(c.visitCount || 1, c.hostVisitCount || 1)
@@ -170,6 +182,7 @@ export function buildBookmarkIndex(
         hostVisitCount: c.hostVisitCount,
         weightVisits: c.weightVisits,
         weightVisitsRadius: c.weightVisitsRadius,
+        hostLastVisitTime: visitTs,
         host,
       });
     }
@@ -205,16 +218,81 @@ const faviconQueue: FaviconJob[] = [];
 let faviconActive = 0;
 const FAVICON_CONCURRENCY = 3;
 
+/** URL-кандидаты favicon: s2 с sz, /favicon.ico, базовый s2. */
+export function faviconSourceUrls(pageUrl: string): string[] {
+  let origin = "";
+  try {
+    origin = new URL(pageUrl).origin;
+  } catch {
+    return [];
+  }
+  const enc = encodeURIComponent(pageUrl);
+  const list = [
+    `https://s2.googleusercontent.com/s2/favicons?domain_url=${enc}&sz=64`,
+    `https://s2.googleusercontent.com/s2/favicons?domain_url=${enc}&sz=32`,
+    `${origin}/favicon.ico`,
+    `https://s2.googleusercontent.com/s2/favicons?domain_url=${enc}`,
+  ];
+  return list;
+}
+
+/** Lazy: link[rel~=icon] и manifest icons (только в расширении с host access). */
+async function discoverFaviconUrls(pageUrl: string): Promise<string[]> {
+  const found: string[] = [];
+  try {
+    const res = await fetch(pageUrl, { credentials: "omit" });
+    if (!res.ok) return found;
+    const html = await res.text();
+    const linkRe =
+      /<link[^>]+rel=["']([^"']*)["'][^>]*href=["']([^"']+)["'][^>]*>/gi;
+    let m: RegExpExecArray | null;
+    while ((m = linkRe.exec(html))) {
+      const rel = m[1].toLowerCase();
+      if (!rel.includes("icon")) continue;
+      try {
+        found.push(new URL(m[2], pageUrl).href);
+      } catch {
+        /* skip */
+      }
+    }
+    const manifestMatch = html.match(
+      /<link[^>]+rel=["']manifest["'][^>]*href=["']([^"']+)["']/i
+    );
+    if (manifestMatch?.[1]) {
+      try {
+        const manifestUrl = new URL(manifestMatch[1], pageUrl).href;
+        const mr = await fetch(manifestUrl, { credentials: "omit" });
+        if (mr.ok) {
+          const manifest = (await mr.json()) as {
+            icons?: { src?: string }[];
+          };
+          for (const ic of manifest.icons || []) {
+            if (ic.src) found.push(new URL(ic.src, manifestUrl).href);
+          }
+        }
+      } catch {
+        /* CORS / parse */
+      }
+    }
+  } catch {
+    /* preview CORS — fallback на s2 */
+  }
+  return found;
+}
+
 async function runFaviconJob(
   job: FaviconJob,
   toDataURL: (url: string) => Promise<string | undefined>,
   faviconLocalhost: string | undefined
 ): Promise<void> {
   const sources = [
-    "https://s2.googleusercontent.com/s2/favicons?domain_url=" +
-      encodeURIComponent(job.url),
+    ...faviconSourceUrls(job.url),
+    ...(await discoverFaviconUrls(job.url)),
   ];
+  const seen = new Set<string>();
   for (const src of sources) {
+    if (seen.has(src)) continue;
+    seen.add(src);
     const data = await toDataURL(src);
     if (data && data.length && data !== faviconLocalhost) {
       job.resolve(data);

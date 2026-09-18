@@ -18,6 +18,14 @@
   import { stashOpenTabs, type StashChrome } from "./stash-tabs";
   import * as Tooltip from "./components/ui/tooltip";
   import BubbleField from "./BubbleField.svelte";
+  import {
+    formatHistoryRangeLabel,
+    historySearchBounds,
+    loadHistoryRangeFromStorage,
+    saveHistoryRangeToStorage,
+    type HistoryRangePreset,
+    type HistoryRangeState,
+  } from "./history-range";
 
   let online = true;
   let initialLoadDone = false;
@@ -26,6 +34,11 @@
 
   let searchTerm: string = localStorage.searchTerm || "";
   let favicon_localhost = localStorage.favicon_localhost;
+  /** Диапазон history.search — пресеты + custom from–to */
+  let historyRange: HistoryRangeState = loadHistoryRangeFromStorage();
+  let rangePopoverOpen = false;
+  let rangeDraftFrom = historyRange.fromDate;
+  let rangeDraftTo = historyRange.toDate;
 
   (async () => {
     // В preview (localhost) XHR к googleusercontent → CORS; в unpacked OK
@@ -59,14 +72,14 @@
   $: visible = Math.ceil((hh * ww) / 50 / 50) || 200;
 
   async function getNodes(term: string): Promise<[any[], any[]]> {
+    const { startTime, endTime } = historySearchBounds(historyRange);
     return Promise.all([
       new Promise((resolve) => {
         chrome.history.search(
           {
             text: term,
-            startTime:
-              new Date().getTime() -
-              1000 * 60 * 60 * 24 * Math.max(7, term.length + 1),
+            startTime,
+            endTime,
             maxResults: 1000,
           },
           (results) => {
@@ -77,6 +90,26 @@
       chrome.bookmarks.search(term || "h"),
     ]);
   }
+
+  function setHistoryPreset(preset: HistoryRangePreset) {
+    historyRange = { ...historyRange, preset };
+    saveHistoryRangeToStorage(historyRange);
+    rangePopoverOpen = false;
+    getBookmarks();
+  }
+
+  function applyCustomRange() {
+    historyRange = {
+      preset: "custom",
+      fromDate: rangeDraftFrom,
+      toDate: rangeDraftTo,
+    };
+    saveHistoryRangeToStorage(historyRange);
+    rangePopoverOpen = false;
+    getBookmarks();
+  }
+
+  $: rangeStatusLabel = formatHistoryRangeLabel(historyRange);
 
   async function getBookmarks() {
     const startTime = performance.now();
@@ -264,6 +297,74 @@
     on:key={onGlobalKey}
   />
   <div class="filterRow actionsRow">
+    <div class="stashBtns">
+      <Tooltip.Root
+        content="Сохранить вкладки этого окна в закладки и закрыть"
+        side="bottom"
+        delayDuration={350}
+      >
+        <button
+          type="button"
+          class="stashBtn"
+          disabled={stashBusy}
+          on:click={() => onStashTabs(false)}
+        >
+          перенести табы окна
+        </button>
+      </Tooltip.Root>
+      <Tooltip.Root
+        content="Сохранить вкладки всех окон в закладки и закрыть"
+        side="bottom"
+        delayDuration={350}
+      >
+        <button
+          type="button"
+          class="stashBtn"
+          disabled={stashBusy}
+          on:click={() => onStashTabs(true)}
+        >
+          перенести все табы
+        </button>
+      </Tooltip.Root>
+    </div>
+    <span class="status">
+      {#if searchTerm}“{searchTerm}” · {/if}
+      {bookmarkListSize} sites ·
+      <button
+        type="button"
+        class="rangeTrigger"
+        aria-expanded={rangePopoverOpen}
+        on:click={() => {
+          rangePopoverOpen = !rangePopoverOpen;
+          rangeDraftFrom = historyRange.fromDate;
+          rangeDraftTo = historyRange.toDate;
+        }}
+      >
+        {rangeStatusLabel}
+      </button>
+      {#if stashNote} · {stashNote}{/if}
+    </span>
+    {#if rangePopoverOpen}
+      <div class="rangePopover" role="dialog" aria-label="History date range">
+        <div class="rangePresets">
+          <button type="button" on:click={() => setHistoryPreset("1w")}>1 week</button>
+          <button type="button" on:click={() => setHistoryPreset("4w")}>4 weeks</button>
+          <button type="button" on:click={() => setHistoryPreset("12w")}>12 weeks</button>
+          <button type="button" on:click={() => setHistoryPreset("all")}>All time</button>
+        </div>
+        <div class="rangeCustom">
+          <label>
+            From
+            <input type="date" bind:value={rangeDraftFrom} />
+          </label>
+          <label>
+            To
+            <input type="date" bind:value={rangeDraftTo} />
+          </label>
+          <button type="button" class="rangeApply" on:click={applyCustomRange}>Apply</button>
+        </div>
+      </div>
+    {/if}
     <Tooltip.Root
       content={titleVisible ? "Bubble view" : "Lined list view"}
       side="bottom"
@@ -358,42 +459,6 @@
         </icon>
       </label>
     </Tooltip.Root>
-    <div class="stashBtns">
-      <Tooltip.Root
-        content="Сохранить вкладки этого окна в закладки и закрыть"
-        side="bottom"
-        delayDuration={350}
-      >
-        <button
-          type="button"
-          class="stashBtn"
-          disabled={stashBusy}
-          on:click={() => onStashTabs(false)}
-        >
-          перенести табы окна
-        </button>
-      </Tooltip.Root>
-      <Tooltip.Root
-        content="Сохранить вкладки всех окон в закладки и закрыть"
-        side="bottom"
-        delayDuration={350}
-      >
-        <button
-          type="button"
-          class="stashBtn"
-          disabled={stashBusy}
-          on:click={() => onStashTabs(true)}
-        >
-          перенести все табы
-        </button>
-      </Tooltip.Root>
-    </div>
-    <span class="status">
-      {#if searchTerm}“{searchTerm}” · {/if}
-      {bookmarkListSize} sites
-      · last {searchTerm.length || 1} week{searchTerm.length > 1 ? "s" : ""}
-      {#if stashNote} · {stashNote}{/if}
-    </span>
   </div>
 </filterBar>
 <anchores bind:clientHeight={hh} bind:clientWidth={ww} class:titleVisible>
@@ -454,6 +519,11 @@
     color: #666;
     font-size: 18px;
   }
+  #changeView {
+    margin-left: auto;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
   #changeView input {
     opacity: 0;
     display: none;
@@ -485,6 +555,7 @@
   }
   filterBar .actionsRow {
     flex-wrap: wrap;
+    position: relative;
   }
   filterBar .previewBanner {
     font-size: 11px;
@@ -498,6 +569,77 @@
     font-size: 12px;
     color: #999;
     white-space: nowrap;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  filterBar .rangeTrigger {
+    background: none;
+    border: none;
+    color: #b5c4e0;
+    font-size: inherit;
+    padding: 0 2px;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+  }
+  filterBar .rangeTrigger:hover {
+    color: #fff;
+  }
+  filterBar .rangePopover {
+    position: absolute;
+    right: 32px;
+    bottom: calc(100% + 6px);
+    z-index: 20;
+    background: rgb(28, 28, 32);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    padding: 10px 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 220px;
+  }
+  filterBar .rangePresets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  filterBar .rangePresets button,
+  filterBar .rangeApply {
+    background: rgba(255, 255, 255, 0.06);
+    color: #ddd;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  filterBar .rangePresets button:hover,
+  filterBar .rangeApply:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+  }
+  filterBar .rangeCustom {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 8px;
+    font-size: 11px;
+    color: #aaa;
+  }
+  filterBar .rangeCustom label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  filterBar .rangeCustom input[type="date"] {
+    background: rgb(20, 20, 20);
+    border: 1px solid #444;
+    color: #eee;
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-size: 11px;
   }
   filterBar .stashBtns {
     display: flex;
