@@ -16,7 +16,6 @@
     ENTER_FALL_MS,
     ENTER_RISE_MS,
     expandHost,
-    expandedHostRadius,
     fieldScrollFromRectTop,
     flightPosition,
     GROUP_ABSORB_MS,
@@ -24,18 +23,25 @@
     GROUP_POP_MS,
     GROUP_SPAWN_LEAD_MS,
     GROUP_CRATER_FILL_MS,
+    GROUP_CHILD_SPAWN_AT_MS,
+    GROUP_CHILD_STAGGER_MS,
+    GROUP_EXPANDED_HOVER_GROW_MS,
+    GROUP_EXPANDED_HOVER_SHRINK_MS,
+    GROUP_MAX_CHILDREN,
     inflateRadius,
     isHostExpanded,
     listHostChildren,
     absorbChildrenFrame,
     shrinkHostFrame,
     startCraterFill,
-    clusterRadiusFromChildRadii,
     offscreenEnterY,
     pinBubbleAt,
     reheat,
     beginDragCollisions,
     endDragCollisions,
+    beginSoftRadiusAdjust,
+    endSoftRadiusAdjust,
+    nudgeSim,
     resizeWorld,
     scrollDirection,
     separateBubbles,
@@ -74,18 +80,20 @@
   /** Полёты из-за экрана → разведённые конечные точки */
   let flights = new Map<string, BubbleEnterFlight>();
   let flightRaf = 0;
-  /** Inflate → pop → expand для groupable host */
+  /** Inflate / hover-grow для groupable host */
   let inflate: {
     id: string;
     node: BubbleNode;
     r0: number;
     r1: number;
     t0: number;
-    /** Длительность роста (3с hover / ~420мс по «+») */
+    /** Длительность сжатия/роста */
     dur: number;
     raf: number;
     /** contextmenu / «+»: сами коммитим после роста */
     autoCommit: boolean;
+    /** unfold | рост на раскрытой | откат при leave */
+    mode: "unfold" | "expandedGrow" | "expandedGrowBack";
   } | null = null;
   let poppingId: string | null = null;
   /** Fold: втягивание детей */
@@ -98,6 +106,12 @@
   let absorbRaf = 0;
   /** Снять временную силу заполнения кратера */
   let stopCraterFill: (() => void) | null = null;
+  /** Hover: очередь индексов детей ещё не заспавненных */
+  let pendingChildIndexes: number[] = [];
+  let spawnHostKey: string | null = null;
+  let childSpawnDelayTimer: ReturnType<typeof setTimeout> | null = null;
+  let childStaggerTimer: ReturnType<typeof setInterval> | null = null;
+  let childSpawnSeq = 0;
 
   /** Drag: pinBubbleAt (fx/fy); после порога не открываем ссылку */
   let dragBubble: BubbleNode | null = null;
@@ -269,12 +283,16 @@
   }
 
   function onTick() {
-    // Во время активного drag симуляцию не крутим — иначе все шары дёргаются
-    if (dragMoved && dragBubble) return;
     // Полёты крутит rAF (ensureFlightLoop) — не ускоряем тут вдвое
     if (flights.size) return;
     if (world) {
+      // И при drag: соседи от collide не улетают за край блока
       bounceBubblesAtWorldEdges(world.nodes, world.width, world.height);
+    }
+    // Drag: обновляем позиции соседей, без refreshVisible (cull не трогаем)
+    if (dragMoved && dragBubble) {
+      frame += 1;
+      return;
     }
     frame += 1;
     if (frame % 2 === 0) refreshVisible();
@@ -359,13 +377,13 @@
       commitCollapseAbsorb(b);
       return;
     }
-    // «+»: быстрый рост → spawn детей → pop → shrink к весу
+    // «+»: быстрое сжатие → spawn детей → pop
     onInflateStart(b, true, 420);
   }
 
   /**
-   * Старт роста радиуса: родитель пухнет до площади детей,
-   * collide раздвигает соседей (longhover / contextmenu / «+»).
+   * Unfold: родитель сжимается groupR → linkR (вес своей ссылки),
+   * дети появляются рядом (longhover / contextmenu / «+»).
    */
   function onInflateStart(
     b: BubbleNode,
@@ -381,22 +399,18 @@
       if (autoCommit) inflate.autoCommit = true;
       return;
     }
-    // groupR — сложенный вес; цель inflate — эквивалент площади детей
+    // groupR — сложенный вес группы; цель — вес своей ссылки
     const r0 = b.groupR ?? b.baseR ?? b.r;
     b.groupR = r0;
     b.baseR = r0;
-    // Реальные радиусы детей (не avg) — точнее под collide
-    const childRadii = group.nodes
-      .slice(1, 25)
-      .map((idx) =>
-        bubbleRadiusFromVisits({
-          visitCount: nodesList[idx]?.visitCount || 1,
-        })
-      );
-    const r1 =
-      childRadii.length > 0
-        ? clusterRadiusFromChildRadii({ childRadii, r0 })
-        : expandedHostRadius(r0, Math.min(group.nodes.length - 1, 24));
+    const rLink =
+      b.linkR ??
+      bubbleRadiusFromVisits({
+        visitCount: nodesList[b.nodeIndex]?.visitCount || 1,
+      });
+    b.linkR = rLink;
+    // Уменьшаем (не растём); если linkR ≥ groupR — чуть меньше groupR
+    const r1 = rLink < r0 ? rLink : Math.max(r0 * 0.72, 28);
     const now =
       typeof performance !== "undefined" ? performance.now() : Date.now();
     inflate = {
@@ -408,11 +422,128 @@
       dur: durationMs,
       raf: 0,
       autoCommit,
+      mode: "unfold",
     };
     pinBubbleAt(b, b.x ?? 0, b.y ?? 0, world.width, world.height);
-    // Сразу подогреть collide — соседи начинают уступать место
-    reheat(world, 0.55);
+    // Мягкая подстройка collide — без взрыва alpha по всему полю
+    beginSoftRadiusAdjust(world);
     ensureInflateLoop();
+    // Hover (не «+»/меню): дети с 2с по очереди
+    if (!autoCommit) scheduleHoverChildSpawn(b);
+  }
+
+  /**
+   * Уже раскрытая группа: при hover родитель медленно растёт к groupR.
+   * Leave → expandedGrowBack к linkR.
+   */
+  function onExpandedHoverGrow(b: BubbleNode) {
+    if (!world || b.kind !== "host") return;
+    if (poppingId || collapsingId) return;
+    if (!isHostExpanded(world, b.host)) return;
+    // Уже растём / откатываемся для этого id — не рестартим с нуля
+    if (inflate?.id === b.id && inflate.mode === "expandedGrow") return;
+    if (inflate?.raf && typeof cancelAnimationFrame !== "undefined") {
+      cancelAnimationFrame(inflate.raf);
+    }
+    const rLink =
+      b.linkR ??
+      bubbleRadiusFromVisits({
+        visitCount: nodesList[b.nodeIndex]?.visitCount || 1,
+      });
+    b.linkR = rLink;
+    const groupR = b.groupR ?? b.baseR ?? rLink;
+    // Цель роста — сложенный размер; если равен linkR — чуть больше
+    const r1 =
+      groupR > rLink + 1 ? groupR : Math.max(rLink * 1.35, rLink + 8);
+    const r0 = b.r;
+    if (r1 <= r0 + 0.5) return; // уже на максимуме
+    const now =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+    inflate = {
+      id: b.id,
+      node: b,
+      r0,
+      r1,
+      t0: now,
+      dur: GROUP_EXPANDED_HOVER_GROW_MS,
+      raf: 0,
+      autoCommit: false,
+      mode: "expandedGrow",
+    };
+    pinBubbleAt(b, b.x ?? 0, b.y ?? 0, world.width, world.height);
+    beginSoftRadiusAdjust(world);
+    ensureInflateLoop();
+  }
+
+  function clearHoverChildSpawn() {
+    if (childSpawnDelayTimer) clearTimeout(childSpawnDelayTimer);
+    if (childStaggerTimer) clearInterval(childStaggerTimer);
+    childSpawnDelayTimer = null;
+    childStaggerTimer = null;
+    pendingChildIndexes = [];
+    spawnHostKey = null;
+    childSpawnSeq = 0;
+  }
+
+  /** С 2с hover — дети по одному; очередь живёт до leave / flush на 3с. */
+  function scheduleHoverChildSpawn(b: BubbleNode) {
+    clearHoverChildSpawn();
+    const group = bookmarkList.get(b.host);
+    if (!group || group.nodes.length < 2) return;
+    pendingChildIndexes = group.nodes.slice(1); // все дети, без обрезки 24
+    spawnHostKey = b.host;
+    childSpawnSeq = 0;
+    childSpawnDelayTimer = setTimeout(() => {
+      childSpawnDelayTimer = null;
+      if (!world || spawnHostKey !== b.host || inflate?.id !== b.id) return;
+      const spawnOne = () => {
+        if (!world || spawnHostKey !== b.host) return;
+        if (!pendingChildIndexes.length) {
+          if (childStaggerTimer) clearInterval(childStaggerTimer);
+          childStaggerTimer = null;
+          return;
+        }
+        const idx = pendingChildIndexes.shift()!;
+        expandHost({
+          world,
+          host: b.host,
+          childIndexes: [idx],
+          nodesList,
+          keepParentR: true,
+          spawnIndexBase: childSpawnSeq,
+        });
+        childSpawnSeq += 1;
+        expandedHosts[b.host] = true;
+        expandedHosts = { ...expandedHosts };
+        nudgeSim(world, 0.12);
+        refreshVisible();
+      };
+      spawnOne();
+      childStaggerTimer = setInterval(spawnOne, GROUP_CHILD_STAGGER_MS);
+    }, GROUP_CHILD_SPAWN_AT_MS);
+  }
+
+  /** Высыпать оставшихся детей (3с hover / commit). */
+  function flushPendingChildren(b: BubbleNode): void {
+    if (!world || !pendingChildIndexes.length || spawnHostKey !== b.host) {
+      clearHoverChildSpawn();
+      return;
+    }
+    const rest = pendingChildIndexes.slice();
+    const base = childSpawnSeq;
+    clearHoverChildSpawn();
+    expandHost({
+      world,
+      host: b.host,
+      childIndexes: rest,
+      nodesList,
+      keepParentR: true,
+      spawnIndexBase: base,
+    });
+    expandedHosts[b.host] = true;
+    expandedHosts = { ...expandedHosts };
+    nudgeSim(world, 0.18);
+    refreshVisible();
   }
 
   function ensureInflateLoop() {
@@ -426,20 +557,34 @@
         typeof performance !== "undefined" ? performance.now() : Date.now();
       const dur = inflate.dur || GROUP_INFLATE_MS;
       const u = Math.min(1, (now - inflate.t0) / dur);
-      // Рост r → forceCollide читает живой radius и толкает соседей
+      // Сжатие/рост r → forceCollide читает живой radius
       inflate.node.r = inflateRadius(inflate.r0, inflate.r1, u);
       inflateTick += 1;
-      // Не каждый кадр: иначе alpha не падает и поле «кипит»
-      if (world && inflateTick % 3 === 0) reheat(world, 0.28);
+      // Не reheat: иначе дальние хосты «пружинят» по полю
+      if (world && inflateTick % 6 === 0) nudgeSim(world, 0.06);
       if (u >= 1) {
         inflate.node.r = inflate.r1;
+        if (inflate.mode === "expandedGrowBack") {
+          // Откат после leave — снимаем pin и остужаем
+          if (world) {
+            unpinBubble(inflate.node);
+            endSoftRadiusAdjust(world);
+          }
+          inflate = null;
+          inflateTick += 1;
+          return;
+        }
+        if (inflate.mode === "expandedGrow") {
+          // Держим увеличенный r, пока курсор на месте
+          return;
+        }
         if (inflate.autoCommit) {
           const node = inflate.node;
           inflate = null;
           commitExpandPop(node);
           return;
         }
-        // Ждём longhover commit — радиус уже на максимуме, место раздвинуто
+        // Ждём longhover commit — радиус уже на linkR
         return;
       }
       inflate.raf = requestAnimationFrame(loop);
@@ -453,20 +598,95 @@
     if (inflate.raf && typeof cancelAnimationFrame !== "undefined") {
       cancelAnimationFrame(inflate.raf);
     }
-    inflate.node.r = inflate.r0;
-    if (world) unpinBubble(inflate.node);
+    // Раскрытая группа: плавный откат роста → linkR
+    if (
+      inflate.mode === "expandedGrow" ||
+      inflate.mode === "expandedGrowBack"
+    ) {
+      const from = b.r;
+      const rLink =
+        b.linkR ??
+        bubbleRadiusFromVisits({
+          visitCount: nodesList[b.nodeIndex]?.visitCount || 1,
+        });
+      b.linkR = rLink;
+      if (from <= rLink + 0.5) {
+        b.r = rLink;
+        if (world) {
+          unpinBubble(inflate.node);
+          endSoftRadiusAdjust(world);
+        }
+        inflate = null;
+        inflateTick += 1;
+        return;
+      }
+      const now =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
+      inflate = {
+        id: b.id,
+        node: b,
+        r0: from,
+        r1: rLink,
+        t0: now,
+        dur: GROUP_EXPANDED_HOVER_SHRINK_MS,
+        raf: 0,
+        autoCommit: false,
+        mode: "expandedGrowBack",
+      };
+      if (world) beginSoftRadiusAdjust(world);
+      ensureInflateLoop();
+      return;
+    }
+    clearHoverChildSpawn();
+    const hasKids = world ? isHostExpanded(world, b.host) : false;
+    if (hasKids) {
+      // Уже есть дети — оставляем группу, сжимаем к linkR без лопания
+      const rLink =
+        b.linkR ??
+        bubbleRadiusFromVisits({
+          visitCount: nodesList[b.nodeIndex]?.visitCount || 1,
+        });
+      b.linkR = rLink;
+      b.r = rLink;
+      if (world) {
+        unpinBubble(inflate.node);
+        endSoftRadiusAdjust(world);
+        stopCraterFill?.();
+        stopCraterFill = startCraterFill({ world, parent: b });
+      }
+    } else {
+      inflate.node.r = inflate.r0;
+      if (world) {
+        unpinBubble(inflate.node);
+        endSoftRadiusAdjust(world);
+      }
+    }
     inflate = null;
     inflateTick += 1;
   }
 
-  /** Longhover дошёл до 3с → лопание и expand. */
+  /** Longhover 3с: оставшиеся дети сразу + лопание / shrink. */
   function onExpandCommit(b: BubbleNode) {
     if (!world || b.kind !== "host") return;
-    if (isHostExpanded(world, b.host)) {
+    if (poppingId) return;
+    // Hover-рост на раскрытой → longhover сворачивает группу
+    if (
+      isHostExpanded(world, b.host) &&
+      (!inflate ||
+        inflate.id !== b.id ||
+        inflate.mode === "expandedGrow" ||
+        inflate.mode === "expandedGrowBack")
+    ) {
+      if (inflate?.id === b.id) {
+        if (inflate.raf && typeof cancelAnimationFrame !== "undefined") {
+          cancelAnimationFrame(inflate.raf);
+        }
+        inflate = null;
+        endSoftRadiusAdjust(world);
+      }
       toggleExpand(b);
       return;
     }
-    if (poppingId) return;
     if (inflate && inflate.id === b.id) {
       if (inflate.raf && typeof cancelAnimationFrame !== "undefined") {
         cancelAnimationFrame(inflate.raf);
@@ -474,10 +694,11 @@
       inflate.node.r = inflate.r1;
       const node = inflate.node;
       inflate = null;
-      commitExpandPop(node);
+      flushPendingChildren(node);
+      commitExpandPop(node, { skipSpawn: true });
       return;
     }
-    // Не было inflate — полный цикл 3с + pop
+    // Не было inflate — полный цикл
     onInflateStart(b, true);
   }
 
@@ -488,33 +709,54 @@
       toggleExpand(b);
       return;
     }
+    clearHoverChildSpawn();
     onInflateStart(b, true);
   }
 
-  /** Spawn детей → пауза → pop + shrink родителя к linkR (вес своей ссылки). */
-  function commitExpandPop(b: BubbleNode) {
+  /**
+   * Spawn детей (если нужно) → пауза → pop + shrink к linkR.
+   * skipSpawn — дети уже по очереди / flush на hover.
+   */
+  function commitExpandPop(b: BubbleNode, { skipSpawn = false } = {}) {
     if (!world || poppingId || collapsingId) return;
+    clearHoverChildSpawn();
     const group = bookmarkList.get(b.host);
-    if (group && group.nodes.length > 1 && !isHostExpanded(world, b.host)) {
-      // 1) Дети раньше лопания (под родителем — expandHost)
+    if (
+      !skipSpawn &&
+      group &&
+      group.nodes.length > 1 &&
+      !isHostExpanded(world, b.host)
+    ) {
       expandHost({
         world,
         host: b.host,
         childIndexes: group.nodes.slice(1),
         nodesList,
-        maxChildren: 24,
+        maxChildren: GROUP_MAX_CHILDREN,
+      });
+      expandedHosts[b.host] = true;
+      expandedHosts = { ...expandedHosts };
+      refreshVisible();
+    } else if (skipSpawn && group && !isHostExpanded(world, b.host)) {
+      // 3с без детей (leave не было, но stagger ещё не стартовал) — все сразу
+      expandHost({
+        world,
+        host: b.host,
+        childIndexes: group.nodes.slice(1),
+        nodesList,
+        maxChildren: GROUP_MAX_CHILDREN,
+        keepParentR: true,
       });
       expandedHosts[b.host] = true;
       expandedHosts = { ...expandedHosts };
       refreshVisible();
     }
     if (expandTimer) clearTimeout(expandTimer);
-    // 2) Через LEAD_MS — лопание и сжатие к весу своей ссылки
+    // Через LEAD_MS — лопание и сжатие к весу своей ссылки
     expandTimer = setTimeout(() => {
       expandTimer = null;
       if (!world) return;
       const rExpanded = b.r;
-      // linkR = primary visitCount, не сумма группы
       const rLink =
         b.linkR ??
         bubbleRadiusFromVisits({
@@ -531,7 +773,6 @@
         unpinBubble(b);
         poppingId = null;
         inflateTick += 1;
-        // Стянуть детей/соседей в дыру после inflate
         stopCraterFill?.();
         stopCraterFill = startCraterFill({ world, parent: b });
         refreshVisible();
@@ -548,6 +789,7 @@
       b.r = r1;
       return;
     }
+    if (world) beginSoftRadiusAdjust(world);
     const t0 =
       typeof performance !== "undefined" ? performance.now() : Date.now();
     const loop = () => {
@@ -557,10 +799,12 @@
       const u = Math.min(1, (now - t0) / GROUP_POP_MS);
       shrinkHostFrame({ parent: b, r0, r1, u });
       inflateTick += 1;
-      // Пока r падает — links/collide подтягивают кольцо
-      if (world && inflateTick % 2 === 0) reheat(world, 0.55);
+      // Мягкий nudge — links/collide подтягивают кольцо без разгона поля
+      if (world && inflateTick % 4 === 0) nudgeSim(world, 0.08);
       if (u < 1) {
         shrinkRaf = requestAnimationFrame(loop);
+      } else if (world) {
+        endSoftRadiusAdjust(world);
       }
     };
     shrinkRaf = requestAnimationFrame(loop);
@@ -581,12 +825,13 @@
       return;
     }
     collapsingId = b.id;
-    // Текущий r — linkR (разложенный покой); цель роста — cluster
+    if (world) beginSoftRadiusAdjust(world);
+    // Текущий r — linkR (разложенный покой); рост только до groupR (не cluster)
     const r0 = b.r;
     const groupR = b.groupR ?? b.baseR ?? r0;
     b.groupR = groupR;
-    const childRadii = children.map((c) => c.baseR ?? c.r);
-    const r1 = clusterRadiusFromChildRadii({ childRadii, r0: groupR });
+    // Потолок роста при fold — размер группы, не площадь детей
+    const r1 = groupR;
     // Снапшот стартовых позиций детей для стабильного lerp
     const starts = children.map((c) => ({
       node: c,
@@ -594,7 +839,8 @@
       y: c.y ?? 0,
       r: c.baseR ?? c.r,
     }));
-    pinBubbleAt(b, b.x ?? 0, b.y ?? 0, world.width, world.height);
+    // Если уже больше группы — сразу прижать к groupR
+    if (r0 > groupR) b.r = groupR;    pinBubbleAt(b, b.x ?? 0, b.y ?? 0, world.width, world.height);
     for (const c of children) {
       pinBubbleAt(c, c.x ?? 0, c.y ?? 0, world.width, world.height);
     }
@@ -637,7 +883,8 @@
         collapsingId = null;
         expandedHosts[b.host] = false;
         expandedHosts = { ...expandedHosts };
-        reheat(world, 0.5);
+        endSoftRadiusAdjust(world);
+        nudgeSim(world, 0.15);
         inflateTick += 1;
         refreshVisible();
       }, GROUP_POP_MS);
@@ -690,12 +937,14 @@
     const dy = e.clientY - dragStartY;
     if (!dragMoved && Math.hypot(dx, dy) >= DRAG_THRESHOLD_PX) {
       dragMoved = true;
-      // Как drag-collisions: alphaTarget(0.3) — соседи отпружинивают от fx/fy
+      // Collide-соседи; links выкл — unfold не схлопывается
       beginDragCollisions(world);
     }
     if (!dragMoved) return;
     const pt = fieldPointFromClient(e.clientX, e.clientY);
+    // Перетаскиваемый — clamp к краям; соседей bounce догонит в onTick
     pinBubbleAt(dragBubble, pt.x, pt.y, world.width, world.height);
+    bounceBubblesAtWorldEdges(world.nodes, world.width, world.height);
     // Тик поля — остальные шары тоже двигаются (collide)
     frame += 1;
     dragTick += 1;
@@ -706,9 +955,9 @@
     if (!dragBubble) return;
     if (world) {
       unpinBubble(dragBubble);
-      // alphaTarget(0) — симуляция остывает, collide дорешает
+      // Links обратно; без reheat — иначе unfold снова стянется
       endDragCollisions(world);
-      reheat(world, 0.3);
+      nudgeSim(world, 0.12);
     }
     detachDragListeners();
     dragBubble = null;
@@ -765,6 +1014,7 @@
 
   onDestroy(() => {
     detachDragListeners();
+    clearHoverChildSpawn();
     if (flightRaf && typeof cancelAnimationFrame !== "undefined") {
       cancelAnimationFrame(flightRaf);
       flightRaf = 0;
@@ -815,7 +1065,11 @@
       enterAnim={enterAnimById[b.id] || "initial"}
       groupable={b.kind === "host" && (bookmarkList.get(b.host)?.nodes.length || 0) > 1}
       expanded={!!expandedHosts[b.host] && b.kind === "host"}
-      onInflateStart={() => onInflateStart(b, false)}
+      onInflateStart={() => {
+        // Раскрытая группа — медленный рост; иначе unfold-сжатие
+        if (world && isHostExpanded(world, b.host)) onExpandedHoverGrow(b);
+        else onInflateStart(b, false);
+      }}
       onInflateCancel={() => onInflateCancel(b)}
       onExpandCommit={() => onExpandCommit(b)}
       onExpandRequest={() => onExpandRequest(b)}

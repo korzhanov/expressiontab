@@ -24,6 +24,8 @@
   import * as Tooltip from "./components/ui/tooltip";
   import BubbleField from "./BubbleField.svelte";
   import {
+    datesForPreset,
+    draftDatesFromRange,
     formatHistoryRangeLabel,
     historySearchBounds,
     loadHistoryRangeFromStorage,
@@ -42,6 +44,7 @@
   /** Диапазон history.search — пресеты + custom from–to */
   let historyRange: HistoryRangeState = loadHistoryRangeFromStorage();
   let rangePopoverOpen = false;
+  // Date inputs сразу с датами текущего пресета
   let rangeDraftFrom = historyRange.fromDate;
   let rangeDraftTo = historyRange.toDate;
 
@@ -97,7 +100,11 @@
   }
 
   function setHistoryPreset(preset: HistoryRangePreset) {
-    historyRange = { ...historyRange, preset };
+    // Пресет + даты для date inputs (сегодня/вчера/недели)
+    const dates = datesForPreset(preset);
+    historyRange = { preset, fromDate: dates.fromDate, toDate: dates.toDate };
+    rangeDraftFrom = dates.fromDate;
+    rangeDraftTo = dates.toDate;
     saveHistoryRangeToStorage(historyRange);
     rangePopoverOpen = false;
     getBookmarks();
@@ -338,12 +345,13 @@
         <span class="previewBanner">Preview · mock data</span>
       </Tooltip.Root>
     {/if}
-    <Tooltip.Root
+    <!-- <Tooltip.Root
       content="Type to filter. Esc clears. Press / to focus."
       side="bottom"
       delayDuration={500}
       block
-    >
+    > -->
+      <div>
       <input
         class="text-white"
         type="search"
@@ -354,7 +362,8 @@
         placeholder="Search history & bookmarks"
         autocomplete="off"
       />
-    </Tooltip.Root>
+      </div>
+    <!-- </Tooltip.Root> -->
   </div>
   <Keydown
     pauseOnInput
@@ -438,8 +447,10 @@
         aria-expanded={rangePopoverOpen}
         on:click={() => {
           rangePopoverOpen = !rangePopoverOpen;
-          rangeDraftFrom = historyRange.fromDate;
-          rangeDraftTo = historyRange.toDate;
+          // Всегда подставить актуальные даты в inputs
+          const draft = draftDatesFromRange(historyRange);
+          rangeDraftFrom = draft.fromDate;
+          rangeDraftTo = draft.toDate;
         }}
       >
         {rangeStatusLabel}
@@ -449,6 +460,8 @@
     {#if rangePopoverOpen}
       <div class="rangePopover" role="dialog" aria-label="History date range">
         <div class="rangePresets">
+          <button type="button" on:click={() => setHistoryPreset("today")}>Today</button>
+          <button type="button" on:click={() => setHistoryPreset("yesterday")}>Yesterday</button>
           <button type="button" on:click={() => setHistoryPreset("1w")}>1 week</button>
           <button type="button" on:click={() => setHistoryPreset("4w")}>4 weeks</button>
           <button type="button" on:click={() => setHistoryPreset("12w")}>12 weeks</button>
@@ -700,7 +713,7 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
-    min-width: 220px;
+    min-width: 280px;
   }
   filterBar .rangePresets {
     display: flex;

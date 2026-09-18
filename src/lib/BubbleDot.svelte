@@ -22,7 +22,7 @@
   export let inflateTick: number = 0;
   /** Пузырь сейчас тянут — grab/grabbing + без tooltip delay */
   export let dragging: boolean = false;
-  /** Идёт 3с рост радиуса перед expand */
+  /** Идёт изменение радиуса (unfold / hover-grow) */
   export let inflating: boolean = false;
   /** Активно лопание BubblePop */
   export let popping: boolean = false;
@@ -111,7 +111,8 @@
         ? GROUP_LONGHOVER_MS
         : 86400000}
       on:mouseenter={() => {
-        if (groupable && !dragging && !popping && !expanded) onInflateStart();
+        // expanded тоже: BubbleField решит grow vs unfold
+        if (groupable && !dragging && !popping) onInflateStart();
       }}
       on:mouseleave={() => {
         if (groupable) onInflateCancel();
@@ -133,15 +134,30 @@
       {#if groupable}
         <span class="bubbleDot__groupRing" aria-hidden="true" />
       {/if}
-      <img
-        class="bubbleDot__favicon"
-        src={faviconSrc}
-        alt=""
-        width="16"
-        height="16"
-        loading="lazy"
-        draggable="false"
-      />
+      <!-- Закладка: фавикон на золотой звезде -->
+      <span class="bubbleDot__faviconWrap" class:starred={bubble.isBookmark}>
+        {#if bubble.isBookmark}
+          <svg
+            class="bubbleDot__star"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path
+              d="M12 2.5l2.9 6.1 6.6.7-4.9 4.5 1.4 6.5L12 16.8 5.9 20.3l1.4-6.5L2.4 9.3l6.6-.7L12 2.5z"
+            />
+          </svg>
+        {/if}
+        <img
+          class="bubbleDot__favicon"
+          src={faviconSrc}
+          alt=""
+          width="16"
+          height="16"
+          loading="lazy"
+          draggable="false"
+        />
+      </span>
     </a>
   </Tooltip.Root>
 </div>
@@ -271,9 +287,6 @@
   .bubbleDot.child {
     --hue: 165;
   }
-  .bubbleDot.bookmark {
-    --hue: 42;
-  }
   .bubbleDot.groupable {
     --hue: 280;
   }
@@ -299,6 +312,7 @@
     width: 55%;
     height: 35%;
     border-radius: 50%;
+    /* Белый блик (не жёлтый) */
     background: radial-gradient(
       circle at top,
       rgba(255, 255, 255, 0.65),
@@ -313,6 +327,31 @@
     border: 2px solid hsla(280, 90%, 75%, 0.55);
     pointer-events: none;
   }
+  .bubbleDot__faviconWrap {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 22px;
+    height: 22px;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+  .bubbleDot__faviconWrap.starred {
+    width: 32px;
+    height: 32px;
+  }
+  .bubbleDot__star {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+  }
+  .bubbleDot__star path {
+    fill: #f0c040;
+    stroke: #c49210;
+    stroke-width: 0.6;
+  }
   .bubbleDot__favicon {
     position: absolute;
     left: 50%;
@@ -324,5 +363,12 @@
     border-radius: 2px;
     pointer-events: none;
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+    z-index: 1;
+  }
+  /* На звезде фавикон чуть меньше, без второй тени */
+  .bubbleDot__faviconWrap.starred .bubbleDot__favicon {
+    width: 16px;
+    height: 16px;
+    filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.35));
   }
 </style>

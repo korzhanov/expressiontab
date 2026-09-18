@@ -219,21 +219,37 @@ describe("bubble-physics", () => {
     expect(fall.y).toBeLessThan(50);
   });
 
-  it("inflateRadius grows from r0 to r1", async () => {
+  it("inflateRadius interpolates grow and shrink", async () => {
     const {
       inflateRadius,
       GROUP_INFLATE_MS,
       GROUP_POP_MS,
       GROUP_SPAWN_LEAD_MS,
       GROUP_ABSORB_MS,
+      GROUP_CHILD_SPAWN_AT_MS,
+      GROUP_CHILD_FLUSH_AT_MS,
+      GROUP_CHILD_STAGGER_MS,
     } = await import("./bubble-physics");
     expect(GROUP_INFLATE_MS).toBe(3000);
     expect(GROUP_POP_MS).toBe(680);
     expect(GROUP_SPAWN_LEAD_MS).toBe(140);
     expect(GROUP_ABSORB_MS).toBe(520);
+    // Hover: 2с задержка → stagger → на 3с flush
+    expect(GROUP_CHILD_SPAWN_AT_MS).toBe(2000);
+    expect(GROUP_CHILD_FLUSH_AT_MS).toBe(3000);
+    expect(GROUP_CHILD_STAGGER_MS).toBe(160);
+    const {
+      GROUP_EXPANDED_HOVER_GROW_MS,
+      GROUP_EXPANDED_HOVER_SHRINK_MS,
+    } = await import("./bubble-physics");
+    expect(GROUP_EXPANDED_HOVER_GROW_MS).toBe(2400);
+    expect(GROUP_EXPANDED_HOVER_SHRINK_MS).toBe(380);
     expect(inflateRadius(40, 90, 0)).toBe(40);
     expect(inflateRadius(40, 90, 1)).toBe(90);
     expect(inflateRadius(40, 90, 0.5)).toBeGreaterThan(65);
+    // Unfold: сжатие groupR → linkR
+    expect(inflateRadius(90, 40, 1)).toBe(40);
+    expect(inflateRadius(90, 40, 0.5)).toBeLessThan(70);
   });
 
   it("absorbChildrenFrame pulls children in while parent grows", async () => {
@@ -316,20 +332,144 @@ describe("bubble-physics", () => {
       nodesList,
     });
     expect(isHostExpanded(world, "a.test")).toBe(true);
-    expect(parent.r).toBeGreaterThan(rBefore);
+    // Unfold: parent сжимается к linkR, не к cluster
+    expect(parent.r).toBe(parent.linkR);
+    expect(parent.r).toBeLessThan(rBefore);
     expect(parent.baseR).toBe(rBefore);
     expect(parent.groupR).toBe(rBefore);
     const kids = world.nodes.filter((n) => n.kind === "child");
     expect(kids.length).toBe(2);
-    // Spawn под родителем (jitter ≤ 4)
+    // Spawn под родителем (jitter ≤ 4); spawnIndex по порядку
     for (const k of kids) {
       expect(Math.abs((k.x ?? 0) - (parent.x ?? 0))).toBeLessThanOrEqual(5);
       expect(Math.abs((k.y ?? 0) - (parent.y ?? 0))).toBeLessThanOrEqual(5);
-      expect(k.spawnIndex).toBe(0);
     }
+    expect(kids.map((k) => k.spawnIndex).sort()).toEqual([0, 1]);
+    // Повторный expandHost добавляет только новых (keepParentR)
+    const rAfterFirst = parent.r;
+    expandHost({
+      world,
+      host: "a.test",
+      childIndexes: [1, 2],
+      nodesList,
+      keepParentR: true,
+      spawnIndexBase: 2,
+    });
+    expect(world.nodes.filter((n) => n.kind === "child").length).toBe(2);
+    expect(parent.r).toBe(rAfterFirst);
     collapseHost(world, "a.test");
     expect(isHostExpanded(world, "a.test")).toBe(false);
     expect(parent.r).toBe(rBefore);
+    stopWorld(world);
+  });
+
+  it("expandHost incremental spawn with spawnIndexBase", async () => {
+    const {
+      buildHostBubbles,
+      createBubbleWorld,
+      expandHost,
+      GROUP_MAX_CHILDREN,
+      stopWorld,
+    } = await import("./bubble-physics");
+    expect(GROUP_MAX_CHILDREN).toBeGreaterThanOrEqual(100);
+    const nodesList = [
+      { url: "https://b.test/1", title: "b1", visitCount: 40 },
+      { url: "https://b.test/2", title: "b2", visitCount: 4 },
+      { url: "https://b.test/3", title: "b3", visitCount: 3 },
+      { url: "https://b.test/4", title: "b4", visitCount: 2 },
+    ] as any;
+    const bookmarkList = new Map([
+      [
+        "b.test",
+        {
+          nodes: [0, 1, 2, 3],
+          hostVisitCount: 49,
+          hostLastVisitTime: 1,
+        },
+      ],
+    ]);
+    const hosts = buildHostBubbles({
+      bookmarkList,
+      nodesList,
+      width: 800,
+      height: 600,
+    });
+    const world = createBubbleWorld({ nodes: hosts, width: 800, height: 600 });
+    const parent = world.nodes[0];
+    const r0 = parent.r;
+    // Первый ребёнок — keepParentR
+    expect(
+      expandHost({
+        world,
+        host: "b.test",
+        childIndexes: [1],
+        nodesList,
+        keepParentR: true,
+        spawnIndexBase: 0,
+      })
+    ).toBe(1);
+    expect(parent.r).toBe(r0);
+    expect(world.nodes.filter((n) => n.kind === "child")[0].spawnIndex).toBe(0);
+    // Второй и третий пачкой
+    expect(
+      expandHost({
+        world,
+        host: "b.test",
+        childIndexes: [2, 3],
+        nodesList,
+        keepParentR: true,
+        spawnIndexBase: 1,
+      })
+    ).toBe(2);
+    const kids = world.nodes.filter((n) => n.kind === "child");
+    expect(kids.length).toBe(3);
+    expect(kids.map((k) => k.spawnIndex).sort()).toEqual([0, 1, 2]);
+    expect(parent.r).toBe(r0);
+    stopWorld(world);
+  });
+
+  it("expandHost spawns more than old 24-child cap", async () => {
+    const {
+      buildHostBubbles,
+      createBubbleWorld,
+      expandHost,
+      stopWorld,
+    } = await import("./bubble-physics");
+    const nodesList: any[] = [
+      { url: "https://c.test/0", title: "c0", visitCount: 80 },
+    ];
+    for (let i = 1; i <= 40; i++) {
+      nodesList.push({
+        url: `https://c.test/${i}`,
+        title: `c${i}`,
+        visitCount: 2,
+      });
+    }
+    const bookmarkList = new Map([
+      [
+        "c.test",
+        {
+          nodes: nodesList.map((_, i) => i),
+          hostVisitCount: 160,
+          hostLastVisitTime: 1,
+        },
+      ],
+    ]);
+    const hosts = buildHostBubbles({
+      bookmarkList,
+      nodesList,
+      width: 800,
+      height: 600,
+    });
+    const world = createBubbleWorld({ nodes: hosts, width: 800, height: 600 });
+    const n = expandHost({
+      world,
+      host: "c.test",
+      childIndexes: nodesList.map((_, i) => i).slice(1),
+      nodesList,
+    });
+    expect(n).toBe(40);
+    expect(world.nodes.filter((x) => x.kind === "child").length).toBe(40);
     stopWorld(world);
   });
 
@@ -378,6 +518,9 @@ describe("bubble-physics", () => {
       createBubbleWorld,
       beginDragCollisions,
       endDragCollisions,
+      beginSoftRadiusAdjust,
+      endSoftRadiusAdjust,
+      nudgeSim,
       stopWorld,
     } = await import("./bubble-physics");
     const nodes = [
@@ -401,9 +544,25 @@ describe("bubble-physics", () => {
       height: 400,
     });
     beginDragCollisions(world);
-    expect(world.simulation.alphaTarget()).toBe(0.3);
+    expect(world.simulation.alphaTarget()).toBe(0.22);
+    // Links выкл — иначе drag схлопывает unfold к центру
+    expect((world.linkForce.strength() as () => number)()).toBe(0);
     endDragCollisions(world);
     expect(world.simulation.alphaTarget()).toBe(0);
+    expect((world.linkForce.strength() as () => number)()).toBe(0.45);
+    // Soft radius: больше трения, низкая цель — без взрыва поля
+    beginSoftRadiusAdjust(world);
+    expect(world.simulation.alphaTarget()).toBe(0.05);
+    expect(world.simulation.velocityDecay()).toBe(0.55);
+    endSoftRadiusAdjust(world);
+    expect(world.simulation.velocityDecay()).toBe(0.28);
+    expect(world.simulation.alphaTarget()).toBe(0);
+    world.simulation.alpha(0.01);
+    nudgeSim(world, 0.1);
+    expect(world.simulation.alpha()).toBeGreaterThanOrEqual(0.1);
+    const before = world.simulation.alpha();
+    nudgeSim(world, 0.05);
+    expect(world.simulation.alpha()).toBe(before);
     stopWorld(world);
   });
 
@@ -418,6 +577,25 @@ describe("bubble-physics", () => {
     expect(nodes[0].vx).toBeGreaterThan(0);
     expect(nodes[1].x).toBe(800 - 44);
     expect(nodes[1].vx).toBeLessThan(0);
+  });
+
+  it("bounceBubblesAtWorldEdges skips pinned drag subject, clamps free neighbor", () => {
+    const pinned = {
+      id: "drag",
+      x: 10,
+      y: 200,
+      r: 40,
+      vx: 0,
+      vy: 0,
+      fx: 10,
+      fy: 200,
+    } as any;
+    const free = { id: "n", x: -20, y: 200, r: 30, vx: -8, vy: 0 } as any;
+    bounceBubblesAtWorldEdges([pinned, free], 800, 560);
+    // Закреплённый (drag) bounce не трогает — clamp делает pinBubbleAt
+    expect(pinned.x).toBe(10);
+    expect(free.x).toBe(34);
+    expect(free.vx).toBeGreaterThan(0);
   });
 
   it("gridSpawnXY fills top-down with fixed cell", () => {
@@ -488,7 +666,7 @@ describe("bubble-physics", () => {
   });
 
   it("createBubbleWorld uses forceY toward top of bubble block", async () => {
-    const { createBubbleWorld, focusYForWorld, stopWorld, PACK_GAP } =
+    const { createBubbleWorld, focusYForWorld, stopWorld, PACK_GAP, BUBBLE_GRAVITY } =
       await import("./bubble-physics");
     const nodes = [
       {
@@ -514,10 +692,13 @@ describe("bubble-physics", () => {
     const topY = focusYForWorld(900);
     expect(topY).toBeGreaterThan(PACK_GAP);
     expect(topY).toBeLessThan(200);
-    world.simulation.alpha(1);
-    const y0 = world.nodes[0].y ?? 500;
-    for (let i = 0; i < 120; i++) world.simulation.tick();
-    expect(world.nodes[0].y ?? 0).toBeLessThan(y0);
+    // Пока гравитация выкл. — узел не обязан ехать вверх
+    if (BUBBLE_GRAVITY) {
+      world.simulation.alpha(1);
+      const y0 = world.nodes[0].y ?? 500;
+      for (let i = 0; i < 120; i++) world.simulation.tick();
+      expect(world.nodes[0].y ?? 0).toBeLessThan(y0);
+    }
     stopWorld(world);
   });
 

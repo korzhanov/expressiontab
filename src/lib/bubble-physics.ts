@@ -42,8 +42,13 @@ export type BubbleNode = SimulationNodeDatum & {
   spawnIndex: number;
 };
 
-/** Зазор между ячейками сетки (collide padding ≈ gap/2). */
+/** Зазор между ячейками сетки (разграничение ≈ gap/2). */
 export const PACK_GAP = 12;
+
+/** Временно: выключить «гравитацию» (стягивание по X/Y). */
+export const BUBBLE_GRAVITY = true;
+/** Сила связей родитель↔дети (слабее — иначе схлопывает unfold). */
+export const BUBBLE_LINK_STRENGTH = 0.5;
 
 export type BubbleLink = SimulationLinkDatum<BubbleNode> & {
   id: string;
@@ -59,8 +64,10 @@ export type BubbleWorld = {
 };
 
 const VIEWPORT_PAD = 120;
-/** Жёсткий потолок тел в симуляции — защита new-tab */
+/** Жёсткий потолок тел-хостов в симуляции — защита new-tab */
 export const BUBBLE_SIM_CAP = 400;
+/** Макс. детей на один unfold (раньше 24 — молчаливая обрезка). */
+export const GROUP_MAX_CHILDREN = 500;
 
 function hostId(host: string): string {
   return `host:${host}`;
@@ -237,13 +244,16 @@ export function createBubbleWorld({
     .distance((l) => {
       const s = l.source as BubbleNode;
       const t = l.target as BubbleNode;
-      // Короче зазор — дети не «кольцом» вокруг кратера
-      return (s.r || 40) + (t.r || 28) + 6;
+      // Зазор шире — unfold не схлопывается в плотное кольцо
+      return (s.r || 40) + (t.r || 28) + 14;
     })
-    .strength(0.7);
+    .strength(BUBBLE_LINK_STRENGTH);
 
   // Якорь Y — верх блока с шариками (не страница/часы)
   const topY = focusYForWorld(height);
+  // Сила «гравитации» (0 = временно выкл.)
+  const gX = BUBBLE_GRAVITY ? 0.003 : 0;
+  const gY = BUBBLE_GRAVITY ? 0.006 : 0;
   const simulation = forceSimulation<BubbleNode>(nodes)
     .force(
       "collide",
@@ -253,10 +263,10 @@ export function createBubbleWorld({
         .iterations(6)
     )
     // Без many-body: в drag-collisions его нет — иначе давит на overlap
-    // Стягивание к середине по горизонтали (сила 0.003 — едва заметная)
-    .force("x", forceX(width / 2).strength(0.003))
-    // Стягивание к верху блока с шариками (сила 0.006)
-    .force("y", forceY(topY).strength(0.006))
+    // Стягивание к середине по горизонтали
+    .force("x", forceX(width / 2).strength(gX))
+    // Стягивание к верху блока с шариками
+    .force("y", forceY(topY).strength(gY))
     // Связи родитель↔дети: держат раскрытую группу рядом
     .force("link", linkForce)
     // Как быстро «остывает» движение после толчка (выше — раньше останавливается)
@@ -273,25 +283,54 @@ export function reheat(world: BubbleWorld, alpha = 0.6): void {
 }
 
 /**
- * Drag как в d3 drag-collisions: держим цель активности, чтобы разграничение
- * двигало соседей вокруг закреплённого (fx/fy) узла.
+ * Поднять активность только если уже почти остановилась —
+ * без сброса к высокому alpha (не разгоняет всё поле).
  */
-export function beginDragCollisions(world: BubbleWorld): void {
-  world.simulation.alphaTarget(0.3).restart();
+export function nudgeSim(world: BubbleWorld, minAlpha = 0.1): void {
+  const sim = world.simulation;
+  if (sim.alpha() < minAlpha) {
+    sim.alpha(minAlpha).restart();
+  }
 }
 
-/** Конец drag: сбросить цель активности, разграничение дорешает остаток. */
+/**
+ * Смена радиуса (inflate/deflate): низкая цель + больше трения,
+ * чтобы соседи чуть уступили, а дальние хосты не пружинили по полю.
+ */
+export function beginSoftRadiusAdjust(world: BubbleWorld): void {
+  world.simulation.velocityDecay(0.55).alphaTarget(0.05).restart();
+}
+
+/** Вернуть обычное трение и остудить цель активности. */
+export function endSoftRadiusAdjust(world: BubbleWorld): void {
+  world.simulation.velocityDecay(0.28).alphaTarget(0);
+}
+
+/**
+ * Drag как в d3 drag-collisions: collide двигает соседей вокруг fx/fy.
+ * Links на время drag выключаем — иначе alphaTarget снова стягивает
+ * все unfold-группы к родителям («схлопывание к центру»).
+ */
+export function beginDragCollisions(world: BubbleWorld): void {
+  world.linkForce.strength(0);
+  world.simulation.velocityDecay(0.35).alphaTarget(0.22).restart();
+}
+
+/** Конец drag: вернуть links и остудить цель активности. */
 export function endDragCollisions(world: BubbleWorld): void {
-  world.simulation.alphaTarget(0);
+  world.linkForce.strength(BUBBLE_LINK_STRENGTH);
+  world.simulation.velocityDecay(0.28).alphaTarget(0);
 }
 
 export function resizeWorld(world: BubbleWorld, width: number, height: number): void {
   world.width = width;
   world.height = height;
   const topY = focusYForWorld(height);
-  world.simulation.force("x", forceX(width / 2).strength(0.003));
-  world.simulation.force("y", forceY(topY).strength(0.006));
-  // Обновить collide на случай смены состава радиусов
+  const gX = BUBBLE_GRAVITY ? 0.003 : 0;
+  const gY = BUBBLE_GRAVITY ? 0.006 : 0;
+  world.simulation.force("x", forceX(width / 2).strength(gX));
+  world.simulation.force("y", forceY(topY).strength(gY));
+  // Обновить разграничение на случай смены состава радиусов
   world.simulation.force(
     "collide",
     forceCollide<BubbleNode>()
@@ -334,35 +373,38 @@ export function expandedHostRadius(r0: number, childCount: number): number {
 }
 
 /**
- * Раскрыть host: родитель на cluster-r, дети спавнятся под ним (collide раздвигает).
- * Лимит children за раз — чтобы не взорвать new-tab.
+ * Раскрыть host: родитель на cluster-r (если нужно), дети под ним.
+ * Можно вызывать повторно — добавит только ещё не созданных детей.
  */
 export function expandHost({
   world,
   host,
   childIndexes,
   nodesList,
-  maxChildren = 24,
+  maxChildren = GROUP_MAX_CHILDREN,
+  /** Не перезаписывать r родителя (уже inflated снаружи) */
+  keepParentR = false,
+  /** База для CSS-задержки появления */
+  spawnIndexBase = 0,
 }: {
   world: BubbleWorld;
   host: string;
   childIndexes: number[];
   nodesList: BookmarkNode[];
   maxChildren?: number;
-}): void {
+  keepParentR?: boolean;
+  spawnIndexBase?: number;
+}): number {
   const parent = world.nodes.find((n) => n.id === hostId(host));
-  if (!parent) return;
+  if (!parent) return 0;
 
-  // Уже раскрыт — no-op
-  if (world.nodes.some((n) => n.parentId === parent.id)) return;
-
-  const slice = childIndexes.slice(0, maxChildren);
-  const childRadii: number[] = [];
-  for (const nodeIndex of slice) {
-    const n = nodesList[nodeIndex];
-    if (!n?.url) continue;
-    childRadii.push(bubbleRadiusFromVisits({ visitCount: n.visitCount || 1 }));
-  }
+  const existing = new Set(
+    world.nodes.filter((n) => n.parentId === parent.id).map((n) => n.nodeIndex)
+  );
+  const slice = childIndexes
+    .filter((i) => !existing.has(i))
+    .slice(0, maxChildren);
+  if (!slice.length) return 0;
 
   // groupR = сложенный; linkR = вес своей ссылки
   parent.groupR = parent.groupR ?? parent.baseR ?? parent.r;
@@ -373,11 +415,10 @@ export function expandHost({
     });
   }
   parent.baseR = parent.groupR;
-  // Inflate до площади детей — соседи отпружинят через collide
-  parent.r = clusterRadiusFromChildRadii({
-    childRadii,
-    r0: parent.groupR,
-  });
+  if (!keepParentR) {
+    // Unfold: родитель сжимается к весу своей ссылки (не к площади детей)
+    parent.r = parent.linkR;
+  }
 
   const px = parent.x ?? world.width / 2;
   const py = parent.y ?? world.height / 2;
@@ -404,8 +445,7 @@ export function expandHost({
       isBookmark: n.isBookmark,
       lastVisitTime: n.lastVisitTime as number | undefined,
       parentId: parent.id,
-      // spawnIndex 0 → без stagger: вместе с unfold
-      spawnIndex: 0,
+      spawnIndex: spawnIndexBase + ci,
       x: px + jx,
       y: py + jy,
       vx: jx * 0.4,
@@ -422,8 +462,10 @@ export function expandHost({
 
   world.simulation.nodes(world.nodes);
   world.linkForce.links(world.links);
-  // Сильный reheat — родитель большой, место раздвигается
-  reheat(world, 1);
+  // keepParentR (stagger) — мягкий толчок; полный expand — чуть сильнее
+  if (keepParentR) nudgeSim(world, 0.15);
+  else reheat(world, 0.35);
+  return ci;
 }
 
 /** Дети хоста (для absorb / orbit). */
@@ -509,7 +551,7 @@ export function startCraterFill({
   world,
   parent,
   durationMs = GROUP_CRATER_FILL_MS,
-  strength = 0.12,
+  strength = 0.08,
 }: {
   world: BubbleWorld;
   parent: BubbleNode;
@@ -518,10 +560,10 @@ export function startCraterFill({
 }): () => void {
   const t0 =
     typeof performance !== "undefined" ? performance.now() : Date.now();
-  // Радиус «зоны кратера» — от размера inflate (~group/cluster)
+  // Зона кратера — уже: чужие хосты только рядом, не полполя
   const craterR = Math.max(
-    (parent.groupR ?? parent.baseR ?? parent.r) * 3.5,
-    220
+    (parent.groupR ?? parent.baseR ?? parent.r) * 2.2,
+    140
   );
 
   const force = (alpha: number) => {
@@ -541,27 +583,29 @@ export function startCraterFill({
       const dy = py - (n.y ?? 0);
       const dist = Math.hypot(dx, dy) || 1;
       const isChild = n.parentId === parent.id;
-      // Чужие хосты — только из зоны кратера; дети — всегда
+      // Чужие хосты — только из узкой зоны; дети — всегда
       if (!isChild && dist > craterR) continue;
-      // Дети тянем сильнее (закрыть кольцо)
-      const k = ((isChild ? 2.4 : 1) * s) / dist;
+      // Дети тянем сильнее; чужие — слабее (не таскать по полю)
+      const k = ((isChild ? 2.2 : 0.45) * s) / dist;
       n.vx = (n.vx ?? 0) + dx * k;
       n.vy = (n.vy ?? 0) + dy * k;
     }
   };
 
   world.simulation.force("craterFill", force as any);
-  // На время fill — плотнее links
-  world.linkForce.strength(0.95);
-  reheat(world, 1);
+  // На время fill — чуть плотнее links; без alpha=1 (не разгонять поле)
+  world.linkForce.strength(Math.min(0.7, BUBBLE_LINK_STRENGTH + 0.2));
+  beginSoftRadiusAdjust(world);
+  nudgeSim(world, 0.2);
 
   let stopped = false;
   const stop = () => {
     if (stopped) return;
     stopped = true;
     world.simulation.force("craterFill", null);
-    world.linkForce.strength(0.7);
-    reheat(world, 0.35);
+    world.linkForce.strength(BUBBLE_LINK_STRENGTH);
+    endSoftRadiusAdjust(world);
+    nudgeSim(world, 0.12);
   };
 
   if (typeof setTimeout !== "undefined") {
@@ -645,7 +689,7 @@ export type BubbleEnterFlight = {
 
 export const ENTER_RISE_MS = 720;
 export const ENTER_FALL_MS = 580;
-/** Рост радиуса перед лопанием / expand группы (совпадает с longhover). */
+/** Рост/сжатие радиуса перед лопанием / expand (совпадает с longhover). */
 export const GROUP_INFLATE_MS = 3000;
 /** Длительность BubblePop (как при delete в AnchoreItem). */
 export const GROUP_POP_MS = 680;
@@ -655,10 +699,18 @@ export const GROUP_SPAWN_LEAD_MS = 140;
 export const GROUP_ABSORB_MS = 520;
 /** После shrink: стягивание кратера вокруг родителя. */
 export const GROUP_CRATER_FILL_MS = 920;
-/** Во сколько раз растёт r за inflate. */
-export const GROUP_INFLATE_SCALE = 2.25;
+/** Hover: через сколько мс начинать детей по очереди. */
+export const GROUP_CHILD_SPAWN_AT_MS = 2000;
+/** Hover: через сколько мс высыпать всех оставшихся (если курсор на месте). */
+export const GROUP_CHILD_FLUSH_AT_MS = 3000;
+/** Пауза между дочерними при появлении по очереди. */
+export const GROUP_CHILD_STAGGER_MS = 160;
+/** Раскрытая группа: медленный рост родителя при hover → groupR. */
+export const GROUP_EXPANDED_HOVER_GROW_MS = 2400;
+/** Раскрытая группа: откат к linkR при leave. */
+export const GROUP_EXPANDED_HOVER_SHRINK_MS = 380;
 
-/** Радиус на прогрессе inflate 0..1. */
+/** Интерполяция r0→r1 на прогрессе 0..1 (рост или сжатие). */
 export function inflateRadius(r0: number, r1: number, u: number): number {
   const t = easeOutCubic(u);
   return r0 + (r1 - r0) * t;
