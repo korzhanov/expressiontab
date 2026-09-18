@@ -89,8 +89,6 @@
     width: 100%;
     min-height: 100vh;
     z-index: -2;
-    /* Обесцвечиваем фото — dial и filter bar читаются лучше */
-    filter: grayscale(1) saturate(0);
     /* без transition на opacity — иначе фон «догоняет» скролл и интерфейс дёргается */
     will-change: opacity;
     pointer-events: none;

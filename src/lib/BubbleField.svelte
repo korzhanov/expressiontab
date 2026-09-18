@@ -234,10 +234,7 @@
     width: 100%;
     min-height: 560px;
     overflow: hidden; /* не пускаем шары на часы / filter bar */
-    background: radial-gradient(
-      ellipse at 50% 18%,
-      rgba(40, 70, 110, 0.35),
-      transparent 55%
-    );
+    /* Без цветного radial — только нейтральный слой поверх anchores; hero-картинка цветная */
+    background: transparent;
   }
 </style>
