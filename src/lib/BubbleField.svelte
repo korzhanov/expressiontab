@@ -13,18 +13,24 @@
     clientToFieldPoint,
     collapseHost,
     createBubbleWorld,
+    ENTER_FALL_MS,
+    ENTER_RISE_MS,
     expandHost,
     fieldScrollFromRectTop,
+    flightPosition,
     isHostExpanded,
+    offscreenEnterY,
     pinBubbleAt,
     reheat,
     resizeWorld,
     scrollDirection,
+    separateBubbles,
     stopWorld,
     unpinBubble,
     visibleBubbles,
     worldHeightForCount,
     type BubbleEnterAnim,
+    type BubbleEnterFlight,
     type BubbleNode,
     type BubbleWorld,
   } from "./bubble-physics";
@@ -50,6 +56,9 @@
   let lastFieldScrollY = 0;
   let prevVisibleIds = new Set<string>();
   let enterAnimById: Record<string, BubbleEnterAnim> = {};
+  /** Полёты из-за экрана → разведённые конечные точки */
+  let flights = new Map<string, BubbleEnterFlight>();
+  let flightRaf = 0;
 
   /** Drag: pinBubbleAt (fx/fy); после порога не открываем ссылку */
   let dragBubble: BubbleNode | null = null;
@@ -95,14 +104,118 @@
     // Сброс enter-анимаций при новой симуляции
     prevVisibleIds = new Set();
     enterAnimById = {};
+    flights = new Map();
     lastFieldScrollY = fieldScrollY();
     world.simulation.on("tick", onTick);
     refreshVisible();
   }
 
+  /** Старт полётов: offscreen → separate targets → pin на траектории. */
+  function startEnterFlights(
+    newcomers: BubbleNode[],
+    anims: Record<string, BubbleEnterAnim>,
+    scrollY: number
+  ) {
+    if (!world || !newcomers.length) return;
+    const newIds = new Set(newcomers.map((n) => n.id));
+    const locked = visible
+      .filter((n) => !newIds.has(n.id))
+      .map((n) => ({
+        id: n.id,
+        x: n.x ?? 0,
+        y: n.y ?? 0,
+        r: n.r || 40,
+        locked: true as const,
+      }));
+    const movable = newcomers.map((n) => ({
+      id: n.id,
+      x: n.x ?? world!.width / 2,
+      y: n.y ?? scrollY + viewH / 2,
+      r: n.r || 40,
+      locked: false as const,
+    }));
+    // Конечные координаты без наложений (новички двигаются, старые — якоря)
+    separateBubbles([...locked, ...movable], {
+      width: world.width,
+      height: world.height,
+    });
+    const now =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+    for (const m of movable) {
+      if (flights.has(m.id)) continue;
+      const anim = anims[m.id];
+      if (anim !== "rise" && anim !== "fall") continue;
+      const node = world.nodes.find((n) => n.id === m.id);
+      if (!node) continue;
+      const y0 = offscreenEnterY({
+        anim,
+        scrollY,
+        viewH,
+        r: m.r,
+      });
+      const x0 = m.x;
+      const flight: BubbleEnterFlight = {
+        id: m.id,
+        anim,
+        x0,
+        y0,
+        x1: m.x,
+        y1: m.y,
+        t0: now,
+        dur: anim === "fall" ? ENTER_FALL_MS : ENTER_RISE_MS,
+      };
+      flights.set(m.id, flight);
+      pinBubbleAt(node, x0, y0, world.width, world.height);
+    }
+    ensureFlightLoop();
+  }
+
+  /** rAF пока есть полёты — даже если d3 alpha остыл. */
+  function ensureFlightLoop() {
+    if (flightRaf || typeof requestAnimationFrame === "undefined") return;
+    const loop = () => {
+      flightRaf = 0;
+      if (!flights.size) return;
+      advanceFlights();
+      flightRaf = requestAnimationFrame(loop);
+    };
+    flightRaf = requestAnimationFrame(loop);
+  }
+
+  /** Продвинуть полёты; по завершении — unpin на конечной точке. */
+  function advanceFlights() {
+    if (!flights.size || !world) return;
+    const now =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+    let finished = false;
+    for (const [id, f] of [...flights]) {
+      const node = world.nodes.find((n) => n.id === id);
+      if (!node) {
+        flights.delete(id);
+        continue;
+      }
+      const u = Math.min(1, (now - f.t0) / f.dur);
+      const pt = flightPosition(f, u);
+      pinBubbleAt(node, pt.x, pt.y, world.width, world.height);
+      if (u >= 1) {
+        node.x = f.x1;
+        node.y = f.y1;
+        unpinBubble(node);
+        flights.delete(id);
+        finished = true;
+      }
+    }
+    frame += 1;
+    if (finished && !flights.size) {
+      reheat(world, 0.2);
+    }
+  }
+
   function onTick() {
     // Во время активного drag симуляцию не крутим — иначе все шары дёргаются
     if (dragMoved && dragBubble) return;
+    // Полёты крутит rAF (ensureFlightLoop) — не ускоряем тут вдвое
+    if (flights.size) return;
     if (world) {
       bounceBubblesAtWorldEdges(world.nodes, world.width, world.height);
     }
@@ -122,16 +235,25 @@
       nodes: world.nodes,
       scrollY: sy,
       viewH,
-      // Не снимать DOM с пузыря в drag — иначе потеряем capture
+      // Не снимать DOM с пузыря в drag / полёте — иначе потеряем capture / анимацию
       pinnedId: dragBubble?.id ?? null,
     });
     const nextIds = next.map((n) => n.id);
-    enterAnimById = assignEnterAnims({
+    const anims = assignEnterAnims({
       prevIds: prevVisibleIds,
       nextIds,
       scrollDir: dir,
       prevAnims: enterAnimById,
     });
+    const newcomers = next.filter((n) => {
+      if (prevVisibleIds.has(n.id) || flights.has(n.id)) return false;
+      const a = anims[n.id];
+      return a === "rise" || a === "fall";
+    });
+    if (newcomers.length) {
+      startEnterFlights(newcomers, anims, sy);
+    }
+    enterAnimById = anims;
     prevVisibleIds = new Set(nextIds);
     visible = next;
   }
@@ -279,6 +401,10 @@
 
   onDestroy(() => {
     detachDragListeners();
+    if (flightRaf && typeof cancelAnimationFrame !== "undefined") {
+      cancelAnimationFrame(flightRaf);
+      flightRaf = 0;
+    }
     resizeObs?.disconnect();
     resizeObs = null;
     stopWorld(world);

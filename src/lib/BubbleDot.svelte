@@ -139,27 +139,27 @@
     }
   }
 
-  /* Скролл вниз: новые всплывают снизу */
+  /* Скролл вниз: всплытие — позиция из JS (offscreen→target), тут только scale/fade */
   @keyframes bubbleRise {
     from {
       opacity: 0;
-      transform: scale(0.5) translateY(64px);
+      transform: scale(0.45);
     }
     to {
       opacity: 0.95;
-      transform: scale(1) translateY(0);
+      transform: scale(1);
     }
   }
 
-  /* Скролл вверх: падают сверху с «гравитацией» */
+  /* Скролл вверх: падение — гравитация в timing, позиция из JS */
   @keyframes bubbleFall {
     from {
       opacity: 0;
-      transform: scale(0.65) translateY(-72px);
+      transform: scale(0.55);
     }
     to {
       opacity: 0.95;
-      transform: scale(1) translateY(0);
+      transform: scale(1);
     }
   }
 

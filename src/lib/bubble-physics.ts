@@ -323,6 +323,21 @@ export function scrollDirection(
 /** Анимация появления пузыря при входе в viewport. */
 export type BubbleEnterAnim = "initial" | "rise" | "fall";
 
+/** Полёт из-за экрана → конечная точка. */
+export type BubbleEnterFlight = {
+  id: string;
+  anim: "rise" | "fall";
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  t0: number;
+  dur: number;
+};
+
+export const ENTER_RISE_MS = 720;
+export const ENTER_FALL_MS = 580;
+
 /**
  * Для id, которых не было в prev: rise при скролле вниз, fall вверх.
  * Уже видимые сохраняют прошлую метку (анимация не рестартит).
@@ -350,6 +365,113 @@ export function assignEnterAnims({
     else out[id] = prevAnims[id] || "initial";
   }
   return out;
+}
+
+/** Y старта за нижней (rise) / верхней (fall) кромкой viewport в coords поля. */
+export function offscreenEnterY({
+  anim,
+  scrollY,
+  viewH,
+  r,
+  margin = 28,
+}: {
+  anim: "rise" | "fall";
+  scrollY: number;
+  viewH: number;
+  r: number;
+  margin?: number;
+}): number {
+  if (anim === "rise") return scrollY + viewH + r + margin;
+  return scrollY - r - margin;
+}
+
+export function easeOutCubic(t: number): number {
+  const u = Math.min(1, Math.max(0, t));
+  return 1 - Math.pow(1 - u, 3);
+}
+
+/** Ease-in — ощущение гравитации при падении. */
+export function easeInCubic(t: number): number {
+  const u = Math.min(1, Math.max(0, t));
+  return u * u * u;
+}
+
+export type SeparableBubble = {
+  id: string;
+  x: number;
+  y: number;
+  r: number;
+  /** Уже на экране — не двигаем, только отталкиваем новичков */
+  locked?: boolean;
+};
+
+/**
+ * Итеративное разведение кругов (collide), чтобы конечные точки не наезжали.
+ * locked узлы — якоря; двигаются только !locked.
+ */
+export function separateBubbles(
+  nodes: SeparableBubble[],
+  {
+    width,
+    height,
+    iterations = 18,
+    gap = 3,
+  }: {
+    width: number;
+    height: number;
+    iterations?: number;
+    gap?: number;
+  }
+): SeparableBubble[] {
+  const pad = 4;
+  for (let iter = 0; iter < iterations; iter++) {
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i];
+        const b = nodes[j];
+        if (a.locked && b.locked) continue;
+        let dx = (b.x - a.x) as number;
+        let dy = (b.y - a.y) as number;
+        let dist = Math.hypot(dx, dy);
+        const min = a.r + b.r + gap;
+        if (dist >= min) continue;
+        if (dist < 1e-6) {
+          dx = 0.01;
+          dy = 0;
+          dist = 0.01;
+        }
+        const push = (min - dist) / (a.locked || b.locked ? 1 : 2);
+        const ux = dx / dist;
+        const uy = dy / dist;
+        if (!a.locked) {
+          a.x -= ux * push;
+          a.y -= uy * push;
+        }
+        if (!b.locked) {
+          b.x += ux * push;
+          b.y += uy * push;
+        }
+      }
+    }
+    for (const n of nodes) {
+      if (n.locked) continue;
+      n.x = Math.max(n.r + pad, Math.min(width - n.r - pad, n.x));
+      n.y = Math.max(n.r + pad, Math.min(height - n.r - pad, n.y));
+    }
+  }
+  return nodes;
+}
+
+/** Позиция на траектории полёта (0..1). */
+export function flightPosition(
+  flight: Pick<BubbleEnterFlight, "x0" | "y0" | "x1" | "y1" | "anim">,
+  u: number
+): { x: number; y: number } {
+  const e = flight.anim === "fall" ? easeInCubic(u) : easeOutCubic(u);
+  return {
+    x: flight.x0 + (flight.x1 - flight.x0) * e,
+    y: flight.y0 + (flight.y1 - flight.y0) * e,
+  };
 }
 
 /** AABB cull: scrollY/viewH в координатах поля (0 = верх .bubbleField). */

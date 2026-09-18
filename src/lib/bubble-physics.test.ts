@@ -140,6 +140,44 @@ describe("bubble-physics", () => {
     expect(fall.c).toBe("fall");
   });
 
+  it("offscreenEnterY is beyond viewport edges", async () => {
+    const { offscreenEnterY } = await import("./bubble-physics");
+    expect(
+      offscreenEnterY({ anim: "rise", scrollY: 100, viewH: 800, r: 40 })
+    ).toBeGreaterThan(100 + 800);
+    expect(
+      offscreenEnterY({ anim: "fall", scrollY: 100, viewH: 800, r: 40 })
+    ).toBeLessThan(100);
+  });
+
+  it("separateBubbles pushes newcomers apart from locked anchors", async () => {
+    const { separateBubbles } = await import("./bubble-physics");
+    const nodes = [
+      { id: "lock", x: 200, y: 200, r: 40, locked: true },
+      { id: "new", x: 205, y: 200, r: 40, locked: false },
+    ];
+    separateBubbles(nodes, { width: 800, height: 600, iterations: 20 });
+    const dist = Math.hypot(nodes[1].x - nodes[0].x, nodes[1].y - nodes[0].y);
+    expect(dist).toBeGreaterThanOrEqual(80);
+    expect(nodes[0].x).toBe(200);
+  });
+
+  it("flightPosition eases rise out and fall in", async () => {
+    const { flightPosition } = await import("./bubble-physics");
+    const rise = flightPosition(
+      { anim: "rise", x0: 0, y0: 100, x1: 0, y1: 0 },
+      0.5
+    );
+    const fall = flightPosition(
+      { anim: "fall", x0: 0, y0: 0, x1: 0, y1: 100 },
+      0.5
+    );
+    // easeOut: halfway time → past halfway distance toward target
+    expect(rise.y).toBeLessThan(50);
+    // easeIn: halfway time → less than halfway distance
+    expect(fall.y).toBeLessThan(50);
+  });
+
   it("bounceBubblesAtWorldEdges keeps both left and right edges", () => {
     const nodes = [
       { id: "l", x: 2, y: 200, r: 40, vx: -5, vy: 0 },
