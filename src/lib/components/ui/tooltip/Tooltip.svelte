@@ -1,11 +1,18 @@
 <script lang="ts">
-  // Tooltip в духе shadcn: delay → fade popup, без native title
+  // Tooltip в духе shadcn: delay → fade popup на портале (слой над overflow:hidden)
   import { fade } from "svelte/transition";
+  import { onDestroy, onMount } from "svelte";
+  import {
+    clampTooltipPos,
+    placeTooltip,
+    tooltipPortal,
+    type TooltipSide,
+  } from "./portal";
 
   /** Текст подсказки */
   export let content: string = "";
   /** Сторона относительно триггера */
-  export let side: "top" | "bottom" | "left" | "right" = "top";
+  export let side: TooltipSide = "top";
   /** Задержка перед показом (как delayDuration у shadcn) */
   export let delayDuration: number = 400;
   /** Блочный триггер (строка списка на всю ширину) */
@@ -14,6 +21,9 @@
   export let disabled: boolean = false;
 
   let open = false;
+  let rootEl: HTMLElement;
+  let popupEl: HTMLElement;
+  let pos = { top: 0, left: 0 };
   let showTimer: ReturnType<typeof setTimeout> | null = null;
   let hideTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -24,10 +34,25 @@
     hideTimer = null;
   }
 
+  function syncPos(popup?: HTMLElement) {
+    if (!rootEl) return;
+    let next = placeTooltip(rootEl, side);
+    if (popup && typeof window !== "undefined") {
+      const r = popup.getBoundingClientRect();
+      next = clampTooltipPos(next, side, { width: r.width, height: r.height }, window.innerWidth, window.innerHeight);
+    }
+    pos = next;
+  }
+
+  function onPopupPlaced(node: HTMLElement) {
+    syncPos(node);
+  }
+
   function onEnter() {
     if (disabled || !content) return;
     clearTimers();
     showTimer = setTimeout(() => {
+      syncPos();
       open = true;
     }, delayDuration);
   }
@@ -39,33 +64,57 @@
       open = false;
     }, 80);
   }
+
+  function onMove() {
+    if (open) syncPos(popupEl);
+  }
+
+  onMount(() => {
+    // capture — скролл virtual-list / страницы тоже двигает popup
+    const opts: AddEventListenerOptions = { capture: true, passive: true };
+    window.addEventListener("scroll", onMove, opts);
+    window.addEventListener("resize", onMove);
+    return () => {
+      window.removeEventListener("scroll", onMove, opts);
+      window.removeEventListener("resize", onMove);
+    };
+  });
+
+  onDestroy(() => {
+    clearTimers();
+  });
 </script>
 
-<!-- role=group: обёртка триггера + popup -->
+<!-- role=group: обёртка триггера; popup уходит в #expressiontab-tooltip-layer -->
 <span
+  bind:this={rootEl}
   class="tooltip-root"
   class:block
   class:open
+  role="group"
   on:mouseenter={onEnter}
   on:mouseleave={onLeave}
   on:focusin={onEnter}
   on:focusout={onLeave}
 >
   <slot />
-  {#if open && content && !disabled}
-    <span
-      class="tooltip-content"
-      class:top={side === "top"}
-      class:bottom={side === "bottom"}
-      class:left={side === "left"}
-      class:right={side === "right"}
-      role="tooltip"
-      transition:fade={{ duration: 120 }}
-    >
-      {content}
-    </span>
-  {/if}
 </span>
+{#if open && content && !disabled}
+  <span
+    bind:this={popupEl}
+    use:tooltipPortal={onPopupPlaced}
+    class="tooltip-content"
+    class:top={side === "top"}
+    class:bottom={side === "bottom"}
+    class:left={side === "left"}
+    class:right={side === "right"}
+    role="tooltip"
+    style="top: {pos.top}px; left: {pos.left}px;"
+    transition:fade={{ duration: 120 }}
+  >
+    {content}
+  </span>
+{/if}
 
 <style>
   .tooltip-root {
@@ -78,10 +127,10 @@
     display: block;
     width: 100%;
   }
-  /* shadcn-like: foreground pill на background */
+  /* shadcn-like: pill на отдельном слое, position:fixed от триггера */
   .tooltip-content {
-    position: absolute;
-    z-index: 1100;
+    position: fixed;
+    z-index: 10000;
     /* max-content — иначе в узком dial shrink-to-fit даёт 1 символ/строку */
     width: max-content;
     min-width: 6rem;
@@ -101,23 +150,15 @@
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
   }
   .tooltip-content.top {
-    bottom: calc(100% + 6px);
-    left: 50%;
-    transform: translateX(-50%);
+    transform: translate(-50%, -100%);
   }
   .tooltip-content.bottom {
-    top: calc(100% + 6px);
-    left: 50%;
-    transform: translateX(-50%);
+    transform: translate(-50%, 0);
   }
   .tooltip-content.left {
-    right: calc(100% + 6px);
-    top: 50%;
-    transform: translateY(-50%);
+    transform: translate(-100%, -50%);
   }
   .tooltip-content.right {
-    left: calc(100% + 6px);
-    top: 50%;
-    transform: translateY(-50%);
+    transform: translate(0, -50%);
   }
 </style>
