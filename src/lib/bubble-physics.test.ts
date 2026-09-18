@@ -45,6 +45,40 @@ describe("bubble-physics", () => {
     expect(vis.map((n) => n.id)).toEqual(["a"]);
   });
 
+  it("visibleBubbles keeps pinned / fx nodes", () => {
+    const nodes = [
+      { id: "far", y: 5000, r: 40 },
+      { id: "pin", y: 5000, r: 40, fx: 100, fy: 5000 },
+    ] as any;
+    const byFx = visibleBubbles({
+      nodes,
+      scrollY: 0,
+      viewH: 800,
+      pad: 50,
+    });
+    expect(byFx.map((n) => n.id)).toEqual(["pin"]);
+    const byId = visibleBubbles({
+      nodes: [{ id: "far", y: 5000, r: 40 }] as any,
+      scrollY: 0,
+      viewH: 800,
+      pad: 50,
+      pinnedId: "far",
+    });
+    expect(byId.map((n) => n.id)).toEqual(["far"]);
+  });
+
+  it("pinBubbleAt clamps and sets fx/fy", async () => {
+    const { pinBubbleAt, unpinBubble } = await import("./bubble-physics");
+    const n = { id: "d", x: 0, y: 0, r: 40, vx: 3, vy: 4 } as any;
+    pinBubbleAt(n, -100, 9999, 800, 560);
+    expect(n.fx).toBe(44);
+    expect(n.fy).toBe(560 - 44);
+    expect(n.vx).toBe(0);
+    unpinBubble(n);
+    expect(n.fx).toBeNull();
+    expect(n.fy).toBeNull();
+  });
+
   it("clampBubblesToWorld keeps nodes inside the field", () => {
     const nodes = [
       { id: "out", x: -80, y: -50, r: 40 },

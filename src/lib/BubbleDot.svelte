@@ -15,9 +15,9 @@
   export let onToggleExpand: (b: BubbleNode) => void = () => {};
   /** Кадр physics — пересчёт transform без remount */
   export let frame: number = 0;
+  /** Пузырь сейчас тянут — grab/grabbing + без tooltip delay */
+  export let dragging: boolean = false;
   export let onPointerDown: (e: PointerEvent) => void = () => {};
-  export let onPointerMove: (e: PointerEvent) => void = () => {};
-  export let onPointerUp: (e: PointerEvent) => void = () => {};
   export let onLinkClick: (e: MouseEvent) => void = () => {};
 
   $: size = bubble.r * 2;
@@ -52,9 +52,15 @@
 <!-- Обёртка двигает физикой; внутренний .bubbleDot — только spawn scale -->
 <div
   class="bubbleWrap"
+  class:dragging
   style="transform: translate({tx}px, {ty}px); width: {size}px; height: {size}px;"
 >
-  <Tooltip.Root content={tooltipText} side="bottom" delayDuration={400}>
+  <Tooltip.Root
+    content={tooltipText}
+    side="bottom"
+    delayDuration={400}
+    disabled={dragging}
+  >
     <a
       class="bubbleDot"
       class:child={bubble.kind === "child"}
@@ -62,22 +68,22 @@
       class:groupable
       class:expanded
       class:bookmark={bubble.isBookmark}
+      class:dragging
       href={bubble.url}
       rel="noopener noreferrer"
+      draggable="false"
       style="animation-delay: {delay}s;"
-      use:longhover={groupable && bubble.kind === "host"
+      use:longhover={groupable && bubble.kind === "host" && !dragging
         ? GROUP_LONGHOVER_MS
         : 86400000}
       on:longhover|preventDefault={() => {
-        if (groupable) onToggleExpand(bubble);
+        if (groupable && !dragging) onToggleExpand(bubble);
       }}
       on:contextmenu|preventDefault={() => {
         if (groupable) onToggleExpand(bubble);
       }}
+      on:dragstart|preventDefault
       on:pointerdown={onPointerDown}
-      on:pointermove={onPointerMove}
-      on:pointerup={onPointerUp}
-      on:pointercancel={onPointerUp}
       on:click={onLinkClick}
     >
       <span class="bubbleDot__shine" />
@@ -142,8 +148,18 @@
       inset 0 -0.15em 0.35em hsla(0, 0%, 0%, 0.25),
       0 0.35em 0.75em hsla(0, 0%, 0%, 0.35);
     animation: bubbleSpawn 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
-    cursor: pointer;
+    cursor: grab;
     touch-action: none;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+  .bubbleDot.dragging {
+    cursor: grabbing;
+    filter: brightness(1.1);
+    z-index: 2;
+  }
+  .bubbleWrap.dragging {
+    z-index: 5;
   }
   .bubbleDot.child {
     --hue: 165;

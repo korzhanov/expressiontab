@@ -293,20 +293,56 @@ export function visibleBubbles({
   scrollY,
   viewH,
   pad = VIEWPORT_PAD,
+  /** id пузыря в drag — не cull'ить, иначе потеряем pointer capture */
+  pinnedId = null,
 }: {
   nodes: BubbleNode[];
   /** Скролл относительно верха bubbleField (window.scrollY - fieldTop) */
   scrollY: number;
   viewH: number;
   pad?: number;
+  pinnedId?: string | null;
 }): BubbleNode[] {
   const top = scrollY - pad;
   const bottom = scrollY + viewH + pad;
   return nodes.filter((n) => {
+    // Пин во время drag всегда в DOM
+    if (pinnedId && n.id === pinnedId) return true;
+    // fx/fy — зафиксирован симуляцией (drag), тоже держим
+    if (n.fx != null || n.fy != null) return true;
     const y = n.y ?? 0;
     const r = n.r || 40;
     return y + r >= top && y - r <= bottom;
   });
+}
+
+/**
+ * Зафиксировать пузырь под курсором (d3 fx/fy + мгновенные x/y).
+ * Координаты клампятся в мир, чтобы не утащить за края.
+ */
+export function pinBubbleAt(
+  node: BubbleNode,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+): void {
+  const r = node.r || 40;
+  const pad = 4;
+  const cx = Math.max(r + pad, Math.min(width - r - pad, x));
+  const cy = Math.max(r + pad, Math.min(height - r - pad, y));
+  node.fx = cx;
+  node.fy = cy;
+  node.x = cx;
+  node.y = cy;
+  node.vx = 0;
+  node.vy = 0;
+}
+
+/** Снять pin после pointerup — физика снова ведёт узел. */
+export function unpinBubble(node: BubbleNode): void {
+  node.fx = null;
+  node.fy = null;
 }
 
 /** Отражение скорости у границ мира (мягкий bounce вместо жёсткого clamp). */

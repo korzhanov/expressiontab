@@ -13,8 +13,10 @@
     isHostExpanded,
     resizeWorld,
     bounceBubblesAtWorldEdges,
+    pinBubbleAt,
     reheat,
     stopWorld,
+    unpinBubble,
     visibleBubbles,
     worldHeightForCount,
     BUBBLE_SIM_CAP,
@@ -38,12 +40,13 @@
   let expandedHosts: Record<string, boolean> = {};
   let builtKey = "";
 
-  /** Drag: fx/fy на узле d3; ссылку не открываем после реального drag */
-  let dragBubbleId: string | null = null;
+  /** Drag: pinBubbleAt (fx/fy); после порога не открываем ссылку */
+  let dragBubble: BubbleNode | null = null;
   let dragStartX = 0;
   let dragStartY = 0;
   let dragMoved = false;
-  const DRAG_THRESHOLD_PX = 8;
+  let dragListenersOn = false;
+  const DRAG_THRESHOLD_PX = 6;
 
   /** scrollY в координатах поля (0 = верх section.bubbleField) */
   function fieldScrollY(): number {
@@ -90,6 +93,8 @@
       nodes: world.nodes,
       scrollY: fieldScrollY(),
       viewH,
+      // Не снимать DOM с пузыря в drag — иначе потеряем capture
+      pinnedId: dragBubble?.id ?? null,
     });
   }
 
@@ -141,45 +146,67 @@
     };
   }
 
-  function onBubblePointerDown(b: BubbleNode, e: PointerEvent) {
-    if (e.button !== 0 || !world) return;
-    dragBubbleId = b.id;
-    dragStartX = e.clientX;
-    dragStartY = e.clientY;
-    dragMoved = false;
-    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+  function detachDragListeners() {
+    if (!dragListenersOn || typeof window === "undefined") return;
+    window.removeEventListener("pointermove", onWindowPointerMove);
+    window.removeEventListener("pointerup", onWindowPointerUp);
+    window.removeEventListener("pointercancel", onWindowPointerUp);
+    dragListenersOn = false;
   }
 
-  function onBubblePointerMove(b: BubbleNode, e: PointerEvent) {
-    if (dragBubbleId !== b.id || !world) return;
+  function attachDragListeners() {
+    if (dragListenersOn || typeof window === "undefined") return;
+    // На window — надёжнее, чем только capture на <a> (native link-drag / cull)
+    window.addEventListener("pointermove", onWindowPointerMove);
+    window.addEventListener("pointerup", onWindowPointerUp);
+    window.addEventListener("pointercancel", onWindowPointerUp);
+    dragListenersOn = true;
+  }
+
+  function onWindowPointerMove(e: PointerEvent) {
+    if (!dragBubble || !world) return;
     const dx = e.clientX - dragStartX;
     const dy = e.clientY - dragStartY;
     if (!dragMoved && Math.hypot(dx, dy) >= DRAG_THRESHOLD_PX) {
       dragMoved = true;
     }
-    if (dragMoved) {
-      const pt = fieldPointFromClient(e.clientX, e.clientY);
-      b.fx = pt.x;
-      b.fy = pt.y;
-      reheat(world, 0.35);
-      e.preventDefault();
-    }
+    if (!dragMoved) return;
+    const pt = fieldPointFromClient(e.clientX, e.clientY);
+    pinBubbleAt(dragBubble, pt.x, pt.y, world.width, world.height);
+    reheat(world, 0.4);
+    frame += 1;
+    e.preventDefault();
   }
 
-  function onBubblePointerUp(b: BubbleNode, e: PointerEvent) {
-    if (dragBubbleId !== b.id || !world) return;
-    b.fx = null;
-    b.fy = null;
-    reheat(world, 0.25);
-    dragBubbleId = null;
-    if (dragMoved) {
-      e.preventDefault();
+  function onWindowPointerUp(e: PointerEvent) {
+    if (!dragBubble) return;
+    if (world) {
+      unpinBubble(dragBubble);
+      reheat(world, 0.3);
     }
+    detachDragListeners();
+    dragBubble = null;
+    // dragMoved сбрасываем в click — чтобы отменить переход по href
+    if (dragMoved) e.preventDefault();
+    refreshVisible();
+  }
+
+  function onBubblePointerDown(b: BubbleNode, e: PointerEvent) {
+    if (e.button !== 0 || !world) return;
+    // Блокируем native HTML5-drag ссылки (иначе пузырь «не едет»)
+    e.preventDefault();
+    dragBubble = b;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    dragMoved = false;
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    attachDragListeners();
   }
 
   function onBubbleClick(e: MouseEvent) {
     if (dragMoved) {
       e.preventDefault();
+      e.stopPropagation();
       dragMoved = false;
     }
   }
@@ -199,6 +226,7 @@
   });
 
   onDestroy(() => {
+    detachDragListeners();
     stopWorld(world);
     if (typeof window !== "undefined") {
       window.removeEventListener("scroll", onScroll);
@@ -217,12 +245,11 @@
     <BubbleDot
       bubble={b}
       frame={frame}
+      dragging={dragBubble?.id === b.id}
       groupable={b.kind === "host" && (bookmarkList.get(b.host)?.nodes.length || 0) > 1}
       expanded={!!expandedHosts[b.host] && b.kind === "host"}
       onToggleExpand={toggleExpand}
       onPointerDown={(e) => onBubblePointerDown(b, e)}
-      onPointerMove={(e) => onBubblePointerMove(b, e)}
-      onPointerUp={(e) => onBubblePointerUp(b, e)}
       onLinkClick={onBubbleClick}
     />
   {/each}
