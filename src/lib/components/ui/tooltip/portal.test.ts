@@ -1,5 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import { clampTooltipPos, placeTooltip, TOOLTIP_LAYER_ID } from "./portal";
+import {
+  claimActiveTooltip,
+  clampTooltipPos,
+  placeTooltip,
+  releaseActiveTooltip,
+  resetActiveTooltip,
+  TOOLTIP_LAYER_ID,
+} from "./portal";
 
 function rect(partial: {
   top: number;
@@ -54,6 +61,29 @@ describe("clampTooltipPos", () => {
     );
     expect(clamped.left).toBeGreaterThanOrEqual(8 + 160);
     expect(clamped.left).toBeLessThanOrEqual(400 - 8 - 160);
+  });
+});
+
+describe("claimActiveTooltip singleton", () => {
+  it("closes the previous owner when a new one claims", () => {
+    resetActiveTooltip();
+    let closedA = 0;
+    claimActiveTooltip(() => {
+      closedA += 1;
+    });
+    claimActiveTooltip(() => {});
+    expect(closedA).toBe(1);
+  });
+
+  it("release only clears matching token", () => {
+    resetActiveTooltip();
+    let closed = 0;
+    const t1 = claimActiveTooltip(() => {
+      closed += 1;
+    });
+    releaseActiveTooltip(t1);
+    claimActiveTooltip(() => {});
+    expect(closed).toBe(0);
   });
 });
 

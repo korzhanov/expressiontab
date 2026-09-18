@@ -23,5 +23,6 @@ describe("tooltip ui module", () => {
     expect(src).toContain("disabled");
     expect(src).toContain("use:tooltipPortal");
     expect(src).toContain("position: fixed");
+    expect(src).toContain("claimActiveTooltip");
   });
 });
