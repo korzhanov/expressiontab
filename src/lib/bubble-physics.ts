@@ -81,9 +81,10 @@ export function buildHostBubbles({
     if (!n?.url) continue;
     const visitCount = group.hostVisitCount || n.visitCount || 1;
     const r = bubbleRadiusFromVisits({ visitCount });
-    // Стартовые позиции — лёгкий разброс, чтобы collide разъехался
-    const x = (width * 0.15 + ((i * 97) % Math.max(width * 0.7, 1))) | 0;
-    const y = (height * 0.2 + ((i * 53) % Math.max(height * 0.6, 1))) | 0;
+    // Старт в верхней зоне поля (рядом с focusY), не по всей высоте мира
+    const focusY = focusYForWorld(height);
+    const x = (width * 0.12 + ((i * 97) % Math.max(width * 0.76, 1))) | 0;
+    const y = (focusY * 0.55 + ((i * 37) % Math.max(focusY * 0.9, 1))) | 0;
     nodes.push({
       id: hostId(host),
       kind: "host",
@@ -105,11 +106,17 @@ export function buildHostBubbles({
   return nodes;
 }
 
+/** Якорь по Y: верх dial-секции (не середина высокого мира — иначе шарики «внизу экрана»). */
+export function focusYForWorld(height: number): number {
+  return Math.min(240, Math.max(160, height * 0.22));
+}
+
 /** Высота мира от числа пузырей (чтобы скроллить при 1000). */
 export function worldHeightForCount(count: number, width: number): number {
   const area = count * Math.PI * 55 * 55;
-  const h = Math.ceil(area / Math.max(width, 320)) + 400;
-  return Math.max(h, 900);
+  const packed = Math.ceil(area / Math.max(width, 320)) + 280;
+  // Минимум ≈ один экран dial, без искусственных 900px для 10 сайтов
+  return Math.max(packed, 560);
 }
 
 export function createBubbleWorld({
@@ -131,6 +138,7 @@ export function createBubbleWorld({
     })
     .strength(0.55);
 
+  const focusY = focusYForWorld(height);
   const simulation = forceSimulation<BubbleNode>(nodes)
     .force(
       "collide",
@@ -139,9 +147,10 @@ export function createBubbleWorld({
         .strength(0.85)
         .iterations(2)
     )
-    .force("charge", forceManyBody<BubbleNode>().strength(-18).distanceMax(220))
-    .force("x", forceX(width / 2).strength(0.03))
-    .force("y", forceY(height / 2).strength(0.03))
+    .force("charge", forceManyBody<BubbleNode>().strength(-22).distanceMax(240))
+    .force("x", forceX(width / 2).strength(0.045))
+    // Тянем к верху dial-поля, не к height/2
+    .force("y", forceY(focusY).strength(0.06))
     .force("link", linkForce)
     .alphaDecay(0.028)
     .velocityDecay(0.35);
@@ -157,8 +166,9 @@ export function reheat(world: BubbleWorld, alpha = 0.6): void {
 export function resizeWorld(world: BubbleWorld, width: number, height: number): void {
   world.width = width;
   world.height = height;
-  world.simulation.force("x", forceX(width / 2).strength(0.03));
-  world.simulation.force("y", forceY(height / 2).strength(0.03));
+  const focusY = focusYForWorld(height);
+  world.simulation.force("x", forceX(width / 2).strength(0.045));
+  world.simulation.force("y", forceY(focusY).strength(0.06));
   reheat(world, 0.35);
 }
 
@@ -245,7 +255,7 @@ export function isHostExpanded(world: BubbleWorld, host: string): boolean {
   return world.nodes.some((n) => n.parentId === pid);
 }
 
-/** AABB cull для DOM: только пузыри в видимой зоне (+pad). */
+/** AABB cull: scrollY/viewH в координатах поля (0 = верх .bubbleField). */
 export function visibleBubbles({
   nodes,
   scrollY,
@@ -253,6 +263,7 @@ export function visibleBubbles({
   pad = VIEWPORT_PAD,
 }: {
   nodes: BubbleNode[];
+  /** Скролл относительно верха bubbleField (window.scrollY - fieldTop) */
   scrollY: number;
   viewH: number;
   pad?: number;
@@ -264,6 +275,22 @@ export function visibleBubbles({
     const r = n.r || 40;
     return y + r >= top && y - r <= bottom;
   });
+}
+
+/** Держим пузыри в поле — иначе они закрашивают часы и filter bar. */
+export function clampBubblesToWorld(
+  nodes: BubbleNode[],
+  width: number,
+  height: number
+): void {
+  const pad = 4;
+  for (const n of nodes) {
+    const r = n.r || 40;
+    const x = n.x ?? 0;
+    const y = n.y ?? 0;
+    n.x = Math.max(r + pad, Math.min(width - r - pad, x));
+    n.y = Math.max(r + pad, Math.min(height - r - pad, y));
+  }
 }
 
 export function stopWorld(world: BubbleWorld | null): void {

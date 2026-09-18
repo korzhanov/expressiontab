@@ -91,6 +91,45 @@ export const MOCK_HISTORY: MockHistoryItem[] = [
   },
 ];
 
+/** Открытые вкладки для preview: окно 1 = current, окно 2 = другое. */
+export type MockOpenTab = {
+  id: number;
+  url: string;
+  title: string;
+  windowId: number;
+  pinned?: boolean;
+  active?: boolean;
+};
+
+export const MOCK_OPEN_TABS: MockOpenTab[] = [
+  {
+    id: 1,
+    url: "http://localhost:4173/newtab/",
+    title: "Xpression Tab",
+    windowId: 1,
+    active: true,
+  },
+  {
+    id: 2,
+    url: "https://example.org/inbox",
+    title: "Inbox — example.org",
+    windowId: 1,
+  },
+  {
+    id: 3,
+    url: "https://example.org/settings",
+    title: "Settings — example.org",
+    windowId: 1,
+    pinned: true,
+  },
+  {
+    id: 4,
+    url: "https://example.net/other-window",
+    title: "Other window",
+    windowId: 2,
+  },
+];
+
 export const MOCK_BOOKMARKS: MockBookmark[] = [
   {
     id: "b1",

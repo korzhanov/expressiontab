@@ -12,6 +12,7 @@
     expandHost,
     isHostExpanded,
     resizeWorld,
+    clampBubblesToWorld,
     stopWorld,
     visibleBubbles,
     worldHeightForCount,
@@ -24,9 +25,9 @@
   export let nodesList: BookmarkNode[] = [];
   export let width: number = 800;
 
+  let fieldEl: HTMLElement;
   let world: BubbleWorld | null = null;
-  let worldH = 900;
-  let scrollY = 0;
+  let worldH = 560;
   let viewH =
     typeof window !== "undefined" ? window.innerHeight : 800;
   /** Кадр симуляции — будит Svelte без remount */
@@ -34,6 +35,13 @@
   let visible: BubbleNode[] = [];
   let expandedHosts: Record<string, boolean> = {};
   let builtKey = "";
+
+  /** scrollY в координатах поля (0 = верх section.bubbleField) */
+  function fieldScrollY(): number {
+    if (!fieldEl || typeof window === "undefined") return 0;
+    const top = fieldEl.getBoundingClientRect().top + window.scrollY;
+    return (window.scrollY || 0) - top;
+  }
 
   function rebuild() {
     stopWorld(world);
@@ -52,6 +60,7 @@
   }
 
   function onTick() {
+    if (world) clampBubblesToWorld(world.nodes, world.width, world.height);
     frame += 1;
     if (frame % 2 === 0) refreshVisible();
   }
@@ -61,19 +70,14 @@
       visible = [];
       return;
     }
-    // Новый массив — Svelte видит обновление; объекты те же (позиции мутирует d3)
     visible = visibleBubbles({
       nodes: world.nodes,
-      scrollY,
+      scrollY: fieldScrollY(),
       viewH,
     });
   }
 
   function onScroll() {
-    scrollY =
-      typeof window !== "undefined"
-        ? window.scrollY || document.documentElement.scrollTop || 0
-        : 0;
     refreshVisible();
   }
 
@@ -118,7 +122,7 @@
   }
 
   onMount(() => {
-    onScroll();
+    refreshVisible();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onResize, { passive: true });
   });
@@ -132,7 +136,12 @@
   });
 </script>
 
-<section class="bubbleField" style="height: {worldH}px;" aria-label="Bubble dial">
+<section
+  class="bubbleField"
+  bind:this={fieldEl}
+  style="height: {worldH}px;"
+  aria-label="Bubble dial"
+>
   {#each visible as b (b.id)}
     <BubbleDot
       bubble={b}
@@ -148,10 +157,10 @@
   .bubbleField {
     position: relative;
     width: 100%;
-    min-height: 70vh;
-    overflow: visible;
+    min-height: 560px;
+    overflow: hidden; /* не пускаем шары на часы / filter bar */
     background: radial-gradient(
-      ellipse at 50% 20%,
+      ellipse at 50% 18%,
       rgba(40, 70, 110, 0.35),
       transparent 55%
     );
