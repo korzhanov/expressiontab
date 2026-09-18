@@ -6,7 +6,7 @@
   import * as Tooltip from "./components/ui/tooltip";
   import { longhover, GROUP_LONGHOVER_MS } from "./longhover";
   import { favicons } from "./stores";
-  import type { BubbleNode } from "./bubble-physics";
+  import type { BubbleEnterAnim, BubbleNode } from "./bubble-physics";
 
   export let bubble: BubbleNode;
   export let expanded: boolean = false;
@@ -19,11 +19,17 @@
   export let dragTick: number = 0;
   /** Пузырь сейчас тянут — grab/grabbing + без tooltip delay */
   export let dragging: boolean = false;
+  /** Вход в viewport: initial / rise (скролл вниз) / fall (вверх) */
+  export let enterAnim: BubbleEnterAnim = "initial";
   export let onPointerDown: (e: PointerEvent) => void = () => {};
   export let onLinkClick: (e: MouseEvent) => void = () => {};
 
   $: size = bubble.r * 2;
-  $: delay = Math.min(bubble.spawnIndex, 48) * 0.035;
+  // initial — staggered spawn; rise/fall — короткий stagger у края
+  $: delay =
+    enterAnim === "initial"
+      ? Math.min(bubble.spawnIndex, 48) * 0.035
+      : Math.min((bubble.spawnIndex % 10) * 0.025, 0.18);
   // frame | dragTick — иначе Svelte не видит мутации x/y от d3 / pin
   $: tx = frame + dragTick >= 0 ? (bubble.x || 0) - bubble.r : 0;
   $: ty = frame + dragTick >= 0 ? (bubble.y || 0) - bubble.r : 0;
@@ -71,6 +77,8 @@
       class:expanded
       class:bookmark={bubble.isBookmark}
       class:dragging
+      class:enter-rise={enterAnim === "rise"}
+      class:enter-fall={enterAnim === "fall"}
       href={bubble.url}
       rel="noopener noreferrer"
       draggable="false"
@@ -131,6 +139,30 @@
     }
   }
 
+  /* Скролл вниз: новые всплывают снизу */
+  @keyframes bubbleRise {
+    from {
+      opacity: 0;
+      transform: scale(0.5) translateY(64px);
+    }
+    to {
+      opacity: 0.95;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  /* Скролл вверх: падают сверху с «гравитацией» */
+  @keyframes bubbleFall {
+    from {
+      opacity: 0;
+      transform: scale(0.65) translateY(-72px);
+    }
+    to {
+      opacity: 0.95;
+      transform: scale(1) translateY(0);
+    }
+  }
+
   .bubbleDot {
     --hue: 200;
     position: relative;
@@ -154,6 +186,17 @@
     touch-action: none;
     user-select: none;
     -webkit-user-drag: none;
+  }
+  .bubbleDot.enter-rise {
+    animation-name: bubbleRise;
+    animation-duration: 0.72s;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .bubbleDot.enter-fall {
+    animation-name: bubbleFall;
+    animation-duration: 0.58s;
+    /* ease-in → ощущение гравитации */
+    animation-timing-function: cubic-bezier(0.4, 0.05, 0.7, 1);
   }
   .bubbleDot.dragging {
     cursor: grabbing;

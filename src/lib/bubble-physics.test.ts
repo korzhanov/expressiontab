@@ -117,6 +117,29 @@ describe("bubble-physics", () => {
     expect(fieldScrollFromRectTop(80)).toBe(0);
   });
 
+  it("scrollDirection and assignEnterAnims map down→rise, up→fall", async () => {
+    const { scrollDirection, assignEnterAnims } = await import(
+      "./bubble-physics"
+    );
+    expect(scrollDirection(0, 40)).toBe(1);
+    expect(scrollDirection(40, 0)).toBe(-1);
+    expect(scrollDirection(10, 11)).toBe(0);
+    const rise = assignEnterAnims({
+      prevIds: ["a"],
+      nextIds: ["a", "b"],
+      scrollDir: 1,
+      prevAnims: { a: "initial" },
+    });
+    expect(rise.a).toBe("initial");
+    expect(rise.b).toBe("rise");
+    const fall = assignEnterAnims({
+      prevIds: ["b"],
+      nextIds: ["b", "c"],
+      scrollDir: -1,
+    });
+    expect(fall.c).toBe("fall");
+  });
+
   it("bounceBubblesAtWorldEdges keeps both left and right edges", () => {
     const nodes = [
       { id: "l", x: 2, y: 200, r: 40, vx: -5, vy: 0 },

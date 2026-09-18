@@ -308,6 +308,50 @@ export function fieldScrollFromRectTop(rectTop: number): number {
   return Math.max(0, -rectTop);
 }
 
+/** Направление скролла поля: 1 вниз, -1 вверх, 0 без сдвига. */
+export function scrollDirection(
+  prevY: number,
+  nextY: number,
+  threshold = 2
+): -1 | 0 | 1 {
+  const d = nextY - prevY;
+  if (d > threshold) return 1;
+  if (d < -threshold) return -1;
+  return 0;
+}
+
+/** Анимация появления пузыря при входе в viewport. */
+export type BubbleEnterAnim = "initial" | "rise" | "fall";
+
+/**
+ * Для id, которых не было в prev: rise при скролле вниз, fall вверх.
+ * Уже видимые сохраняют прошлую метку (анимация не рестартит).
+ */
+export function assignEnterAnims({
+  prevIds,
+  nextIds,
+  scrollDir,
+  prevAnims = {},
+}: {
+  prevIds: Set<string> | Iterable<string>;
+  nextIds: Iterable<string>;
+  scrollDir: -1 | 0 | 1;
+  prevAnims?: Record<string, BubbleEnterAnim>;
+}): Record<string, BubbleEnterAnim> {
+  const prev = prevIds instanceof Set ? prevIds : new Set(prevIds);
+  const out: Record<string, BubbleEnterAnim> = {};
+  for (const id of nextIds) {
+    if (prev.has(id) && prevAnims[id]) {
+      out[id] = prevAnims[id];
+      continue;
+    }
+    if (scrollDir > 0) out[id] = "rise";
+    else if (scrollDir < 0) out[id] = "fall";
+    else out[id] = prevAnims[id] || "initial";
+  }
+  return out;
+}
+
 /** AABB cull: scrollY/viewH в координатах поля (0 = верх .bubbleField). */
 export function visibleBubbles({
   nodes,

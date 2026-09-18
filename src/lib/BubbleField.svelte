@@ -6,6 +6,7 @@
   import { onDestroy, onMount } from "svelte";
   import type { BookmarkNode, HostGroup } from "./bookmarks";
   import {
+    assignEnterAnims,
     buildHostBubbles,
     bounceBubblesAtWorldEdges,
     BUBBLE_SIM_CAP,
@@ -18,10 +19,12 @@
     pinBubbleAt,
     reheat,
     resizeWorld,
+    scrollDirection,
     stopWorld,
     unpinBubble,
     visibleBubbles,
     worldHeightForCount,
+    type BubbleEnterAnim,
     type BubbleNode,
     type BubbleWorld,
   } from "./bubble-physics";
@@ -43,6 +46,10 @@
   let visible: BubbleNode[] = [];
   let expandedHosts: Record<string, boolean> = {};
   let builtKey = "";
+  /** Предыдущий scrollY поля — направление rise/fall */
+  let lastFieldScrollY = 0;
+  let prevVisibleIds = new Set<string>();
+  let enterAnimById: Record<string, BubbleEnterAnim> = {};
 
   /** Drag: pinBubbleAt (fx/fy); после порога не открываем ссылку */
   let dragBubble: BubbleNode | null = null;
@@ -85,6 +92,10 @@
     });
     world = createBubbleWorld({ nodes, width: w, height: worldH });
     expandedHosts = {};
+    // Сброс enter-анимаций при новой симуляции
+    prevVisibleIds = new Set();
+    enterAnimById = {};
+    lastFieldScrollY = fieldScrollY();
     world.simulation.on("tick", onTick);
     refreshVisible();
   }
@@ -104,13 +115,25 @@
       visible = [];
       return;
     }
-    visible = visibleBubbles({
+    const sy = fieldScrollY();
+    const dir = scrollDirection(lastFieldScrollY, sy);
+    lastFieldScrollY = sy;
+    const next = visibleBubbles({
       nodes: world.nodes,
-      scrollY: fieldScrollY(),
+      scrollY: sy,
       viewH,
       // Не снимать DOM с пузыря в drag — иначе потеряем capture
       pinnedId: dragBubble?.id ?? null,
     });
+    const nextIds = next.map((n) => n.id);
+    enterAnimById = assignEnterAnims({
+      prevIds: prevVisibleIds,
+      nextIds,
+      scrollDir: dir,
+      prevAnims: enterAnimById,
+    });
+    prevVisibleIds = new Set(nextIds);
+    visible = next;
   }
 
   function onScroll() {
@@ -278,6 +301,7 @@
       frame={frame}
       dragTick={dragBubble?.id === b.id ? dragTick : 0}
       dragging={dragBubble?.id === b.id}
+      enterAnim={enterAnimById[b.id] || "initial"}
       groupable={b.kind === "host" && (bookmarkList.get(b.host)?.nodes.length || 0) > 1}
       expanded={!!expandedHosts[b.host] && b.kind === "host"}
       onToggleExpand={toggleExpand}
