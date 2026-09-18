@@ -15,6 +15,8 @@
   export let onToggleExpand: (b: BubbleNode) => void = () => {};
   /** Кадр physics — пересчёт transform без remount */
   export let frame: number = 0;
+  /** Тик только при drag этого пузыря (остальные не инвалидируем) */
+  export let dragTick: number = 0;
   /** Пузырь сейчас тянут — grab/grabbing + без tooltip delay */
   export let dragging: boolean = false;
   export let onPointerDown: (e: PointerEvent) => void = () => {};
@@ -22,9 +24,9 @@
 
   $: size = bubble.r * 2;
   $: delay = Math.min(bubble.spawnIndex, 48) * 0.035;
-  // frame в зависимости — иначе Svelte не видит мутации x/y от d3
-  $: tx = frame >= 0 ? (bubble.x || 0) - bubble.r : 0;
-  $: ty = frame >= 0 ? (bubble.y || 0) - bubble.r : 0;
+  // frame | dragTick — иначе Svelte не видит мутации x/y от d3 / pin
+  $: tx = frame + dragTick >= 0 ? (bubble.x || 0) - bubble.r : 0;
+  $: ty = frame + dragTick >= 0 ? (bubble.y || 0) - bubble.r : 0;
 
   $: host = bubble.host;
   $: faviconSrc =

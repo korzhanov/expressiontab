@@ -7,19 +7,21 @@
   import type { BookmarkNode, HostGroup } from "./bookmarks";
   import {
     buildHostBubbles,
+    bounceBubblesAtWorldEdges,
+    BUBBLE_SIM_CAP,
+    clientToFieldPoint,
     collapseHost,
     createBubbleWorld,
     expandHost,
+    fieldScrollFromRectTop,
     isHostExpanded,
-    resizeWorld,
-    bounceBubblesAtWorldEdges,
     pinBubbleAt,
     reheat,
+    resizeWorld,
     stopWorld,
     unpinBubble,
     visibleBubbles,
     worldHeightForCount,
-    BUBBLE_SIM_CAP,
     type BubbleNode,
     type BubbleWorld,
   } from "./bubble-physics";
@@ -34,8 +36,10 @@
   let worldH = 560;
   let viewH =
     typeof window !== "undefined" ? window.innerHeight : 800;
-  /** Кадр симуляции — будит Svelte без remount */
+  /** Кадр симуляции — будит Svelte без remount (все пузыри) */
   let frame = 0;
+  /** Локальный тик только для тянутого пузыря — без перерисовки остальных */
+  let dragTick = 0;
   let visible: BubbleNode[] = [];
   let expandedHosts: Record<string, boolean> = {};
   let builtKey = "";
@@ -53,9 +57,8 @@
 
   /** scrollY в координатах поля (0 = верх section.bubbleField) */
   function fieldScrollY(): number {
-    if (!fieldEl || typeof window === "undefined") return 0;
-    const top = fieldEl.getBoundingClientRect().top + window.scrollY;
-    return (window.scrollY || 0) - top;
+    if (!fieldEl) return 0;
+    return fieldScrollFromRectTop(fieldEl.getBoundingClientRect().top);
   }
 
   /** Ширина мира = clientWidth .bubbleField (симметрия L/R границ). */
@@ -87,6 +90,8 @@
   }
 
   function onTick() {
+    // Во время активного drag симуляцию не крутим — иначе все шары дёргаются
+    if (dragMoved && dragBubble) return;
     if (world) {
       bounceBubblesAtWorldEdges(world.nodes, world.width, world.height);
     }
@@ -153,10 +158,12 @@
   } {
     if (!fieldEl) return { x: clientX, y: clientY };
     const rect = fieldEl.getBoundingClientRect();
-    return {
-      x: clientX - rect.left,
-      y: clientY - rect.top + fieldScrollY(),
-    };
+    return clientToFieldPoint({
+      clientX,
+      clientY,
+      fieldLeft: rect.left,
+      fieldTop: rect.top,
+    });
   }
 
   function detachDragListeners() {
@@ -182,12 +189,14 @@
     const dy = e.clientY - dragStartY;
     if (!dragMoved && Math.hypot(dx, dy) >= DRAG_THRESHOLD_PX) {
       dragMoved = true;
+      // Заморозить физику: без reheat — остальные шары стоят
+      world.simulation.alpha(0).stop();
     }
     if (!dragMoved) return;
     const pt = fieldPointFromClient(e.clientX, e.clientY);
     pinBubbleAt(dragBubble, pt.x, pt.y, world.width, world.height);
-    reheat(world, 0.4);
-    frame += 1;
+    // Только тянутый пузырь: не трогаем глобальный frame
+    dragTick += 1;
     e.preventDefault();
   }
 
@@ -195,7 +204,8 @@
     if (!dragBubble) return;
     if (world) {
       unpinBubble(dragBubble);
-      reheat(world, 0.3);
+      // Лёгкий reheat только после отпускания
+      reheat(world, 0.25);
     }
     detachDragListeners();
     dragBubble = null;
@@ -266,6 +276,7 @@
     <BubbleDot
       bubble={b}
       frame={frame}
+      dragTick={dragBubble?.id === b.id ? dragTick : 0}
       dragging={dragBubble?.id === b.id}
       groupable={b.kind === "host" && (bookmarkList.get(b.host)?.nodes.length || 0) > 1}
       expanded={!!expandedHosts[b.host] && b.kind === "host"}

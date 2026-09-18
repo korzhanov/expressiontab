@@ -100,6 +100,23 @@ describe("bubble-physics", () => {
     expect(worldHeightForCount(2000, 800)).toBe(worldHeightForCount(400, 800));
   });
 
+  it("clientToFieldPoint maps viewport to field without scroll double-count", async () => {
+    const { clientToFieldPoint, fieldScrollFromRectTop } = await import(
+      "./bubble-physics"
+    );
+    // Поле частично выше viewport (rect.top < 0) — scroll уже в top
+    expect(
+      clientToFieldPoint({
+        clientX: 100,
+        clientY: 50,
+        fieldLeft: 0,
+        fieldTop: -200,
+      })
+    ).toEqual({ x: 100, y: 250 });
+    expect(fieldScrollFromRectTop(-200)).toBe(200);
+    expect(fieldScrollFromRectTop(80)).toBe(0);
+  });
+
   it("bounceBubblesAtWorldEdges keeps both left and right edges", () => {
     const nodes = [
       { id: "l", x: 2, y: 200, r: 40, vx: -5, vy: 0 },

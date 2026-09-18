@@ -287,6 +287,27 @@ export function isHostExpanded(world: BubbleWorld, host: string): boolean {
   return world.nodes.some((n) => n.parentId === pid);
 }
 
+/** Viewport client → координаты внутри .bubbleField (без double-count scroll). */
+export function clientToFieldPoint({
+  clientX,
+  clientY,
+  fieldLeft,
+  fieldTop,
+}: {
+  clientX: number;
+  clientY: number;
+  fieldLeft: number;
+  fieldTop: number;
+}): { x: number; y: number } {
+  // getBoundingClientRect.top уже учитывает document scroll
+  return { x: clientX - fieldLeft, y: clientY - fieldTop };
+}
+
+/** Сколько px верха поля ушло выше viewport (для cull). */
+export function fieldScrollFromRectTop(rectTop: number): number {
+  return Math.max(0, -rectTop);
+}
+
 /** AABB cull: scrollY/viewH в координатах поля (0 = верх .bubbleField). */
 export function visibleBubbles({
   nodes,
