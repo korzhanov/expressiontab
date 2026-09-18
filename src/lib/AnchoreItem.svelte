@@ -3,6 +3,8 @@
   import globe from "../assets/Globe.svg";
   import { fly, fade } from "svelte/transition";
   import { favicons } from "./stores";
+  import * as Tooltip from "./components/ui/tooltip";
+  import BubblePop from "./BubblePop.svelte";
 
   export let anchor: any = {};
   export let unfold: boolean | null = null;
@@ -18,6 +20,8 @@
   $: visitCount = anchor?.visitCount || 1;
   $: hostVisitCount = anchor?.hostVisitCount || 0;
   $: host = anchor?.host || "localhost";
+  // В lined кнопки меньше — иконки тоже, иначе съезжают
+  $: actionIconSize = titleVisible ? "14" : "18";
   $: weightVisits = Math.log10(
     Math.max(unfold ? visitCount : hostVisitCount, visitCount) * 1 || 1
   );
@@ -26,6 +30,8 @@
   let multiButton = false;
   let menuFlip = false;
   let deleted = false;
+  /** Идёт анимация лопания перед удалением из DOM */
+  let popping = false;
   let closeTimer: ReturnType<typeof setTimeout> | null = null;
   let anchorEl: HTMLElement;
 
@@ -99,94 +105,124 @@
   }
 
   async function deleteAnchore() {
+    if (popping || deleted) return;
     if (isBookmark) {
       chrome.bookmarks.remove(String(id));
       isBookmark = false;
     }
     try {
       chrome.history.deleteUrl({ url: url });
-      deleted = true;
     } catch (e) {
       console.log(e);
     }
+    // Сначала лопание пузырька (CodePen-мотив), потом убираем из списка
+    popping = true;
+    multiButton = false;
+    setTimeout(() => {
+      deleted = true;
+      popping = false;
+    }, 680);
   }
 </script>
 
 {#if !deleted && anchor && url && (url.startsWith("http://") || url.startsWith("https://"))}
-  <anchor
-    bind:this={anchorEl}
-    {title}
-    style:margin={titleVisible ? "2px 0" : `${Math.min(weightVisits, 2) * 8 + 8}px`}
-    class:isBookmark
-    class:invisible={!childrenInvisible}
-    class:titleVisible
-    class:nested={nested && titleVisible}
-    class:menuFlip
-    on:contextmenu={openMenu}
-    on:mouseleave={scheduleCloseMenu}
-    on:mouseenter={showMenu}
+  <Tooltip.Root
+    content={nested ? url : title || host}
+    side="bottom"
+    delayDuration={450}
+    block={titleVisible}
+    disabled={titleVisible && !nested}
   >
-    {#if !titleVisible}
-      <bgcircle
-        style="
+    <anchor
+      bind:this={anchorEl}
+      style:margin={titleVisible ? "2px 0" : `${Math.min(weightVisits, 2) * 8 + 8}px`}
+      class:isBookmark
+      class:invisible={!childrenInvisible}
+      class:titleVisible
+      class:nested={nested && titleVisible}
+      class:menuFlip
+      class:popping
+      on:contextmenu={openMenu}
+      on:mouseleave={scheduleCloseMenu}
+      on:mouseenter={showMenu}
+    >
+      <div class="popLayer" aria-hidden="true">
+        <BubblePop active={popping} />
+      </div>
+      {#if !titleVisible}
+        <bgcircle
+          style="
     transform: translateZ(0) scale({(Math.min(weightVisits, 2) * 0.35 + 1).toFixed(2)});
     background-image: url('{src}');
 "
-      />
-    {/if}
-    <slot />
-    <a href={url} rel="noopener noreferrer" on:click|stopPropagation>
-      <anchoricon style:background-image="url('{src}')" />
-      {#if unfold === false && !titleVisible}
-        <anchoricon
-          class="subicon"
-          in:fly={{ x: 95, duration: 300 }}
-          out:fly={{ x: 70, duration: 350 }}
-          style:background-image="url('{src}')"
-        />
-        <anchoricon
-          class="subicon"
-          in:fly={{ x: 55, duration: 300 }}
-          out:fly={{ x: 50, duration: 350 }}
-          style:background-image="url('{src}')"
-          style="transform:  translateZ(0) scale(0.56) translate(51px, -18px);"
         />
       {/if}
+      <slot />
+      <a href={url} rel="noopener noreferrer" on:click|stopPropagation>
+        <anchoricon style:background-image="url('{src}')" />
+        {#if unfold === false && !titleVisible}
+          <anchoricon
+            class="subicon"
+            in:fly={{ x: 95, duration: 300 }}
+            out:fly={{ x: 70, duration: 350 }}
+            style:background-image="url('{src}')"
+          />
+          <anchoricon
+            class="subicon"
+            in:fly={{ x: 55, duration: 300 }}
+            out:fly={{ x: 50, duration: 350 }}
+            style:background-image="url('{src}')"
+            style="transform:  translateZ(0) scale(0.56) translate(51px, -18px);"
+          />
+        {/if}
 
-      <span class:showTitle={titleVisible}>
-        <strong>{title || host}</strong>
-        | {isBookmark ? "bookmark" : visitCount + " visits"}
-      </span>
-    </a>
-    {#if multiButton}
-      <div
-        class="multiButton"
-        class:menuFlip
-        class:lined={titleVisible}
-        transition:fade={{ duration: 160 }}
-        on:mouseenter={keepMenuOpen}
-        on:mouseleave={scheduleCloseMenu}
-      >
-        <button
-          class:isBookmark
-          title="Bookmark"
-          on:click={() => changeBookmark()}
+        <span class:showTitle={titleVisible}>
+          <strong>{title || host}</strong>
+          | {isBookmark ? "bookmark" : visitCount + " visits"}
+        </span>
+      </a>
+      {#if multiButton}
+        <div
+          class="multiButton"
+          class:menuFlip
+          class:lined={titleVisible}
+          transition:fade={{ duration: 160 }}
+          on:mouseenter={keepMenuOpen}
+          on:mouseleave={scheduleCloseMenu}
         >
-          <Icon src={Star} solid size="22" />
-        </button>
-        <button
-          class="copyToBuffer"
-          title="Copy url"
-          on:click={(e) => copyToBuffer(e, url)}
-        >
-          <Icon src={Duplicate} solid size="22" />
-        </button>
-        <button title="Delete" on:click={() => deleteAnchore()}>
-          <Icon src={Trash} solid size="22" />
-        </button>
-      </div>
-    {/if}
-  </anchor>
+          <Tooltip.Root content="Bookmark" side="top" delayDuration={200}>
+            <button
+              class:isBookmark
+              type="button"
+              aria-label="Bookmark"
+              on:click={() => changeBookmark()}
+            >
+              <Icon src={Star} solid size={actionIconSize} />
+            </button>
+          </Tooltip.Root>
+          <Tooltip.Root content="Copy url" side="top" delayDuration={200}>
+            <button
+              class="copyToBuffer"
+              type="button"
+              aria-label="Copy url"
+              on:click={(e) => copyToBuffer(e, url)}
+            >
+              <Icon src={Duplicate} solid size={actionIconSize} />
+            </button>
+          </Tooltip.Root>
+          <Tooltip.Root content="Delete" side="top" delayDuration={200}>
+            <button
+              type="button"
+              aria-label="Delete"
+              on:click={() => deleteAnchore()}
+            >
+              <Icon src={Trash} solid size={actionIconSize} />
+            </button>
+          </Tooltip.Root>
+        </div>
+      {/if}
+    </anchor>
+  </Tooltip.Root>
 {/if}
 
 <style lang="scss">
@@ -230,7 +266,25 @@
     padding-right: 0px;
     box-sizing: border-box;
     transition: transform 0.35s var(--ease-out), border-color 0.35s var(--ease-out),
-      background-color 0.35s var(--ease-out), box-shadow 0.35s var(--ease-out);
+      background-color 0.35s var(--ease-out), box-shadow 0.35s var(--ease-out),
+      opacity 0.35s var(--ease-out);
+  }
+  // Во время лопания прячем контент иконки — виден только BubblePop
+  anchor.popping {
+    pointer-events: none;
+    background-color: transparent !important;
+    border-color: transparent !important;
+  }
+  anchor.popping > :not(.popLayer) {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.12s ease;
+  }
+  .popLayer {
+    position: absolute;
+    inset: -4px;
+    z-index: 3000;
+    pointer-events: none;
   }
   anchor.titleVisible {
     width: 100%;
@@ -326,21 +380,24 @@
     transform: translateY(-50%);
   }
   .multiButton button {
-    display: grid;
-    place-items: center;
-    position: absolute;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: static;
     width: 2rem;
     height: 2rem;
+    padding: 0;
+    margin: 0;
     border: none;
     border-radius: 100%;
     background: var(--background);
     color: var(--text);
+    line-height: 0;
     // Только кнопки ловят клик (контейнер pointer-events: none)
     pointer-events: auto;
-    transform: translateZ(0) translate(-50%, -50%);
+    transform: none;
     cursor: pointer;
-    transition: left 0.28s var(--ease-out), top 0.28s var(--ease-out),
-      background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease,
+    transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease,
       transform 0.28s var(--ease-out);
     box-shadow: 0 0 0rem -0.25rem var(--background);
     z-index: 1001;
@@ -350,55 +407,40 @@
       box-shadow: 0 0 1rem -0.25rem var(--background);
       z-index: 1002;
     }
-    // Дуга сверху: ★ / copy / delete (bubble)
-    &:first-child:nth-last-child(3),
-    &:first-child:nth-last-child(3) ~ * {
-      &:nth-child(1) {
-        left: 22%;
-        top: 28%;
-      }
-      &:nth-child(2) {
-        left: 50%;
-        top: 8%;
-      }
-      &:nth-child(3) {
-        left: 78%;
-        top: 28%;
-      }
+    // Центр иконки внутри круга (svelte-hero-icons / svg)
+    :global(svg) {
+      display: block;
+      margin: 0;
+      flex-shrink: 0;
     }
   }
+  // Дуга сверху: позиции на обёртках Tooltip (не на button)
+  .multiButton:not(.lined) :global(.tooltip-root) {
+    position: absolute;
+    pointer-events: auto;
+    transform: translate(-50%, -50%);
+  }
+  .multiButton:not(.lined) :global(.tooltip-root:nth-child(1)) {
+    left: 22%;
+    top: 28%;
+  }
+  .multiButton:not(.lined) :global(.tooltip-root:nth-child(2)) {
+    left: 50%;
+    top: 8%;
+  }
+  .multiButton:not(.lined) :global(.tooltip-root:nth-child(3)) {
+    left: 78%;
+    top: 28%;
+  }
   .multiButton.lined button {
-    position: static;
-    transform: none;
     width: 1.75rem;
     height: 1.75rem;
     flex-shrink: 0;
-    &:first-child:nth-last-child(3),
-    &:first-child:nth-last-child(3) ~ * {
-      &:nth-child(1),
-      &:nth-child(2),
-      &:nth-child(3) {
-        left: auto;
-        top: auto;
-      }
-    }
   }
-  .multiButton.menuFlip button {
-    &:first-child:nth-last-child(3),
-    &:first-child:nth-last-child(3) ~ * {
-      &:nth-child(1) {
-        left: 22%;
-        top: 28%;
-      }
-      &:nth-child(2) {
-        left: 50%;
-        top: 8%;
-      }
-      &:nth-child(3) {
-        left: 78%;
-        top: 28%;
-      }
-    }
+  .multiButton.lined :global(.tooltip-root) {
+    position: static;
+    transform: none;
+    pointer-events: auto;
   }
   // Hovered dial выше соседей — кнопки не «под» соседней иконкой
   anchor:hover,
