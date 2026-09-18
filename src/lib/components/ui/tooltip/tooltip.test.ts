@@ -21,5 +21,7 @@ describe("tooltip ui module", () => {
     expect(src).toContain('role="tooltip"');
     expect(src).toContain("delayDuration");
     expect(src).toContain("disabled");
+    expect(src).toContain("use:tooltipPortal");
+    expect(src).toContain("position: fixed");
   });
 });
