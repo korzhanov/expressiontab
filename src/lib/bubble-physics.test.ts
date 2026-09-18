@@ -100,13 +100,16 @@ describe("bubble-physics", () => {
     expect(worldHeightForCount(2000, 800)).toBe(worldHeightForCount(400, 800));
   });
 
-  it("bounceBubblesAtWorldEdges reflects velocity at walls", () => {
+  it("bounceBubblesAtWorldEdges keeps both left and right edges", () => {
     const nodes = [
       { id: "l", x: 2, y: 200, r: 40, vx: -5, vy: 0 },
-      { id: "r", x: 798, y: 200, r: 40, vx: 5, vy: 0 },
+      { id: "r", x: 900, y: 200, r: 40, vx: 5, vy: 0 },
     ] as any;
     bounceBubblesAtWorldEdges(nodes, 800, 560);
+    // Левая и правая: центр не ближе r+4 к краю
+    expect(nodes[0].x).toBe(44);
     expect(nodes[0].vx).toBeGreaterThan(0);
+    expect(nodes[1].x).toBe(800 - 44);
     expect(nodes[1].vx).toBeLessThan(0);
   });
 

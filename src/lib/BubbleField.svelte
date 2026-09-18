@@ -47,6 +47,9 @@
   let dragMoved = false;
   let dragListenersOn = false;
   const DRAG_THRESHOLD_PX = 6;
+  /** Реальная ширина поля (не window) — иначе правый край «протекает» из‑за scrollbar */
+  let measuredW = 0;
+  let resizeObs: ResizeObserver | null = null;
 
   /** scrollY в координатах поля (0 = верх section.bubbleField) */
   function fieldScrollY(): number {
@@ -55,13 +58,20 @@
     return (window.scrollY || 0) - top;
   }
 
+  /** Ширина мира = clientWidth .bubbleField (симметрия L/R границ). */
+  function fieldWidth(): number {
+    const fromDom = fieldEl?.clientWidth || measuredW;
+    return Math.max(fromDom || width || 800, 320);
+  }
+
   function simHostCount(): number {
     return Math.min(bookmarkList.size, BUBBLE_SIM_CAP);
   }
 
   function rebuild() {
     stopWorld(world);
-    const w = Math.max(width || 800, 320);
+    const w = fieldWidth();
+    measuredW = w;
     const count = simHostCount();
     worldH = worldHeightForCount(count, w);
     const nodes = buildHostBubbles({
@@ -105,9 +115,12 @@
   function onResize() {
     viewH = window.innerHeight;
     if (world) {
-      const w = Math.max(width || window.innerWidth, 320);
+      const w = fieldWidth();
+      measuredW = w;
       worldH = worldHeightForCount(simHostCount(), w);
       resizeWorld(world, w, worldH);
+      // После сужения поля — сразу прижать к новым краям
+      bounceBubblesAtWorldEdges(world.nodes, world.width, world.height);
     }
     refreshVisible();
   }
@@ -212,7 +225,7 @@
   }
 
   $: {
-    const key = `${bookmarkList.size}:${nodesList.length}:${width | 0}`;
+    const key = `${bookmarkList.size}:${nodesList.length}`;
     if (bookmarkList.size && key !== builtKey) {
       builtKey = key;
       rebuild();
@@ -220,13 +233,21 @@
   }
 
   onMount(() => {
+    measuredW = fieldEl?.clientWidth || width || 800;
     refreshVisible();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onResize, { passive: true });
+    // clientWidth поля (scrollbar / padding) — не window.innerWidth
+    if (typeof ResizeObserver !== "undefined" && fieldEl) {
+      resizeObs = new ResizeObserver(() => onResize());
+      resizeObs.observe(fieldEl);
+    }
   });
 
   onDestroy(() => {
     detachDragListeners();
+    resizeObs?.disconnect();
+    resizeObs = null;
     stopWorld(world);
     if (typeof window !== "undefined") {
       window.removeEventListener("scroll", onScroll);
