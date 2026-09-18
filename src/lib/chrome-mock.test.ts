@@ -48,4 +48,13 @@ describe("installChromeMockIfNeeded", () => {
     const results = await chrome.bookmarks.search("svelte");
     expect(Array.isArray(results)).toBe(true);
   });
+
+  it("tabs.query returns current-window mock tabs", async () => {
+    installChromeMockIfNeeded();
+    const tabs = await new Promise<any[]>((resolve) => {
+      chrome.tabs.query({ currentWindow: true }, resolve);
+    });
+    expect(tabs.length).toBeGreaterThan(0);
+    expect(tabs.every((t) => t.windowId === 1)).toBe(true);
+  });
 });

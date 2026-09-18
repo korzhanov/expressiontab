@@ -15,6 +15,7 @@
     type HostGroup,
   } from "./bookmarks";
   import { isMockChrome } from "./chrome-mock";
+  import { stashOpenTabs, type StashChrome } from "./stash-tabs";
   import * as Tooltip from "./components/ui/tooltip";
   import BubbleField from "./BubbleField.svelte";
 
@@ -126,6 +127,11 @@
   }
 
   let timer: ReturnType<typeof setTimeout>;
+  /** Идёт перенос вкладок в закладки */
+  let stashBusy = false;
+  /** Короткий статус после переноса */
+  let stashNote = "";
+
   $: newSearch(searchTerm);
   $: if (titleVisible !== undefined && bookmarkList.size) {
     rebuildChunks();
@@ -160,6 +166,49 @@
     // "/" focuses search when not typing in an input
     if (e.detail === "/" || e.detail === "Slash") {
       searchInputEl?.focus();
+    }
+  }
+
+  /** chrome.tabs + bookmarks — без permission `tabs`, URL даёт `<all_urls>`. */
+  function stashChrome(): StashChrome | null {
+    try {
+      if (
+        typeof chrome !== "undefined" &&
+        chrome.tabs?.query &&
+        chrome.bookmarks?.create
+      ) {
+        return chrome as unknown as StashChrome;
+      }
+    } catch {
+      // preview без mock tabs
+    }
+    return null;
+  }
+
+  async function onStashTabs(allWindows: boolean) {
+    if (stashBusy) return;
+    const api = stashChrome();
+    if (!api) {
+      stashNote = "Нужно расширение Chrome";
+      return;
+    }
+    const scope = allWindows ? "все вкладки" : "вкладки этого окна";
+    if (!confirm(`Сохранить в закладки и закрыть ${scope}?`)) return;
+    stashBusy = true;
+    stashNote = "";
+    try {
+      const result = await stashOpenTabs({ allWindows, chromeApi: api });
+      if (!result.bookmarked) {
+        stashNote = "Нет вкладок для переноса";
+      } else {
+        stashNote = `Перенесено ${result.bookmarked}`;
+        await getBookmarks();
+      }
+    } catch (err) {
+      console.error(err);
+      stashNote = "Не удалось перенести";
+    } finally {
+      stashBusy = false;
     }
   }
 
@@ -306,10 +355,41 @@
       </icon>
     </label>
   </Tooltip.Root>
+  <div class="stashBtns">
+    <Tooltip.Root
+      content="Сохранить вкладки этого окна в закладки и закрыть"
+      side="bottom"
+      delayDuration={350}
+    >
+      <button
+        type="button"
+        class="stashBtn"
+        disabled={stashBusy}
+        on:click={() => onStashTabs(false)}
+      >
+        перенести табы окна
+      </button>
+    </Tooltip.Root>
+    <Tooltip.Root
+      content="Сохранить вкладки всех окон в закладки и закрыть"
+      side="bottom"
+      delayDuration={350}
+    >
+      <button
+        type="button"
+        class="stashBtn"
+        disabled={stashBusy}
+        on:click={() => onStashTabs(true)}
+      >
+        перенести все табы
+      </button>
+    </Tooltip.Root>
+  </div>
   <span class="status">
     {#if searchTerm}“{searchTerm}” · {/if}
     {bookmarkListSize} sites
     · last {searchTerm.length || 1} week{searchTerm.length > 1 ? "s" : ""}
+    {#if stashNote} · {stashNote}{/if}
   </span>
 </filterBar>
 <anchores bind:clientHeight={hh} bind:clientWidth={ww} class:titleVisible>
@@ -402,6 +482,33 @@
     font-size: 12px;
     color: #999;
     white-space: nowrap;
+  }
+  filterBar .stashBtns {
+    display: flex;
+    flex-shrink: 0;
+    gap: 6px;
+    position: relative;
+    z-index: 3; /* поверх переполненного placeholder поиска */
+  }
+  filterBar .stashBtn {
+    background: rgba(255, 255, 255, 0.06);
+    color: #ddd;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+    line-height: 1.2;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  filterBar .stashBtn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.28);
+    color: #fff;
+  }
+  filterBar .stashBtn:disabled {
+    opacity: 0.45;
+    cursor: default;
   }
   anchores {
     display: block;
