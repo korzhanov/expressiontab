@@ -19,7 +19,7 @@
 - **Точка входа**: `src/newtab/main.js` → `App.svelte` → `Anchores.svelte` → `HostItems` / `HostItem` / `AnchoreItem`.
 - **Данные**: `chrome.history.search` + `chrome.bookmarks.search` → `src/lib/bookmarks.ts` (`buildBookmarkIndex`, `makeChunks`) → stores `nodesList` / `filteredListSliced`.
 - **Сборка**: `bun run build` → артефакт в `builds/expressiontab`. Если `vite-plugin-chrome-extension` не находится — `npm install` (или `bun run prebuild`); bun иногда ставит пакет без `lib/`.
-- **Dev**: `bun run dev` (`scripts/watch-build.mjs` → полный `vite build` на изменения; не `vite --watch` из‑за бага chrome-extension plugin) → F5 на new-tab; CursorBrowser: `bun run preview` → http://localhost:4173/newtab/ (mock chrome.*).
+- **Dev**: `bun run dev` (`scripts/watch-build.mjs`) → F5 на new-tab; CursorBrowser: `bun run preview` → http://localhost:4173/newtab/ (mock chrome.*). Bubble-режим: `d3-force` поле (`BubbleField`); lined — VirtualScroll как раньше.
 - **Тесты**: `bun test` (unit в `src/lib/*.test.ts`); E2E Playwright — при наличии конфига.
 - **Protected base**: `main` / `master` — только через PR (`branch-pr-not-direct-commit.mdc`).
 - **Имена веток**: `NNN-short-slug` (номер issue) или `fix/…` / `feat/…`.

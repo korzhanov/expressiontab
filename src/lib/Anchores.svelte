@@ -16,6 +16,7 @@
   } from "./bookmarks";
   import { isMockChrome } from "./chrome-mock";
   import * as Tooltip from "./components/ui/tooltip";
+  import BubbleField from "./BubbleField.svelte";
 
   let online = true;
   let initialLoadDone = false;
@@ -312,20 +313,29 @@
   </span>
 </filterBar>
 <anchores bind:clientHeight={hh} bind:clientWidth={ww} class:titleVisible>
-  <VirtualScroll
-    let:data
-    data={$filteredListSliced}
-    key="key"
-    pageMode={true}
-    keeps={40}
-    estimateSize={rowEstimate}
-    topThreshold={2}
-    bottomThreshold={2}
-  >
-    <div class="itemWrapper" class:lined={titleVisible} style:min-height="{rowEstimate}px">
-      <HostItems value={data.value} />
-    </div>
-  </VirtualScroll>
+  {#if titleVisible}
+    <VirtualScroll
+      let:data
+      data={$filteredListSliced}
+      key="key"
+      pageMode={true}
+      keeps={40}
+      estimateSize={rowEstimate}
+      topThreshold={2}
+      bottomThreshold={2}
+    >
+      <div class="itemWrapper lined" style:min-height="{rowEstimate}px">
+        <HostItems value={data.value} />
+      </div>
+    </VirtualScroll>
+  {:else if bookmarkList.size && $nodesList.length}
+    <!-- Bubble field: d3-force + viewport cull (lined выше) -->
+    <BubbleField
+      {bookmarkList}
+      nodesList={$nodesList}
+      width={windowWidth || ww || 800}
+    />
+  {/if}
   {#if loader}<loader><div class="lds-circle"><div /></div></loader>{/if}
 </anchores>
 
