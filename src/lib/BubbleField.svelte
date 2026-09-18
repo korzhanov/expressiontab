@@ -18,6 +18,10 @@
     expandHost,
     fieldScrollFromRectTop,
     flightPosition,
+    GROUP_INFLATE_MS,
+    GROUP_INFLATE_SCALE,
+    GROUP_POP_MS,
+    inflateRadius,
     isHostExpanded,
     offscreenEnterY,
     pinBubbleAt,
@@ -59,6 +63,20 @@
   /** Полёты из-за экрана → разведённые конечные точки */
   let flights = new Map<string, BubbleEnterFlight>();
   let flightRaf = 0;
+  /** Inflate → pop → expand для groupable host */
+  let inflate: {
+    id: string;
+    node: BubbleNode;
+    r0: number;
+    r1: number;
+    t0: number;
+    raf: number;
+    /** contextmenu: сами коммитим после 3с */
+    autoCommit: boolean;
+  } | null = null;
+  let poppingId: string | null = null;
+  let inflateTick = 0;
+  let expandTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Drag: pinBubbleAt (fx/fy); после порога не открываем ссылку */
   let dragBubble: BubbleNode | null = null;
@@ -283,18 +301,142 @@
     if (isHostExpanded(world, b.host)) {
       collapseHost(world, b.host);
       expandedHosts[b.host] = false;
-    } else {
-      expandHost({
-        world,
-        host: b.host,
-        childIndexes: group.nodes.slice(1),
-        nodesList,
-        maxChildren: 24,
-      });
-      expandedHosts[b.host] = true;
+      expandedHosts = { ...expandedHosts };
+      refreshVisible();
+      return;
     }
-    expandedHosts = { ...expandedHosts };
-    refreshVisible();
+    // Раскрытие — только через inflate→pop (longhover / contextmenu)
+  }
+
+  /** Старт роста радиуса (longhover mouseenter или contextmenu). */
+  function onInflateStart(b: BubbleNode, autoCommit = false) {
+    if (!world || b.kind !== "host") return;
+    if (poppingId || (inflate && inflate.id !== b.id)) return;
+    if (isHostExpanded(world, b.host)) return;
+    const group = bookmarkList.get(b.host);
+    if (!group || group.nodes.length < 2) return;
+    if (inflate?.id === b.id) {
+      if (autoCommit) inflate.autoCommit = true;
+      return;
+    }
+    const r0 = b.r;
+    const r1 = r0 * GROUP_INFLATE_SCALE;
+    const now =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+    inflate = {
+      id: b.id,
+      node: b,
+      r0,
+      r1,
+      t0: now,
+      raf: 0,
+      autoCommit,
+    };
+    pinBubbleAt(b, b.x ?? 0, b.y ?? 0, world.width, world.height);
+    ensureInflateLoop();
+  }
+
+  function ensureInflateLoop() {
+    if (!inflate) return;
+    if (inflate.raf) return;
+    if (typeof requestAnimationFrame === "undefined") return;
+    const loop = () => {
+      if (!inflate) return;
+      inflate.raf = 0;
+      const now =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
+      const u = Math.min(1, (now - inflate.t0) / GROUP_INFLATE_MS);
+      inflate.node.r = inflateRadius(inflate.r0, inflate.r1, u);
+      inflateTick += 1;
+      if (u >= 1) {
+        inflate.node.r = inflate.r1;
+        if (inflate.autoCommit) {
+          const node = inflate.node;
+          inflate = null;
+          commitExpandPop(node);
+          return;
+        }
+        // Ждём longhover commit — радиус уже на максимуме
+        return;
+      }
+      inflate.raf = requestAnimationFrame(loop);
+    };
+    inflate.raf = requestAnimationFrame(loop);
+  }
+
+  function onInflateCancel(b: BubbleNode) {
+    if (!inflate || inflate.id !== b.id) return;
+    if (inflate.autoCommit) return; // contextmenu-цепочку не рвём leave'ом
+    if (inflate.raf && typeof cancelAnimationFrame !== "undefined") {
+      cancelAnimationFrame(inflate.raf);
+    }
+    inflate.node.r = inflate.r0;
+    if (world) unpinBubble(inflate.node);
+    inflate = null;
+    inflateTick += 1;
+  }
+
+  /** Longhover дошёл до 3с → лопание и expand. */
+  function onExpandCommit(b: BubbleNode) {
+    if (!world || b.kind !== "host") return;
+    if (isHostExpanded(world, b.host)) {
+      toggleExpand(b);
+      return;
+    }
+    if (poppingId) return;
+    if (inflate && inflate.id === b.id) {
+      if (inflate.raf && typeof cancelAnimationFrame !== "undefined") {
+        cancelAnimationFrame(inflate.raf);
+      }
+      inflate.node.r = inflate.r1;
+      const node = inflate.node;
+      const r0 = inflate.r0;
+      inflate = null;
+      commitExpandPop(node, r0);
+      return;
+    }
+    // Не было inflate — полный цикл 3с + pop
+    onInflateStart(b, true);
+  }
+
+  /** Contextmenu: inflate 3с → pop → expand. */
+  function onExpandRequest(b: BubbleNode) {
+    if (!world || b.kind !== "host") return;
+    if (isHostExpanded(world, b.host)) {
+      toggleExpand(b);
+      return;
+    }
+    onInflateStart(b, true);
+  }
+
+  function commitExpandPop(b: BubbleNode, r0?: number) {
+    if (!world || poppingId) return;
+    const baseR = r0 ?? b.r / GROUP_INFLATE_SCALE;
+    poppingId = b.id;
+    inflateTick += 1;
+    if (expandTimer) clearTimeout(expandTimer);
+    expandTimer = setTimeout(() => {
+      expandTimer = null;
+      if (!world) return;
+      const group = bookmarkList.get(b.host);
+      if (group && group.nodes.length > 1) {
+        expandHost({
+          world,
+          host: b.host,
+          childIndexes: group.nodes.slice(1),
+          nodesList,
+          maxChildren: 24,
+        });
+        expandedHosts[b.host] = true;
+        expandedHosts = { ...expandedHosts };
+      }
+      b.r = baseR;
+      unpinBubble(b);
+      poppingId = null;
+      inflateTick += 1;
+      reheat(world, 0.45);
+      refreshVisible();
+    }, GROUP_POP_MS);
   }
 
   function fieldPointFromClient(clientX: number, clientY: number): {
@@ -363,6 +505,10 @@
     if (e.button !== 0 || !world) return;
     // Блокируем native HTML5-drag ссылки (иначе пузырь «не едет»)
     e.preventDefault();
+    // Drag отменяет hover-inflate (кроме contextmenu autoCommit)
+    if (inflate?.id === b.id && !inflate.autoCommit) {
+      onInflateCancel(b);
+    }
     dragBubble = b;
     dragStartX = e.clientX;
     dragStartY = e.clientY;
@@ -405,6 +551,10 @@
       cancelAnimationFrame(flightRaf);
       flightRaf = 0;
     }
+    if (inflate?.raf && typeof cancelAnimationFrame !== "undefined") {
+      cancelAnimationFrame(inflate.raf);
+    }
+    if (expandTimer) clearTimeout(expandTimer);
     resizeObs?.disconnect();
     resizeObs = null;
     stopWorld(world);
@@ -426,11 +576,17 @@
       bubble={b}
       frame={frame}
       dragTick={dragBubble?.id === b.id ? dragTick : 0}
+      inflateTick={inflate?.id === b.id || poppingId === b.id ? inflateTick : 0}
       dragging={dragBubble?.id === b.id}
+      inflating={inflate?.id === b.id}
+      popping={poppingId === b.id}
       enterAnim={enterAnimById[b.id] || "initial"}
       groupable={b.kind === "host" && (bookmarkList.get(b.host)?.nodes.length || 0) > 1}
       expanded={!!expandedHosts[b.host] && b.kind === "host"}
-      onToggleExpand={toggleExpand}
+      onInflateStart={() => onInflateStart(b, false)}
+      onInflateCancel={() => onInflateCancel(b)}
+      onExpandCommit={() => onExpandCommit(b)}
+      onExpandRequest={() => onExpandRequest(b)}
       onPointerDown={(e) => onBubblePointerDown(b, e)}
       onLinkClick={onBubbleClick}
     />

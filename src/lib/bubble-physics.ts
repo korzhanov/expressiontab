@@ -337,6 +337,18 @@ export type BubbleEnterFlight = {
 
 export const ENTER_RISE_MS = 720;
 export const ENTER_FALL_MS = 580;
+/** Рост радиуса перед лопанием / expand группы (совпадает с longhover). */
+export const GROUP_INFLATE_MS = 3000;
+/** Длительность BubblePop (как при delete в AnchoreItem). */
+export const GROUP_POP_MS = 680;
+/** Во сколько раз растёт r за inflate. */
+export const GROUP_INFLATE_SCALE = 2.25;
+
+/** Радиус на прогрессе inflate 0..1. */
+export function inflateRadius(r0: number, r1: number, u: number): number {
+  const t = easeOutCubic(u);
+  return r0 + (r1 - r0) * t;
+}
 
 /**
  * Для id, которых не было в prev: rise при скролле вниз, fall вверх.

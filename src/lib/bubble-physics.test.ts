@@ -178,6 +178,17 @@ describe("bubble-physics", () => {
     expect(fall.y).toBeLessThan(50);
   });
 
+  it("inflateRadius grows from r0 to r1", async () => {
+    const { inflateRadius, GROUP_INFLATE_MS, GROUP_POP_MS } = await import(
+      "./bubble-physics"
+    );
+    expect(GROUP_INFLATE_MS).toBe(3000);
+    expect(GROUP_POP_MS).toBe(680);
+    expect(inflateRadius(40, 90, 0)).toBe(40);
+    expect(inflateRadius(40, 90, 1)).toBe(90);
+    expect(inflateRadius(40, 90, 0.5)).toBeGreaterThan(65);
+  });
+
   it("bounceBubblesAtWorldEdges keeps both left and right edges", () => {
     const nodes = [
       { id: "l", x: 2, y: 200, r: 40, vx: -5, vy: 0 },

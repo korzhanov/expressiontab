@@ -1,8 +1,10 @@
 <script lang="ts">
   /**
    * Один пузырёк в BubbleField — позиция из d3-force, spawn CSS.
+   * Groupable: inflate 3с → BubblePop → expand.
    */
   import globe from "../assets/Globe.svg";
+  import BubblePop from "./BubblePop.svelte";
   import * as Tooltip from "./components/ui/tooltip";
   import { longhover, GROUP_LONGHOVER_MS } from "./longhover";
   import { favicons } from "./stores";
@@ -12,27 +14,42 @@
   export let expanded: boolean = false;
   /** Несколько URL на хост — цвет-маркер, expand без «+» */
   export let groupable: boolean = false;
-  export let onToggleExpand: (b: BubbleNode) => void = () => {};
   /** Кадр physics — пересчёт transform без remount */
   export let frame: number = 0;
   /** Тик только при drag этого пузыря (остальные не инвалидируем) */
   export let dragTick: number = 0;
+  /** Тик роста радиуса / лопания */
+  export let inflateTick: number = 0;
   /** Пузырь сейчас тянут — grab/grabbing + без tooltip delay */
   export let dragging: boolean = false;
+  /** Идёт 3с рост радиуса перед expand */
+  export let inflating: boolean = false;
+  /** Активно лопание BubblePop */
+  export let popping: boolean = false;
   /** Вход в viewport: initial / rise (скролл вниз) / fall (вверх) */
   export let enterAnim: BubbleEnterAnim = "initial";
+  export let onInflateStart: () => void = () => {};
+  export let onInflateCancel: () => void = () => {};
+  export let onExpandCommit: () => void = () => {};
+  export let onExpandRequest: () => void = () => {};
   export let onPointerDown: (e: PointerEvent) => void = () => {};
   export let onLinkClick: (e: MouseEvent) => void = () => {};
 
-  $: size = bubble.r * 2;
+  // frame | dragTick | inflateTick — Svelte видит мутации x/y/r
+  $: size =
+    frame + dragTick + inflateTick >= 0 ? bubble.r * 2 : bubble.r * 2;
   // initial — staggered spawn; rise/fall — короткий stagger у края
   $: delay =
     enterAnim === "initial"
       ? Math.min(bubble.spawnIndex, 48) * 0.035
       : Math.min((bubble.spawnIndex % 10) * 0.025, 0.18);
-  // frame | dragTick — иначе Svelte не видит мутации x/y от d3 / pin
-  $: tx = frame + dragTick >= 0 ? (bubble.x || 0) - bubble.r : 0;
-  $: ty = frame + dragTick >= 0 ? (bubble.y || 0) - bubble.r : 0;
+  $: tx = (bubble.x || 0) - bubble.r;
+  $: ty = (bubble.y || 0) - bubble.r;
+  // зависимость от тиков (иначе tx/ty не обновятся при мутации bubble)
+  $: if (frame + dragTick + inflateTick >= 0) {
+    tx = (bubble.x || 0) - bubble.r;
+    ty = (bubble.y || 0) - bubble.r;
+  }
 
   $: host = bubble.host;
   $: faviconSrc =
@@ -57,17 +74,19 @@
     .join(" · ");
 </script>
 
-<!-- Обёртка двигает физикой; внутренний .bubbleDot — только spawn scale -->
+<!-- Обёртка двигает физикой; внутренний .bubbleDot — spawn / pop -->
 <div
   class="bubbleWrap"
   class:dragging
+  class:inflating
+  class:popping
   style="transform: translate({tx}px, {ty}px); width: {size}px; height: {size}px;"
 >
   <Tooltip.Root
     content={tooltipText}
     side="bottom"
     delayDuration={400}
-    disabled={dragging}
+    disabled={dragging || inflating || popping}
   >
     <a
       class="bubbleDot"
@@ -77,25 +96,36 @@
       class:expanded
       class:bookmark={bubble.isBookmark}
       class:dragging
+      class:inflating
+      class:popping
       class:enter-rise={enterAnim === "rise"}
       class:enter-fall={enterAnim === "fall"}
       href={bubble.url}
       rel="noopener noreferrer"
       draggable="false"
       style="animation-delay: {delay}s;"
-      use:longhover={groupable && bubble.kind === "host" && !dragging
+      use:longhover={groupable && bubble.kind === "host" && !dragging && !popping
         ? GROUP_LONGHOVER_MS
         : 86400000}
+      on:mouseenter={() => {
+        if (groupable && !dragging && !popping && !expanded) onInflateStart();
+      }}
+      on:mouseleave={() => {
+        if (groupable) onInflateCancel();
+      }}
       on:longhover|preventDefault={() => {
-        if (groupable && !dragging) onToggleExpand(bubble);
+        if (groupable && !dragging) onExpandCommit();
       }}
       on:contextmenu|preventDefault={() => {
-        if (groupable) onToggleExpand(bubble);
+        if (groupable) onExpandRequest();
       }}
       on:dragstart|preventDefault
       on:pointerdown={onPointerDown}
       on:click={onLinkClick}
     >
+      <div class="popLayer" aria-hidden="true">
+        <BubblePop active={popping} />
+      </div>
       <span class="bubbleDot__shine" />
       {#if groupable}
         <span class="bubbleDot__groupRing" aria-hidden="true" />
@@ -203,8 +233,30 @@
     filter: brightness(1.1);
     z-index: 2;
   }
-  .bubbleWrap.dragging {
+  .bubbleWrap.dragging,
+  .bubbleWrap.inflating {
     z-index: 5;
+  }
+  .bubbleWrap.popping {
+    z-index: 6;
+  }
+  .bubbleDot.inflating {
+    filter: brightness(1.12);
+  }
+  /* Во время лопания прячем контент — виден BubblePop */
+  .bubbleDot.popping {
+    background: transparent;
+    box-shadow: none;
+    animation: none;
+  }
+  .bubbleDot.popping > :not(.popLayer) {
+    visibility: hidden;
+  }
+  .popLayer {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
   }
   .bubbleDot.child {
     --hue: 165;
