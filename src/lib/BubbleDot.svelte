@@ -38,7 +38,8 @@
   // frame | dragTick | inflateTick — Svelte видит мутации x/y/r
   $: size =
     frame + dragTick + inflateTick >= 0 ? bubble.r * 2 : bubble.r * 2;
-  // initial — staggered spawn; rise/fall — короткий stagger у края
+  // initial — staggered spawn; rise/fall — короткий stagger у края;
+  // child с spawnIndex 0 (burst из pop) — без задержки, вместе с лопанием
   $: delay =
     enterAnim === "initial"
       ? Math.min(bubble.spawnIndex, 48) * 0.035
@@ -77,6 +78,8 @@
 <!-- Обёртка двигает физикой; внутренний .bubbleDot — spawn / pop -->
 <div
   class="bubbleWrap"
+  class:host={bubble.kind === "host"}
+  class:child={bubble.kind === "child"}
   class:dragging
   class:inflating
   class:popping
@@ -150,6 +153,13 @@
     top: 0;
     will-change: transform;
     pointer-events: none;
+  }
+  /* Host выше детей — inflate/hover не перекрывают дети */
+  .bubbleWrap.child {
+    z-index: 1;
+  }
+  .bubbleWrap.host {
+    z-index: 3;
   }
   .bubbleWrap :global(.tooltip-root) {
     display: block;

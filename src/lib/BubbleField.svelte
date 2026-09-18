@@ -16,16 +16,26 @@
     ENTER_FALL_MS,
     ENTER_RISE_MS,
     expandHost,
+    expandedHostRadius,
     fieldScrollFromRectTop,
     flightPosition,
+    GROUP_ABSORB_MS,
     GROUP_INFLATE_MS,
-    GROUP_INFLATE_SCALE,
     GROUP_POP_MS,
+    GROUP_SPAWN_LEAD_MS,
+    GROUP_CRATER_FILL_MS,
     inflateRadius,
     isHostExpanded,
+    listHostChildren,
+    absorbChildrenFrame,
+    shrinkHostFrame,
+    startCraterFill,
+    clusterRadiusFromChildRadii,
     offscreenEnterY,
     pinBubbleAt,
     reheat,
+    beginDragCollisions,
+    endDragCollisions,
     resizeWorld,
     scrollDirection,
     separateBubbles,
@@ -38,6 +48,7 @@
     type BubbleNode,
     type BubbleWorld,
   } from "./bubble-physics";
+  import { bubbleRadiusFromVisits } from "./bubble-radius";
   import BubbleDot from "./BubbleDot.svelte";
 
   export let bookmarkList: Map<string, HostGroup> = new Map();
@@ -70,13 +81,23 @@
     r0: number;
     r1: number;
     t0: number;
+    /** Длительность роста (3с hover / ~420мс по «+») */
+    dur: number;
     raf: number;
-    /** contextmenu: сами коммитим после 3с */
+    /** contextmenu / «+»: сами коммитим после роста */
     autoCommit: boolean;
   } | null = null;
   let poppingId: string | null = null;
+  /** Fold: втягивание детей */
+  let collapsingId: string | null = null;
+  /** Fold: дети в момент лопания (id → true) */
+  let poppingChildIds: Record<string, boolean> = {};
   let inflateTick = 0;
   let expandTimer: ReturnType<typeof setTimeout> | null = null;
+  let shrinkRaf = 0;
+  let absorbRaf = 0;
+  /** Снять временную силу заполнения кратера */
+  let stopCraterFill: (() => void) | null = null;
 
   /** Drag: pinBubbleAt (fx/fy); после порога не открываем ссылку */
   let dragBubble: BubbleNode | null = null;
@@ -110,7 +131,25 @@
     const w = fieldWidth();
     measuredW = w;
     const count = simHostCount();
-    worldH = worldHeightForCount(count, w);
+    // minHeight ≈ viewport под filter bar — preview не короткая «полоска»
+    const minH = Math.max((viewH || 800) - 100, 480);
+    // Сначала maxR → высота → spawn (не provisional с clamp-pile)
+    const radii: number[] = [];
+    for (const [, group] of bookmarkList) {
+      if (radii.length >= BUBBLE_SIM_CAP) break;
+      const n = nodesList[group.nodes[0]];
+      if (!n?.url) continue;
+      radii.push(
+        bubbleRadiusFromVisits({
+          visitCount: group.hostVisitCount || n.visitCount || 1,
+        })
+      );
+    }
+    const maxR = radii.length ? Math.max(...radii, 40) : 52;
+    worldH = worldHeightForCount(radii.length || count, w, {
+      avgR: maxR,
+      minHeight: minH,
+    });
     const nodes = buildHostBubbles({
       bookmarkList,
       nodesList,
@@ -282,36 +321,59 @@
 
   function onResize() {
     viewH = window.innerHeight;
-    if (world) {
-      const w = fieldWidth();
-      measuredW = w;
-      worldH = worldHeightForCount(simHostCount(), w);
+    // При перетаскивании мир не трогаем — иначе ResizeObserver раздувает высоту
+    if (!world || dragBubble) return;
+    const w = fieldWidth();
+    measuredW = w;
+    const hosts = world.nodes.filter((n) => n.kind === "host");
+    // Только «спокойный» радиус (groupR) — не live r после inflate/unfold
+    const maxR = hosts.reduce(
+      (m, n) => Math.max(m, n.groupR ?? n.baseR ?? 40),
+      40
+    );
+    const nextH = worldHeightForCount(hosts.length || simHostCount(), w, {
+      avgR: maxR,
+      minHeight: Math.max((viewH || 800) - 100, 480),
+    });
+    // Не расширять уже построенный мир (drag / scrollbar / inflate)
+    if (nextH > worldH && Math.abs(w - world.width) < 2) {
       resizeWorld(world, w, worldH);
-      // После сужения поля — сразу прижать к новым краям
       bounceBubblesAtWorldEdges(world.nodes, world.width, world.height);
+      refreshVisible();
+      return;
     }
+    worldH = nextH;
+    resizeWorld(world, w, worldH);
+    bounceBubblesAtWorldEdges(world.nodes, world.width, world.height);
     refreshVisible();
   }
 
   function toggleExpand(b: BubbleNode) {
     if (!world || b.kind !== "host") return;
+    if (poppingId || collapsingId) return;
     const group = bookmarkList.get(b.host);
     if (!group || group.nodes.length < 2) return;
 
     if (isHostExpanded(world, b.host)) {
-      collapseHost(world, b.host);
-      expandedHosts[b.host] = false;
-      expandedHosts = { ...expandedHosts };
-      refreshVisible();
+      // Fold: растёт и втягивает детей
+      commitCollapseAbsorb(b);
       return;
     }
-    // Раскрытие — только через inflate→pop (longhover / contextmenu)
+    // «+»: быстрый рост → spawn детей → pop → shrink к весу
+    onInflateStart(b, true, 420);
   }
 
-  /** Старт роста радиуса (longhover mouseenter или contextmenu). */
-  function onInflateStart(b: BubbleNode, autoCommit = false) {
+  /**
+   * Старт роста радиуса: родитель пухнет до площади детей,
+   * collide раздвигает соседей (longhover / contextmenu / «+»).
+   */
+  function onInflateStart(
+    b: BubbleNode,
+    autoCommit = false,
+    durationMs = GROUP_INFLATE_MS
+  ) {
     if (!world || b.kind !== "host") return;
-    if (poppingId || (inflate && inflate.id !== b.id)) return;
+    if (poppingId || collapsingId || (inflate && inflate.id !== b.id)) return;
     if (isHostExpanded(world, b.host)) return;
     const group = bookmarkList.get(b.host);
     if (!group || group.nodes.length < 2) return;
@@ -319,8 +381,22 @@
       if (autoCommit) inflate.autoCommit = true;
       return;
     }
-    const r0 = b.r;
-    const r1 = r0 * GROUP_INFLATE_SCALE;
+    // groupR — сложенный вес; цель inflate — эквивалент площади детей
+    const r0 = b.groupR ?? b.baseR ?? b.r;
+    b.groupR = r0;
+    b.baseR = r0;
+    // Реальные радиусы детей (не avg) — точнее под collide
+    const childRadii = group.nodes
+      .slice(1, 25)
+      .map((idx) =>
+        bubbleRadiusFromVisits({
+          visitCount: nodesList[idx]?.visitCount || 1,
+        })
+      );
+    const r1 =
+      childRadii.length > 0
+        ? clusterRadiusFromChildRadii({ childRadii, r0 })
+        : expandedHostRadius(r0, Math.min(group.nodes.length - 1, 24));
     const now =
       typeof performance !== "undefined" ? performance.now() : Date.now();
     inflate = {
@@ -329,10 +405,13 @@
       r0,
       r1,
       t0: now,
+      dur: durationMs,
       raf: 0,
       autoCommit,
     };
     pinBubbleAt(b, b.x ?? 0, b.y ?? 0, world.width, world.height);
+    // Сразу подогреть collide — соседи начинают уступать место
+    reheat(world, 0.55);
     ensureInflateLoop();
   }
 
@@ -345,9 +424,13 @@
       inflate.raf = 0;
       const now =
         typeof performance !== "undefined" ? performance.now() : Date.now();
-      const u = Math.min(1, (now - inflate.t0) / GROUP_INFLATE_MS);
+      const dur = inflate.dur || GROUP_INFLATE_MS;
+      const u = Math.min(1, (now - inflate.t0) / dur);
+      // Рост r → forceCollide читает живой radius и толкает соседей
       inflate.node.r = inflateRadius(inflate.r0, inflate.r1, u);
       inflateTick += 1;
+      // Не каждый кадр: иначе alpha не падает и поле «кипит»
+      if (world && inflateTick % 3 === 0) reheat(world, 0.28);
       if (u >= 1) {
         inflate.node.r = inflate.r1;
         if (inflate.autoCommit) {
@@ -356,7 +439,7 @@
           commitExpandPop(node);
           return;
         }
-        // Ждём longhover commit — радиус уже на максимуме
+        // Ждём longhover commit — радиус уже на максимуме, место раздвинуто
         return;
       }
       inflate.raf = requestAnimationFrame(loop);
@@ -390,9 +473,8 @@
       }
       inflate.node.r = inflate.r1;
       const node = inflate.node;
-      const r0 = inflate.r0;
       inflate = null;
-      commitExpandPop(node, r0);
+      commitExpandPop(node);
       return;
     }
     // Не было inflate — полный цикл 3с + pop
@@ -409,34 +491,166 @@
     onInflateStart(b, true);
   }
 
-  function commitExpandPop(b: BubbleNode, r0?: number) {
-    if (!world || poppingId) return;
-    const baseR = r0 ?? b.r / GROUP_INFLATE_SCALE;
-    poppingId = b.id;
-    inflateTick += 1;
+  /** Spawn детей → пауза → pop + shrink родителя к linkR (вес своей ссылки). */
+  function commitExpandPop(b: BubbleNode) {
+    if (!world || poppingId || collapsingId) return;
+    const group = bookmarkList.get(b.host);
+    if (group && group.nodes.length > 1 && !isHostExpanded(world, b.host)) {
+      // 1) Дети раньше лопания (под родителем — expandHost)
+      expandHost({
+        world,
+        host: b.host,
+        childIndexes: group.nodes.slice(1),
+        nodesList,
+        maxChildren: 24,
+      });
+      expandedHosts[b.host] = true;
+      expandedHosts = { ...expandedHosts };
+      refreshVisible();
+    }
     if (expandTimer) clearTimeout(expandTimer);
+    // 2) Через LEAD_MS — лопание и сжатие к весу своей ссылки
     expandTimer = setTimeout(() => {
       expandTimer = null;
       if (!world) return;
-      const group = bookmarkList.get(b.host);
-      if (group && group.nodes.length > 1) {
-        expandHost({
-          world,
-          host: b.host,
-          childIndexes: group.nodes.slice(1),
-          nodesList,
-          maxChildren: 24,
+      const rExpanded = b.r;
+      // linkR = primary visitCount, не сумма группы
+      const rLink =
+        b.linkR ??
+        bubbleRadiusFromVisits({
+          visitCount: nodesList[b.nodeIndex]?.visitCount || 1,
         });
-        expandedHosts[b.host] = true;
-        expandedHosts = { ...expandedHosts };
-      }
-      b.r = baseR;
-      unpinBubble(b);
-      poppingId = null;
+      b.linkR = rLink;
+      poppingId = b.id;
       inflateTick += 1;
-      reheat(world, 0.45);
+      startShrinkToWeight(b, rExpanded, rLink);
+      expandTimer = setTimeout(() => {
+        expandTimer = null;
+        if (!world) return;
+        b.r = rLink;
+        unpinBubble(b);
+        poppingId = null;
+        inflateTick += 1;
+        // Стянуть детей/соседей в дыру после inflate
+        stopCraterFill?.();
+        stopCraterFill = startCraterFill({ world, parent: b });
+        refreshVisible();
+      }, GROUP_POP_MS);
+    }, GROUP_SPAWN_LEAD_MS);
+  }
+
+  /** Во время pop родитель уменьшается до размера по весу. */
+  function startShrinkToWeight(b: BubbleNode, r0: number, r1: number) {
+    if (shrinkRaf && typeof cancelAnimationFrame !== "undefined") {
+      cancelAnimationFrame(shrinkRaf);
+    }
+    if (typeof requestAnimationFrame === "undefined") {
+      b.r = r1;
+      return;
+    }
+    const t0 =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+    const loop = () => {
+      shrinkRaf = 0;
+      const now =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
+      const u = Math.min(1, (now - t0) / GROUP_POP_MS);
+      shrinkHostFrame({ parent: b, r0, r1, u });
+      inflateTick += 1;
+      // Пока r падает — links/collide подтягивают кольцо
+      if (world && inflateTick % 2 === 0) reheat(world, 0.55);
+      if (u < 1) {
+        shrinkRaf = requestAnimationFrame(loop);
+      }
+    };
+    shrinkRaf = requestAnimationFrame(loop);
+  }
+
+  /** Fold: рост → втягивание → pop детей → groupR. */
+  function commitCollapseAbsorb(b: BubbleNode) {
+    if (!world || collapsingId || poppingId) return;
+    // Кратер-fill мешает absorb — снимаем
+    stopCraterFill?.();
+    stopCraterFill = null;
+    const children = listHostChildren(world, b.host);
+    if (!children.length) {
+      collapseHost(world, b.host);
+      expandedHosts[b.host] = false;
+      expandedHosts = { ...expandedHosts };
       refreshVisible();
-    }, GROUP_POP_MS);
+      return;
+    }
+    collapsingId = b.id;
+    // Текущий r — linkR (разложенный покой); цель роста — cluster
+    const r0 = b.r;
+    const groupR = b.groupR ?? b.baseR ?? r0;
+    b.groupR = groupR;
+    const childRadii = children.map((c) => c.baseR ?? c.r);
+    const r1 = clusterRadiusFromChildRadii({ childRadii, r0: groupR });
+    // Снапшот стартовых позиций детей для стабильного lerp
+    const starts = children.map((c) => ({
+      node: c,
+      x: c.x ?? 0,
+      y: c.y ?? 0,
+      r: c.baseR ?? c.r,
+    }));
+    pinBubbleAt(b, b.x ?? 0, b.y ?? 0, world.width, world.height);
+    for (const c of children) {
+      pinBubbleAt(c, c.x ?? 0, c.y ?? 0, world.width, world.height);
+    }
+    if (absorbRaf && typeof cancelAnimationFrame !== "undefined") {
+      cancelAnimationFrame(absorbRaf);
+    }
+    const t0 =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+    const loop = () => {
+      absorbRaf = 0;
+      if (!world) return;
+      const now =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
+      const u = Math.min(1, (now - t0) / GROUP_ABSORB_MS);
+      absorbChildrenFrame({ parent: b, starts, r0, r1, u });
+      for (const s of starts) {
+        pinBubbleAt(s.node, s.node.x ?? 0, s.node.y ?? 0, world.width, world.height);
+      }
+      pinBubbleAt(b, b.x ?? 0, b.y ?? 0, world.width, world.height);
+      inflateTick += 1;
+      if (u < 1) {
+        absorbRaf = requestAnimationFrame(loop);
+        return;
+      }
+      // Финал absorb: лопание детей, затем collapse → groupR
+      const nextPop: Record<string, boolean> = {};
+      for (const c of children) nextPop[c.id] = true;
+      poppingChildIds = nextPop;
+      inflateTick += 1;
+      if (expandTimer) clearTimeout(expandTimer);
+      expandTimer = setTimeout(() => {
+        expandTimer = null;
+        if (!world) return;
+        for (const c of children) unpinBubble(c);
+        collapseHost(world, b.host);
+        b.r = groupR;
+        b.baseR = groupR;
+        unpinBubble(b);
+        poppingChildIds = {};
+        collapsingId = null;
+        expandedHosts[b.host] = false;
+        expandedHosts = { ...expandedHosts };
+        reheat(world, 0.5);
+        inflateTick += 1;
+        refreshVisible();
+      }, GROUP_POP_MS);
+    };
+    if (typeof requestAnimationFrame === "undefined") {
+      collapseHost(world, b.host);
+      collapsingId = null;
+      expandedHosts[b.host] = false;
+      expandedHosts = { ...expandedHosts };
+      refreshVisible();
+      return;
+    }
+    absorbRaf = requestAnimationFrame(loop);
   }
 
   function fieldPointFromClient(clientX: number, clientY: number): {
@@ -476,13 +690,14 @@
     const dy = e.clientY - dragStartY;
     if (!dragMoved && Math.hypot(dx, dy) >= DRAG_THRESHOLD_PX) {
       dragMoved = true;
-      // Заморозить физику: без reheat — остальные шары стоят
-      world.simulation.alpha(0).stop();
+      // Как drag-collisions: alphaTarget(0.3) — соседи отпружинивают от fx/fy
+      beginDragCollisions(world);
     }
     if (!dragMoved) return;
     const pt = fieldPointFromClient(e.clientX, e.clientY);
     pinBubbleAt(dragBubble, pt.x, pt.y, world.width, world.height);
-    // Только тянутый пузырь: не трогаем глобальный frame
+    // Тик поля — остальные шары тоже двигаются (collide)
+    frame += 1;
     dragTick += 1;
     e.preventDefault();
   }
@@ -491,8 +706,9 @@
     if (!dragBubble) return;
     if (world) {
       unpinBubble(dragBubble);
-      // Лёгкий reheat только после отпускания
-      reheat(world, 0.25);
+      // alphaTarget(0) — симуляция остывает, collide дорешает
+      endDragCollisions(world);
+      reheat(world, 0.3);
     }
     detachDragListeners();
     dragBubble = null;
@@ -513,6 +729,8 @@
     dragStartX = e.clientX;
     dragStartY = e.clientY;
     dragMoved = false;
+    // Сразу fx/fy — collide видит pinned субъект (как drag-collisions subject)
+    pinBubbleAt(b, b.x ?? 0, b.y ?? 0, world.width, world.height);
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
     attachDragListeners();
   }
@@ -555,6 +773,14 @@
       cancelAnimationFrame(inflate.raf);
     }
     if (expandTimer) clearTimeout(expandTimer);
+    if (shrinkRaf && typeof cancelAnimationFrame !== "undefined") {
+      cancelAnimationFrame(shrinkRaf);
+    }
+    if (absorbRaf && typeof cancelAnimationFrame !== "undefined") {
+      cancelAnimationFrame(absorbRaf);
+    }
+    stopCraterFill?.();
+    stopCraterFill = null;
     resizeObs?.disconnect();
     resizeObs = null;
     stopWorld(world);
@@ -576,10 +802,16 @@
       bubble={b}
       frame={frame}
       dragTick={dragBubble?.id === b.id ? dragTick : 0}
-      inflateTick={inflate?.id === b.id || poppingId === b.id ? inflateTick : 0}
+      inflateTick={inflate?.id === b.id ||
+      poppingId === b.id ||
+      collapsingId === b.id ||
+      !!poppingChildIds[b.id] ||
+      (collapsingId != null && b.parentId === collapsingId)
+        ? inflateTick
+        : 0}
       dragging={dragBubble?.id === b.id}
       inflating={inflate?.id === b.id}
-      popping={poppingId === b.id}
+      popping={poppingId === b.id || !!poppingChildIds[b.id]}
       enterAnim={enterAnimById[b.id] || "initial"}
       groupable={b.kind === "host" && (bookmarkList.get(b.host)?.nodes.length || 0) > 1}
       expanded={!!expandedHosts[b.host] && b.kind === "host"}

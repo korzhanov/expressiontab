@@ -31,6 +31,39 @@ describe("bubble-physics", () => {
     expect(bubbles.length).toBeLessThanOrEqual(BUBBLE_SIM_CAP);
   });
 
+  it("buildHostBubbles uses uniform grid cell so hosts do not spawn overlapped", () => {
+    const nodesList: BookmarkNode[] = [];
+    const map = new Map<string, HostGroup>();
+    for (let i = 0; i < 20; i++) {
+      nodesList.push({
+        url: `https://h${i}.test/`,
+        title: `H${i}`,
+        visitCount: i % 2 === 0 ? 5 : 500,
+      });
+      map.set(`h${i}.test`, {
+        nodes: [i],
+        hostVisitCount: i % 2 === 0 ? 5 : 500,
+        host: `h${i}.test`,
+      });
+    }
+    const bubbles = buildHostBubbles({
+      bookmarkList: map,
+      nodesList,
+      width: 800,
+      height: 2000,
+    });
+    expect(bubbles.length).toBe(20);
+    // Пара с разным r не ближе суммы радиусов (сетка + jitter ≤5)
+    for (let i = 0; i < bubbles.length; i++) {
+      for (let j = i + 1; j < bubbles.length; j++) {
+        const a = bubbles[i];
+        const b = bubbles[j];
+        const dist = Math.hypot((a.x ?? 0) - (b.x ?? 0), (a.y ?? 0) - (b.y ?? 0));
+        expect(dist + 0.01).toBeGreaterThanOrEqual(a.r + b.r - 12);
+      }
+    }
+  });
+
   it("visibleBubbles culls by scroll window", () => {
     const nodes = [
       { id: "a", y: 100, r: 40 },
@@ -92,12 +125,20 @@ describe("bubble-physics", () => {
     expect(nodes[1].y).toBe(200);
   });
 
-  it("worldHeightForCount grows with sim count not full bookmark map", () => {
+  it("worldHeightForCount uses grid packing not circle area", () => {
+    // 400×800: rows*cell — не меньше сетки; не «короткая полоска»
+    const h = worldHeightForCount(400, 800);
+    const cell = 2 * 52 + 12;
+    const cols = Math.floor(800 / cell);
+    const rows = Math.ceil(400 / cols);
+    expect(h).toBeGreaterThanOrEqual(rows * cell);
     expect(worldHeightForCount(200, 800)).toBeGreaterThan(
       worldHeightForCount(20, 800)
     );
     // 2000 hosts capped — высота как для 400, не раздувается
     expect(worldHeightForCount(2000, 800)).toBe(worldHeightForCount(400, 800));
+    // minHeight поднимает низкие миры (preview)
+    expect(worldHeightForCount(5, 800, { minHeight: 700 })).toBe(700);
   });
 
   it("clientToFieldPoint maps viewport to field without scroll double-count", async () => {
@@ -179,14 +220,191 @@ describe("bubble-physics", () => {
   });
 
   it("inflateRadius grows from r0 to r1", async () => {
-    const { inflateRadius, GROUP_INFLATE_MS, GROUP_POP_MS } = await import(
-      "./bubble-physics"
-    );
+    const {
+      inflateRadius,
+      GROUP_INFLATE_MS,
+      GROUP_POP_MS,
+      GROUP_SPAWN_LEAD_MS,
+      GROUP_ABSORB_MS,
+    } = await import("./bubble-physics");
     expect(GROUP_INFLATE_MS).toBe(3000);
     expect(GROUP_POP_MS).toBe(680);
+    expect(GROUP_SPAWN_LEAD_MS).toBe(140);
+    expect(GROUP_ABSORB_MS).toBe(520);
     expect(inflateRadius(40, 90, 0)).toBe(40);
     expect(inflateRadius(40, 90, 1)).toBe(90);
     expect(inflateRadius(40, 90, 0.5)).toBeGreaterThan(65);
+  });
+
+  it("absorbChildrenFrame pulls children in while parent grows", async () => {
+    const { absorbChildrenFrame } = await import("./bubble-physics");
+    const parent = { id: "host:a", x: 100, y: 100, r: 40 } as any;
+    const child = { id: "c1", x: 200, y: 100, r: 30, vx: 1, vy: 1 } as any;
+    absorbChildrenFrame({
+      parent,
+      starts: [{ node: child, x: 200, y: 100, r: 30 }],
+      r0: 40,
+      r1: 80,
+      u: 1,
+    });
+    expect(parent.r).toBe(80);
+    expect(child.x).toBe(100);
+    expect(child.y).toBe(100);
+    expect(child.r).toBe(2);
+  });
+
+  it("shrinkHostFrame returns parent toward weight radius", async () => {
+    const { shrinkHostFrame } = await import("./bubble-physics");
+    const parent = { r: 90 } as any;
+    shrinkHostFrame({ parent, r0: 90, r1: 40, u: 1 });
+    expect(parent.r).toBe(40);
+  });
+
+  it("expandedHostRadius grows room for children via area", async () => {
+    const { expandedHostRadius, clusterRadiusFromChildRadii } = await import(
+      "./bubble-physics"
+    );
+    expect(expandedHostRadius(40, 4)).toBeGreaterThan(40);
+    expect(expandedHostRadius(40, 12)).toBeGreaterThanOrEqual(
+      expandedHostRadius(40, 4)
+    );
+    // Площадь детей: два r=30 ≈ эквивалентный радиус > 40
+    expect(
+      clusterRadiusFromChildRadii({ childRadii: [30, 30, 30], r0: 40 })
+    ).toBeGreaterThan(40);
+  });
+
+  it("expandHost spawns under parent, sets linkR/groupR, collapse restores groupR", async () => {
+    const {
+      buildHostBubbles,
+      createBubbleWorld,
+      expandHost,
+      collapseHost,
+      isHostExpanded,
+      stopWorld,
+    } = await import("./bubble-physics");
+    const nodesList = [
+      { url: "https://a.test/1", title: "a1", visitCount: 50 },
+      { url: "https://a.test/2", title: "a2", visitCount: 5 },
+      { url: "https://a.test/3", title: "a3", visitCount: 3 },
+    ] as any;
+    const bookmarkList = new Map([
+      [
+        "a.test",
+        {
+          nodes: [0, 1, 2],
+          hostVisitCount: 58,
+          hostLastVisitTime: 1,
+        },
+      ],
+    ]);
+    const hosts = buildHostBubbles({
+      bookmarkList,
+      nodesList,
+      width: 800,
+      height: 600,
+    });
+    const world = createBubbleWorld({ nodes: hosts, width: 800, height: 600 });
+    const parent = world.nodes[0];
+    const rBefore = parent.r;
+    expect(parent.groupR).toBe(rBefore);
+    expect(parent.linkR).toBeLessThan(parent.groupR!);
+    expandHost({
+      world,
+      host: "a.test",
+      childIndexes: [1, 2],
+      nodesList,
+    });
+    expect(isHostExpanded(world, "a.test")).toBe(true);
+    expect(parent.r).toBeGreaterThan(rBefore);
+    expect(parent.baseR).toBe(rBefore);
+    expect(parent.groupR).toBe(rBefore);
+    const kids = world.nodes.filter((n) => n.kind === "child");
+    expect(kids.length).toBe(2);
+    // Spawn под родителем (jitter ≤ 4)
+    for (const k of kids) {
+      expect(Math.abs((k.x ?? 0) - (parent.x ?? 0))).toBeLessThanOrEqual(5);
+      expect(Math.abs((k.y ?? 0) - (parent.y ?? 0))).toBeLessThanOrEqual(5);
+      expect(k.spawnIndex).toBe(0);
+    }
+    collapseHost(world, "a.test");
+    expect(isHostExpanded(world, "a.test")).toBe(false);
+    expect(parent.r).toBe(rBefore);
+    stopWorld(world);
+  });
+
+  it("collide keeps nodes from overlapping after ticks", async () => {
+    const { createBubbleWorld, stopWorld } = await import("./bubble-physics");
+    const nodes = [
+      {
+        id: "a",
+        kind: "host" as const,
+        host: "a",
+        nodeIndex: 0,
+        r: 40,
+        visitCount: 1,
+        title: "a",
+        url: "https://a.test",
+        spawnIndex: 0,
+        x: 200,
+        y: 200,
+      },
+      {
+        id: "b",
+        kind: "host" as const,
+        host: "b",
+        nodeIndex: 1,
+        r: 40,
+        visitCount: 1,
+        title: "b",
+        url: "https://b.test",
+        spawnIndex: 1,
+        x: 210,
+        y: 200,
+      },
+    ];
+    const world = createBubbleWorld({ nodes: nodes as any, width: 800, height: 600 });
+    for (let i = 0; i < 50; i++) world.simulation.tick();
+    const a = world.nodes[0];
+    const b = world.nodes[1];
+    const dist = Math.hypot((a.x ?? 0) - (b.x ?? 0), (a.y ?? 0) - (b.y ?? 0));
+    // drag-collisions: radius = r+1 → минимум ≈ r_i+r_j+2
+    expect(dist).toBeGreaterThanOrEqual(a.r + b.r);
+    stopWorld(world);
+  });
+
+  it("beginDragCollisions sets alphaTarget like d3 drag-collisions", async () => {
+    const {
+      createBubbleWorld,
+      beginDragCollisions,
+      endDragCollisions,
+      stopWorld,
+    } = await import("./bubble-physics");
+    const nodes = [
+      {
+        id: "a",
+        kind: "host" as const,
+        host: "a",
+        nodeIndex: 0,
+        r: 20,
+        visitCount: 1,
+        title: "a",
+        url: "https://a.test",
+        spawnIndex: 0,
+        x: 100,
+        y: 100,
+      },
+    ];
+    const world = createBubbleWorld({
+      nodes: nodes as any,
+      width: 400,
+      height: 400,
+    });
+    beginDragCollisions(world);
+    expect(world.simulation.alphaTarget()).toBe(0.3);
+    endDragCollisions(world);
+    expect(world.simulation.alphaTarget()).toBe(0);
+    stopWorld(world);
   });
 
   it("bounceBubblesAtWorldEdges keeps both left and right edges", () => {
@@ -202,15 +420,114 @@ describe("bubble-physics", () => {
     expect(nodes[1].vx).toBeLessThan(0);
   });
 
-  it("gridSpawnXY spreads indices vertically for tall world", () => {
+  it("gridSpawnXY fills top-down with fixed cell", () => {
     const a = gridSpawnXY({ index: 0, count: 40, width: 800, height: 2400, r: 40 });
     const b = gridSpawnXY({ index: 20, count: 40, width: 800, height: 2400, r: 40 });
     expect(b.y).toBeGreaterThan(a.y);
+    // Первый ряд ближе к верху, не к центру мира
+    expect(a.y).toBeLessThan(200);
   });
 
-  it("focusYForWorld stays in upper band", async () => {
-    const { focusYForWorld } = await import("./bubble-physics");
-    expect(focusYForWorld(900)).toBeLessThan(300);
-    expect(focusYForWorld(560)).toBeGreaterThan(150);
+  it("craterPullStep moves node toward target", async () => {
+    const { craterPullStep } = await import("./bubble-physics");
+    const node = { id: "n", x: 0, y: 0, r: 20 } as any;
+    craterPullStep({ node, targetX: 100, targetY: 0, strength: 10 });
+    expect(node.x).toBeGreaterThan(0);
+    expect(node.x).toBeLessThan(100);
+  });
+
+  it("startCraterFill pulls distant child closer after ticks", async () => {
+    const {
+      createBubbleWorld,
+      startCraterFill,
+      stopWorld,
+      GROUP_CRATER_FILL_MS,
+    } = await import("./bubble-physics");
+    expect(GROUP_CRATER_FILL_MS).toBe(920);
+    const parent = {
+      id: "host:a",
+      kind: "host" as const,
+      host: "a",
+      nodeIndex: 0,
+      r: 40,
+      groupR: 60,
+      visitCount: 1,
+      title: "a",
+      url: "https://a.test",
+      spawnIndex: 0,
+      x: 200,
+      y: 200,
+    };
+    const child = {
+      id: "child:a:1",
+      kind: "child" as const,
+      host: "a",
+      nodeIndex: 1,
+      r: 30,
+      visitCount: 1,
+      title: "c",
+      url: "https://a.test/c",
+      spawnIndex: 0,
+      parentId: "host:a",
+      x: 400,
+      y: 200,
+    };
+    const world = createBubbleWorld({
+      nodes: [parent, child] as any,
+      width: 800,
+      height: 600,
+    });
+    const dist0 = Math.hypot((child.x ?? 0) - 200, (child.y ?? 0) - 200);
+    const stop = startCraterFill({ world, parent: parent as any, durationMs: 500 });
+    world.simulation.alpha(1);
+    for (let i = 0; i < 80; i++) world.simulation.tick();
+    const dist1 = Math.hypot((child.x ?? 0) - (parent.x ?? 0), (child.y ?? 0) - (parent.y ?? 0));
+    expect(dist1).toBeLessThan(dist0);
+    stop();
+    stopWorld(world);
+  });
+
+  it("createBubbleWorld uses forceY toward top of bubble block", async () => {
+    const { createBubbleWorld, focusYForWorld, stopWorld, PACK_GAP } =
+      await import("./bubble-physics");
+    const nodes = [
+      {
+        id: "a",
+        kind: "host" as const,
+        host: "a",
+        nodeIndex: 0,
+        r: 40,
+        visitCount: 1,
+        title: "a",
+        url: "https://a.test",
+        spawnIndex: 0,
+        x: 400,
+        y: 500,
+      },
+    ];
+    const world = createBubbleWorld({
+      nodes: nodes as any,
+      width: 800,
+      height: 900,
+    });
+    expect(world.simulation.force("y")).toBeTruthy();
+    const topY = focusYForWorld(900);
+    expect(topY).toBeGreaterThan(PACK_GAP);
+    expect(topY).toBeLessThan(200);
+    world.simulation.alpha(1);
+    const y0 = world.nodes[0].y ?? 500;
+    for (let i = 0; i < 120; i++) world.simulation.tick();
+    expect(world.nodes[0].y ?? 0).toBeLessThan(y0);
+    stopWorld(world);
+  });
+
+  it("focusYForWorld anchors to top of bubble block not page", async () => {
+    const { focusYForWorld, PACK_GAP } = await import("./bubble-physics");
+    const y = focusYForWorld(900);
+    // Центр первого ряда ≈ pad + cell/2
+    const pad = PACK_GAP + 8;
+    const cell = 2 * 52 + PACK_GAP;
+    expect(y).toBe(pad + cell * 0.5);
+    expect(focusYForWorld(200)).toBeLessThanOrEqual(200 * 0.45 + 1);
   });
 });
