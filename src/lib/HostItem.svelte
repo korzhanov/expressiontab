@@ -170,6 +170,9 @@
     border-width: 1px !important;
     border-color: rgba(255, 255, 255, 0.08) !important;
     margin: 2px 0;
+    // Одна строка: заголовок хоста + кнопка «ещё N» (без переноса)
+    flex-wrap: nowrap;
+    flex-direction: row;
     justify-content: flex-start;
     align-items: center;
     padding: 0 8px 0 0;
@@ -177,10 +180,18 @@
     background-color: rgba(255, 255, 255, 0.03);
     gap: 4px;
   }
-  // В lined родительская строка растягивается, стрелка справа
+  // Заголовок занимает оставшуюся ширину; иначе .tooltip-root.block { width:100% } выталкивает кнопку вниз
   anchorGroup.lined :global(.tooltip-root.block) {
-    flex: 1 1 auto;
+    flex: 1 1 0%;
     min-width: 0;
+    width: auto;
+    max-width: none;
+    overflow: hidden; // ellipsis заголовка, не выталкивает кнопку
+  }
+  // Обёртка groupToggle: слева от заголовка, без сжатия и без переноса
+  anchorGroup.lined :global(.tooltip-root:not(.block)) {
+    flex: 0 0 auto;
+    order: -1;
   }
 
   .groupToggle {
