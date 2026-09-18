@@ -47,4 +47,10 @@ describe("bubble-physics", () => {
       worldHeightForCount(20, 800)
     );
   });
+
+  it("focusYForWorld stays in upper band", async () => {
+    const { focusYForWorld } = await import("./bubble-physics");
+    expect(focusYForWorld(900)).toBeLessThan(300);
+    expect(focusYForWorld(560)).toBeGreaterThan(150);
+  });
 });
