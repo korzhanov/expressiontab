@@ -12,6 +12,7 @@
     expandHost,
     isHostExpanded,
     resizeWorld,
+    clampBubblesToWorld,
     stopWorld,
     visibleBubbles,
     worldHeightForCount,
@@ -59,6 +60,7 @@
   }
 
   function onTick() {
+    if (world) clampBubblesToWorld(world.nodes, world.width, world.height);
     frame += 1;
     if (frame % 2 === 0) refreshVisible();
   }
@@ -156,7 +158,7 @@
     position: relative;
     width: 100%;
     min-height: 560px;
-    overflow: visible;
+    overflow: hidden; /* не пускаем шары на часы / filter bar */
     background: radial-gradient(
       ellipse at 50% 18%,
       rgba(40, 70, 110, 0.35),

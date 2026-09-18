@@ -229,168 +229,172 @@
 />
 
 <filterBar class="text-white">
-  {#if previewMock}
+  <div class="filterRow searchRow">
+    {#if previewMock}
+      <Tooltip.Root
+        content="Нет chrome.history — демо-данные"
+        side="bottom"
+        delayDuration={300}
+      >
+        <span class="previewBanner">Preview · mock data</span>
+      </Tooltip.Root>
+    {/if}
     <Tooltip.Root
-      content="Нет chrome.history — демо-данные"
+      content="Type to filter. Esc clears. Press / to focus."
       side="bottom"
-      delayDuration={300}
+      delayDuration={500}
+      block
     >
-      <span class="previewBanner">Preview · mock data</span>
+      <input
+        class="text-white"
+        type="search"
+        id="search"
+        bind:this={searchInputEl}
+        bind:value={searchTerm}
+        on:keydown={onSearchKeydown}
+        placeholder="Search history & bookmarks"
+        autocomplete="off"
+      />
     </Tooltip.Root>
-  {/if}
-  <Tooltip.Root
-    content="Type to filter. Esc clears. Press / to focus."
-    side="bottom"
-    delayDuration={500}
-    block
-  >
-    <input
-      class="text-white"
-      type="search"
-      id="search"
-      bind:this={searchInputEl}
-      bind:value={searchTerm}
-      on:keydown={onSearchKeydown}
-      placeholder="Search history & bookmarks"
-      autocomplete="off"
-    />
-  </Tooltip.Root>
+  </div>
   <Keydown
     pauseOnInput
     on:Delete={clearSearch}
     on:Escape={clearSearch}
     on:key={onGlobalKey}
   />
-  <Tooltip.Root
-    content={titleVisible ? "Bubble view" : "Lined list view"}
-    side="bottom"
-    delayDuration={350}
-  >
-    <label id="changeView">
-      <input type="checkbox" bind:checked={titleVisible} />
-      <icon>
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="feather feather-stop-circle"
+  <div class="filterRow actionsRow">
+    <Tooltip.Root
+      content={titleVisible ? "Bubble view" : "Lined list view"}
+      side="bottom"
+      delayDuration={350}
+    >
+      <label id="changeView">
+        <input type="checkbox" bind:checked={titleVisible} />
+        <icon>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="feather feather-stop-circle"
+          >
+            {#if titleVisible}
+              <circle
+                cx="12"
+                cy="12"
+                r="10"
+                transition:draw={{
+                  duration: 500,
+                  delay: 0,
+                  easing: cubicOut,
+                }}
+              />
+              <circle
+                cx="12"
+                cy="12"
+                r="2"
+                transition:draw={{
+                  duration: 200,
+                  delay: 200,
+                  easing: cubicOut,
+                }}
+              />
+              <rect
+                x="6"
+                y="6"
+                width="12"
+                height="12"
+                transition:draw={{
+                  duration: 100,
+                  delay: 0,
+                  easing: cubicOut,
+                }}
+              />
+            {:else}
+              <line
+                x1="8"
+                y1="6"
+                x2="21"
+                y2="6"
+                transition:draw={{
+                  duration: 300,
+                  delay: 100,
+                  easing: cubicOut,
+                }}
+              />
+              <line
+                x1="8"
+                y1="12"
+                x2="21"
+                y2="12"
+                transition:draw={{
+                  duration: 300,
+                  delay: 200,
+                  easing: quintOut,
+                }}
+              />
+              <line
+                x1="8"
+                y1="18"
+                x2="21"
+                y2="18"
+                transition:draw={{
+                  duration: 400,
+                  delay: 200,
+                  easing: quintOut,
+                }}
+              />
+              <line x1="3" y1="6" x2="3.01" y2="6" />
+              <line x1="3" y1="12" x2="3.01" y2="12" />
+              <line x1="3" y1="18" x2="3.01" y2="18" />
+            {/if}
+          </svg>
+        </icon>
+      </label>
+    </Tooltip.Root>
+    <div class="stashBtns">
+      <Tooltip.Root
+        content="Сохранить вкладки этого окна в закладки и закрыть"
+        side="bottom"
+        delayDuration={350}
+      >
+        <button
+          type="button"
+          class="stashBtn"
+          disabled={stashBusy}
+          on:click={() => onStashTabs(false)}
         >
-          {#if titleVisible}
-            <circle
-              cx="12"
-              cy="12"
-              r="10"
-              transition:draw={{
-                duration: 500,
-                delay: 0,
-                easing: cubicOut,
-              }}
-            />
-            <circle
-              cx="12"
-              cy="12"
-              r="2"
-              transition:draw={{
-                duration: 200,
-                delay: 200,
-                easing: cubicOut,
-              }}
-            />
-            <rect
-              x="6"
-              y="6"
-              width="12"
-              height="12"
-              transition:draw={{
-                duration: 100,
-                delay: 0,
-                easing: cubicOut,
-              }}
-            />
-          {:else}
-            <line
-              x1="8"
-              y1="6"
-              x2="21"
-              y2="6"
-              transition:draw={{
-                duration: 300,
-                delay: 100,
-                easing: cubicOut,
-              }}
-            />
-            <line
-              x1="8"
-              y1="12"
-              x2="21"
-              y2="12"
-              transition:draw={{
-                duration: 300,
-                delay: 200,
-                easing: quintOut,
-              }}
-            />
-            <line
-              x1="8"
-              y1="18"
-              x2="21"
-              y2="18"
-              transition:draw={{
-                duration: 400,
-                delay: 200,
-                easing: cubicOut,
-              }}
-            />
-            <line x1="3" y1="6" x2="3.01" y2="6" />
-            <line x1="3" y1="12" x2="3.01" y2="12" />
-            <line x1="3" y1="18" x2="3.01" y2="18" />
-          {/if}
-        </svg>
-      </icon>
-    </label>
-  </Tooltip.Root>
-  <div class="stashBtns">
-    <Tooltip.Root
-      content="Сохранить вкладки этого окна в закладки и закрыть"
-      side="bottom"
-      delayDuration={350}
-    >
-      <button
-        type="button"
-        class="stashBtn"
-        disabled={stashBusy}
-        on:click={() => onStashTabs(false)}
+          перенести табы окна
+        </button>
+      </Tooltip.Root>
+      <Tooltip.Root
+        content="Сохранить вкладки всех окон в закладки и закрыть"
+        side="bottom"
+        delayDuration={350}
       >
-        перенести табы окна
-      </button>
-    </Tooltip.Root>
-    <Tooltip.Root
-      content="Сохранить вкладки всех окон в закладки и закрыть"
-      side="bottom"
-      delayDuration={350}
-    >
-      <button
-        type="button"
-        class="stashBtn"
-        disabled={stashBusy}
-        on:click={() => onStashTabs(true)}
-      >
-        перенести все табы
-      </button>
-    </Tooltip.Root>
+        <button
+          type="button"
+          class="stashBtn"
+          disabled={stashBusy}
+          on:click={() => onStashTabs(true)}
+        >
+          перенести все табы
+        </button>
+      </Tooltip.Root>
+    </div>
+    <span class="status">
+      {#if searchTerm}“{searchTerm}” · {/if}
+      {bookmarkListSize} sites
+      · last {searchTerm.length || 1} week{searchTerm.length > 1 ? "s" : ""}
+      {#if stashNote} · {stashNote}{/if}
+    </span>
   </div>
-  <span class="status">
-    {#if searchTerm}“{searchTerm}” · {/if}
-    {bookmarkListSize} sites
-    · last {searchTerm.length || 1} week{searchTerm.length > 1 ? "s" : ""}
-    {#if stashNote} · {stashNote}{/if}
-  </span>
 </filterBar>
 <anchores bind:clientHeight={hh} bind:clientWidth={ww} class:titleVisible>
   {#if titleVisible}
@@ -428,17 +432,19 @@
     background: rgb(20, 20, 20);
     border: 0px;
     border-bottom: 2px solid #b5b5b5;
-    height: 30px;
+    box-sizing: border-box;
+    height: 40px;
     width: 100%;
     text-align: center;
-    font-size: 30px;
-    padding: 10px 0px;
+    font-size: 22px;
+    line-height: 1.2;
+    padding: 4px 0 6px;
   }
-  /* Tooltip-обёртка поиска — на всю ширину filter bar */
-  filterBar :global(.tooltip-root.block) {
+  /* Поиск в своей строке — не width:98%, иначе кнопки уезжают под placeholder */
+  filterBar .searchRow :global(.tooltip-root.block) {
     flex: 1 1 auto;
     min-width: 0;
-    width: 98%;
+    width: auto;
   }
   #search:focus {
     border-bottom: 2px solid #395e9d;
@@ -446,7 +452,7 @@
   }
   #search::placeholder {
     color: #666;
-    font-size: 22px;
+    font-size: 18px;
   }
   #changeView input {
     opacity: 0;
@@ -459,16 +465,26 @@
     background: rgb(20, 20, 20);
     display: flex;
     position: relative;
-    height: 80px;
+    height: auto;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 8px;
+    padding: 10px 32px 12px;
+    opacity: 1;
+    z-index: 10;
+  }
+  filterBar .filterRow {
+    display: flex;
     flex-direction: row;
-    flex-wrap: wrap;
-    align-content: space-around;
-    justify-content: flex-start;
+    flex-wrap: nowrap;
     align-items: center;
     gap: 10px;
-    padding: 0 32px;
-    opacity: 1;
-    z-index: 2;
+    width: 100%;
+    min-width: 0;
+  }
+  filterBar .actionsRow {
+    flex-wrap: wrap;
   }
   filterBar .previewBanner {
     font-size: 11px;
@@ -488,7 +504,7 @@
     flex-shrink: 0;
     gap: 6px;
     position: relative;
-    z-index: 3; /* поверх переполненного placeholder поиска */
+    z-index: 3;
   }
   filterBar .stashBtn {
     background: rgba(255, 255, 255, 0.06);

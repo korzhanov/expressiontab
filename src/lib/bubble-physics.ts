@@ -277,6 +277,22 @@ export function visibleBubbles({
   });
 }
 
+/** Держим пузыри в поле — иначе они закрашивают часы и filter bar. */
+export function clampBubblesToWorld(
+  nodes: BubbleNode[],
+  width: number,
+  height: number
+): void {
+  const pad = 4;
+  for (const n of nodes) {
+    const r = n.r || 40;
+    const x = n.x ?? 0;
+    const y = n.y ?? 0;
+    n.x = Math.max(r + pad, Math.min(width - r - pad, x));
+    n.y = Math.max(r + pad, Math.min(height - r - pad, y));
+  }
+}
+
 export function stopWorld(world: BubbleWorld | null): void {
   world?.simulation.stop();
 }

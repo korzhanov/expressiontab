@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   BUBBLE_SIM_CAP,
   buildHostBubbles,
+  clampBubblesToWorld,
   visibleBubbles,
   worldHeightForCount,
 } from "./bubble-physics";
@@ -40,6 +41,19 @@ describe("bubble-physics", () => {
       pad: 50,
     });
     expect(vis.map((n) => n.id)).toEqual(["a"]);
+  });
+
+  it("clampBubblesToWorld keeps nodes inside the field", () => {
+    const nodes = [
+      { id: "out", x: -80, y: -50, r: 40 },
+      { id: "ok", x: 400, y: 200, r: 40 },
+    ] as any;
+    clampBubblesToWorld(nodes, 800, 560);
+    expect(nodes[0].x).toBeGreaterThanOrEqual(44);
+    expect(nodes[0].y).toBeGreaterThanOrEqual(44);
+    expect(nodes[0].x).toBeLessThanOrEqual(800 - 44);
+    expect(nodes[1].x).toBe(400);
+    expect(nodes[1].y).toBe(200);
   });
 
   it("worldHeightForCount grows with count", () => {
