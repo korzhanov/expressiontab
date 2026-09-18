@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, setContext, onDestroy } from "svelte";
-  import { writable } from "svelte/store";
+  import { writable, get } from "svelte/store";
   import Keydown from "svelte-keydown";
   import { cubicOut, quintOut } from "svelte/easing";
   import { draw } from "svelte/transition";
@@ -16,6 +16,11 @@
   } from "./bookmarks";
   import { isMockChrome } from "./chrome-mock";
   import { stashOpenTabs, type StashChrome } from "./stash-tabs";
+  import {
+    downloadLinksCsv,
+    importLinksFromCsvText,
+    type ImportBookmarksChrome,
+  } from "./links-csv";
   import * as Tooltip from "./components/ui/tooltip";
   import BubbleField from "./BubbleField.svelte";
   import {
@@ -80,7 +85,7 @@
             text: term,
             startTime,
             endTime,
-            maxResults: 1000,
+            maxResults: 2500,
           },
           (results) => {
             resolve(results || []);
@@ -164,6 +169,9 @@
   let stashBusy = false;
   /** Короткий статус после переноса */
   let stashNote = "";
+  /** CSV import: скрытый file input */
+  let csvFileInput: HTMLInputElement;
+  let csvBusy = false;
 
   $: newSearch(searchTerm);
   $: if (titleVisible !== undefined && bookmarkList.size) {
@@ -242,6 +250,64 @@
       stashNote = "Не удалось перенести";
     } finally {
       stashBusy = false;
+    }
+  }
+
+  /** chrome.bookmarks для CSV-импорта (в т.ч. preview mock). */
+  function importChrome(): ImportBookmarksChrome | null {
+    try {
+      if (typeof chrome !== "undefined" && chrome.bookmarks?.create) {
+        return chrome as unknown as ImportBookmarksChrome;
+      }
+    } catch {
+      // нет API
+    }
+    return null;
+  }
+
+  /** Export текущего dial (nodesList) в CSV-файл. */
+  function onExportCsv() {
+    const nodes = get(nodesList) || [];
+    const { rows } = downloadLinksCsv({ nodes });
+    stashNote = rows ? `CSV · ${rows} ссылок` : "CSV · пусто";
+  }
+
+  function onImportCsvClick() {
+    if (csvBusy) return;
+    if (!importChrome()) {
+      stashNote = "Нужен chrome.bookmarks";
+      return;
+    }
+    csvFileInput?.click();
+  }
+
+  async function onCsvFileChange(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    const api = importChrome();
+    if (!api) {
+      stashNote = "Нужен chrome.bookmarks";
+      return;
+    }
+    csvBusy = true;
+    stashNote = "CSV · импорт…";
+    try {
+      const text = await file.text();
+      const { imported, skipped } = await importLinksFromCsvText({
+        text,
+        chromeApi: api,
+      });
+      stashNote = skipped
+        ? `CSV · +${imported}, пропуск ${skipped}`
+        : `CSV · +${imported}`;
+      if (imported) await getBookmarks();
+    } catch (err) {
+      console.error(err);
+      stashNote = "CSV · ошибка импорта";
+    } finally {
+      csvBusy = false;
     }
   }
 
@@ -326,6 +392,42 @@
           перенести все табы
         </button>
       </Tooltip.Root>
+      <Tooltip.Root
+        content="Скачать текущие ссылки dial в CSV"
+        side="bottom"
+        delayDuration={350}
+      >
+        <button
+          type="button"
+          class="stashBtn"
+          disabled={csvBusy}
+          on:click={onExportCsv}
+        >
+          export csv
+        </button>
+      </Tooltip.Root>
+      <Tooltip.Root
+        content="Импорт ссылок из CSV в закладки"
+        side="bottom"
+        delayDuration={350}
+      >
+        <button
+          type="button"
+          class="stashBtn"
+          disabled={csvBusy}
+          on:click={onImportCsvClick}
+        >
+          import csv
+        </button>
+      </Tooltip.Root>
+      <!-- Скрытый input: выбор .csv для импорта -->
+      <input
+        bind:this={csvFileInput}
+        type="file"
+        accept=".csv,text/csv"
+        class="csvFileInput"
+        on:change={onCsvFileChange}
+      />
     </div>
     <span class="status">
       {#if searchTerm}“{searchTerm}” · {/if}
@@ -667,6 +769,9 @@
   filterBar .stashBtn:disabled {
     opacity: 0.45;
     cursor: default;
+  }
+  filterBar .csvFileInput {
+    display: none;
   }
   anchores {
     display: block;

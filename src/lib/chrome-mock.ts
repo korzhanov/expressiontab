@@ -3,6 +3,7 @@ import {
   MOCK_HISTORY,
   MOCK_OPEN_TABS,
   filterByText,
+  filterByVisitTime,
   type MockBookmark,
   type MockOpenTab,
 } from "./chrome-mock-data";
@@ -66,10 +67,17 @@ export function installChromeMockIfNeeded(): boolean {
     },
     history: {
       search(
-        query: { text?: string; maxResults?: number },
+        query: {
+          text?: string;
+          maxResults?: number;
+          startTime?: number;
+          endTime?: number;
+        },
         callback: (results: unknown[]) => void
       ) {
-        const list = filterByText(MOCK_HISTORY, query?.text || "");
+        // Текст + окно дат (как у chrome.history.search)
+        let list = filterByText(MOCK_HISTORY, query?.text || "");
+        list = filterByVisitTime(list, query?.startTime, query?.endTime);
         const max = query?.maxResults || 1000;
         setTimeout(() => callback(list.slice(0, max)), 30);
       },
