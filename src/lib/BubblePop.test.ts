@@ -26,21 +26,22 @@ describe("BubblePop", () => {
     expect(src).toContain("onToggleBookmark");
     expect(src).toContain("onDelete");
     expect(src).toContain('width="22"');
-    expect(src).toContain("multiButton");
+    // Меню только по ПКМ, на портале как тултипы
+    expect(src).toContain("bubbleActions");
+    expect(src).toContain("tooltipPortal");
+    expect(src).toContain("on:contextmenu={openMenu}");
+    expect(src).not.toContain("showMenu()");
+    expect(src).toContain("Tooltip.Root");
   });
 
-  it("bookmark uses white shine and gold star under favicon", () => {
+  it("bookmark bubbles use gold hue, white shine, no star under favicon", () => {
     const src = readFileSync(join(import.meta.dir, "BubbleDot.svelte"), "utf8");
-    // Нет жёлтого блика / hue на весь шар
-    expect(src).not.toContain(".bubbleDot.bookmark .bubbleDot__shine");
-    expect(src).not.toMatch(/\.bubbleDot\.bookmark\s*\{[^}]*--hue:\s*42/);
-    // Золотая звезда под фавиконом закладок
-    expect(src).toContain("bubbleDot__star");
-    expect(src).toContain("starred={localBookmark}");
-    // Контур: прозрачный fill + жёлтая обводка
-    expect(src).toContain("fill: transparent");
-    expect(src).toContain("stroke: #f0c040");
-    expect(src).toContain("width: 44px");
+    // Белый блик остаётся общим
+    expect(src).toContain("rgba(255, 255, 255, 0.65)");
+    // Закладка — золотой --hue, без звезды под фавиконом
+    expect(src).toMatch(/\.bubbleDot\.bookmark\s*\{[^}]*--hue:\s*42/);
+    expect(src).not.toContain("bubbleDot__star");
+    expect(src).not.toContain("starred={localBookmark}");
   });
 
   it("BubbleField spawns children before pop, then shrinks to linkR; fold pops kids", () => {

@@ -41,7 +41,7 @@ export function resetActiveTooltip(): void {
 export function flushTooltipLayer(keep?: HTMLElement | null): void {
   const layer = getTooltipLayer();
   if (!layer) return;
-  for (const child of [...layer.children]) {
+  for (const child of Array.from(layer.children)) {
     if (keep && child === keep) continue;
     child.remove();
   }

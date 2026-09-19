@@ -2,13 +2,21 @@
   /**
    * Один пузырёк в BubbleField — позиция из d3-force, spawn CSS.
    * Groupable: inflate 3с → BubblePop → expand.
-   * ПКМ / hover: Bookmark, Copy, Delete.
+   * Тултипы — hover (портал). Действия Bookmark/Copy/Delete — только ПКМ на портале.
    */
   import Icon, { Star, Trash, Duplicate } from "svelte-hero-icons";
   import { fade } from "svelte/transition";
+  import { onDestroy, onMount } from "svelte";
   import globe from "../assets/Globe.svg";
   import BubblePop from "./BubblePop.svelte";
   import * as Tooltip from "./components/ui/tooltip";
+  import {
+    claimActiveTooltip,
+    clampTooltipPos,
+    placeTooltip,
+    releaseActiveTooltip,
+    tooltipPortal,
+  } from "./components/ui/tooltip/portal";
   import { longhover, GROUP_LONGHOVER_MS } from "./longhover";
   import { favicons } from "./stores";
   import type { BubbleEnterAnim, BubbleNode } from "./bubble-physics";
@@ -84,16 +92,33 @@
     .join(" · ");
 
   let multiButton = false;
-  let closeTimer: ReturnType<typeof setTimeout> | null = null;
   let localBookmark = !!bubble.isBookmark;
   $: localBookmark = !!bubble.isBookmark;
+  /** Якорь для позиции меню (тот же <a>, что и тултип) */
+  let anchorEl: HTMLAnchorElement | null = null;
+  let menuPos = { top: 0, left: 0 };
+  let claimToken = 0;
 
-  function showMenu() {
-    if (closeTimer) {
-      clearTimeout(closeTimer);
-      closeTimer = null;
-    }
-    multiButton = true;
+  function syncMenuPos(menuEl?: HTMLElement) {
+    if (!anchorEl || typeof window === "undefined") return;
+    let next = placeTooltip(anchorEl, "top", 10);
+    const size = menuEl
+      ? { width: menuEl.offsetWidth, height: menuEl.offsetHeight }
+      : { width: 120, height: 44 };
+    next = clampTooltipPos(
+      next,
+      "top",
+      size,
+      window.innerWidth,
+      window.innerHeight
+    );
+    menuPos = next;
+  }
+
+  function closeMenu() {
+    if (!multiButton) return;
+    multiButton = false;
+    releaseActiveTooltip(claimToken);
   }
 
   function openMenu(e: MouseEvent) {
@@ -104,22 +129,17 @@
       onExpandRequest();
       return;
     }
-    showMenu();
+    if (dragging || popping) return;
+    syncMenuPos();
+    // Закрыть открытый тултип — меню занимает тот же слой
+    claimToken = claimActiveTooltip(closeMenu);
+    multiButton = true;
   }
 
-  function scheduleCloseMenu() {
-    if (closeTimer) clearTimeout(closeTimer);
-    closeTimer = setTimeout(() => {
-      multiButton = false;
-    }, 280);
-  }
-
-  function keepMenuOpen() {
-    if (!multiButton) return;
-    if (closeTimer) {
-      clearTimeout(closeTimer);
-      closeTimer = null;
-    }
+  function onMenuPlaced(node: HTMLElement) {
+    // pointer-events на слое none — включаем на меню
+    node.style.pointerEvents = "auto";
+    syncMenuPos(node);
   }
 
   async function copyToBuffer(e: Event) {
@@ -130,6 +150,7 @@
     } catch (err) {
       console.error(err);
     }
+    closeMenu();
   }
 
   function toggleBookmark(e: Event) {
@@ -142,9 +163,39 @@
   function deleteBubble(e: Event) {
     e.preventDefault();
     e.stopPropagation();
-    multiButton = false;
+    closeMenu();
     onDelete();
   }
+
+  onMount(() => {
+    // Клик снаружи / скролл — закрыть меню действий
+    const onDocDown = (e: Event) => {
+      if (!multiButton) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest?.(".bubbleActions")) return;
+      if (anchorEl && t && anchorEl.contains(t)) return;
+      closeMenu();
+    };
+    const onScrollOrResize = () => {
+      if (multiButton) closeMenu();
+    };
+    const opts: AddEventListenerOptions = { capture: true };
+    document.addEventListener("pointerdown", onDocDown, opts);
+    window.addEventListener("scroll", onScrollOrResize, opts);
+    window.addEventListener("resize", onScrollOrResize);
+    return () => {
+      document.removeEventListener("pointerdown", onDocDown, opts);
+      window.removeEventListener("scroll", onScrollOrResize, opts);
+      window.removeEventListener("resize", onScrollOrResize);
+    };
+  });
+
+  onDestroy(() => {
+    releaseActiveTooltip(claimToken);
+  });
+
+  // Drag / pop — сразу спрятать меню
+  $: if (dragging || popping) closeMenu();
 </script>
 
 <!-- Обёртка двигает физикой; внутренний .bubbleDot — spawn / pop -->
@@ -155,10 +206,8 @@
   class:dragging
   class:inflating
   class:popping
-  class:menuOpen={multiButton}
   role="group"
   style="transform: translate({tx}px, {ty}px); width: {size}px; height: {size}px;"
-  on:mouseleave={scheduleCloseMenu}
 >
   <Tooltip.Root
     content={tooltipText}
@@ -167,6 +216,7 @@
     disabled={dragging || inflating || popping || multiButton}
   >
     <a
+      bind:this={anchorEl}
       class="bubbleDot"
       class:child={bubble.kind === "child"}
       class:host={bubble.kind === "host"}
@@ -188,8 +238,7 @@
         ? GROUP_LONGHOVER_MS
         : 86400000}
       on:mouseenter={() => {
-        showMenu();
-        // expanded тоже: BubbleField решит grow vs unfold
+        // Только inflate — меню только по ПКМ
         if (groupable && !dragging && !popping) onInflateStart();
       }}
       on:mouseleave={() => {
@@ -210,20 +259,8 @@
       {#if groupable}
         <span class="bubbleDot__groupRing" aria-hidden="true"></span>
       {/if}
-      <!-- Закладка: фавикон на золотой звезде -->
-      <span class="bubbleDot__faviconWrap" class:starred={localBookmark}>
-        {#if localBookmark}
-          <svg
-            class="bubbleDot__star"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-            focusable="false"
-          >
-            <path
-              d="M12 2.5l2.9 6.1 6.6.7-4.9 4.5 1.4 6.5L12 16.8 5.9 20.3l1.4-6.5L2.4 9.3l6.6-.7L12 2.5z"
-            />
-          </svg>
-        {/if}
+      <!-- Фавикон по центру; закладка — золотой шар (--hue) -->
+      <span class="bubbleDot__faviconWrap">
         <img
           class="bubbleDot__favicon"
           src={faviconSrc}
@@ -239,49 +276,47 @@
       {/if}
     </a>
   </Tooltip.Root>
-  {#if multiButton && !dragging && !popping}
-    <div
-      class="multiButton"
-      role="toolbar"
-      aria-label="Bubble actions"
-      transition:fade={{ duration: 160 }}
-      on:mouseenter={keepMenuOpen}
-      on:mouseleave={scheduleCloseMenu}
-    >
-      <Tooltip.Root content="Bookmark" side="top" delayDuration={200}>
-        <button
-          class:isBookmark={localBookmark}
-          type="button"
-          aria-label="Bookmark"
-          on:click={toggleBookmark}
-          on:pointerdown|stopPropagation
-        >
-          <Icon src={Star} solid size="18" />
-        </button>
-      </Tooltip.Root>
-      <Tooltip.Root content="Copy url" side="top" delayDuration={200}>
-        <button
-          type="button"
-          aria-label="Copy url"
-          on:click={copyToBuffer}
-          on:pointerdown|stopPropagation
-        >
-          <Icon src={Duplicate} solid size="18" />
-        </button>
-      </Tooltip.Root>
-      <Tooltip.Root content="Delete" side="top" delayDuration={200}>
-        <button
-          type="button"
-          aria-label="Delete"
-          on:click={deleteBubble}
-          on:pointerdown|stopPropagation
-        >
-          <Icon src={Trash} solid size="18" />
-        </button>
-      </Tooltip.Root>
-    </div>
-  {/if}
 </div>
+<!-- Меню на том же fixed-слое, что и тултипы — только ПКМ -->
+{#if multiButton && !dragging && !popping}
+  <div
+    class="bubbleActions"
+    role="toolbar"
+    aria-label="Bubble actions"
+    use:tooltipPortal={onMenuPlaced}
+    style="top: {menuPos.top}px; left: {menuPos.left}px;"
+    transition:fade={{ duration: 120 }}
+  >
+    <button
+      class:isBookmark={localBookmark}
+      type="button"
+      aria-label="Bookmark"
+      title="Bookmark"
+      on:click={toggleBookmark}
+      on:pointerdown|stopPropagation
+    >
+      <Icon src={Star} solid size="18" />
+    </button>
+    <button
+      type="button"
+      aria-label="Copy url"
+      title="Copy url"
+      on:click={copyToBuffer}
+      on:pointerdown|stopPropagation
+    >
+      <Icon src={Duplicate} solid size="18" />
+    </button>
+    <button
+      type="button"
+      aria-label="Delete"
+      title="Delete"
+      on:click={deleteBubble}
+      on:pointerdown|stopPropagation
+    >
+      <Icon src={Trash} solid size="18" />
+    </button>
+  </div>
+{/if}
 
 <style lang="scss">
   .bubbleWrap {
@@ -297,9 +332,6 @@
   }
   .bubbleWrap.host {
     z-index: 3;
-  }
-  .bubbleWrap.menuOpen {
-    z-index: 40;
   }
   .bubbleWrap :global(.tooltip-root) {
     display: block;
@@ -424,11 +456,18 @@
   .bubbleDot.overflow {
     --hue: 320;
   }
+  /* Закладка: золотой шар (вместо звезды под фавиконом) */
+  .bubbleDot.bookmark {
+    --hue: 42;
+  }
   .bubbleDot.bookmark.groupable {
     box-shadow:
       inset 0 -0.15em 0.35em hsla(0, 0%, 0%, 0.25),
-      0 0 0 2px hsl(280, 75%, 58%),
+      0 0 0 2px hsl(42, 85%, 55%),
       0 0.35em 0.75em hsla(0, 0%, 0%, 0.35);
+  }
+  .bubbleDot.bookmark .bubbleDot__groupRing {
+    border-color: hsla(42, 90%, 65%, 0.65);
   }
   .bubbleDot.expanded {
     box-shadow:
@@ -473,25 +512,6 @@
     transform: translate(-50%, -50%);
     pointer-events: none;
   }
-  .bubbleDot__faviconWrap.starred {
-    /* Чуть крупнее звезды вокруг фавикона */
-    width: 44px;
-    height: 44px;
-  }
-  .bubbleDot__star {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
-  }
-  .bubbleDot__star path {
-    /* Контурная звезда: прозрачная заливка, жёлтая обводка */
-    fill: transparent;
-    stroke: #f0c040;
-    stroke-width: 1.4;
-    stroke-linejoin: round;
-  }
   .bubbleDot__favicon {
     position: absolute;
     left: 50%;
@@ -504,12 +524,6 @@
     pointer-events: none;
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
     z-index: 1;
-  }
-  /* На звезде фавикон чуть меньше, без второй тени */
-  .bubbleDot__faviconWrap.starred .bubbleDot__favicon {
-    width: 18px;
-    height: 18px;
-    filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.35));
   }
   .bubbleDot__overflowBadge {
     position: absolute;
@@ -527,19 +541,22 @@
     pointer-events: none;
     z-index: 2;
   }
-  /* Меню действий — дуга над пузырьком */
-  .multiButton {
-    z-index: 1000;
-    position: absolute;
-    top: 0.1rem;
-    left: 50%;
-    border-radius: 100%;
-    width: 6.5rem;
-    height: 6.5rem;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
+  /* Действия на fixed-слое (как tooltip) — над полем с overflow:hidden */
+  .bubbleActions {
+    position: fixed;
+    z-index: 10001;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    border-radius: 999px;
+    background: rgba(250, 250, 250, 0.96);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+    transform: translate(-50%, -100%);
+    pointer-events: auto;
   }
-  .multiButton button {
+  .bubbleActions button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -549,39 +566,22 @@
     margin: 0;
     border: none;
     border-radius: 100%;
-    background: #fff;
-    color: #111;
+    background: transparent;
+    color: #141414;
     line-height: 0;
-    pointer-events: auto;
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-    transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+    transition: background-color 0.15s ease, color 0.15s ease;
   }
-  .multiButton button:hover {
-    background: #111;
+  .bubbleActions button:hover {
+    background: #141414;
     color: #fff;
   }
-  .multiButton button.isBookmark {
+  .bubbleActions button.isBookmark {
     background: #f0c040;
     color: #3a2a00;
   }
-  .multiButton :global(.tooltip-root) {
-    position: absolute;
-    width: auto;
-    height: auto;
-    pointer-events: auto;
-    transform: translate(-50%, -50%);
-  }
-  .multiButton :global(.tooltip-root:nth-child(1)) {
-    left: 22%;
-    top: 28%;
-  }
-  .multiButton :global(.tooltip-root:nth-child(2)) {
-    left: 50%;
-    top: 8%;
-  }
-  .multiButton :global(.tooltip-root:nth-child(3)) {
-    left: 78%;
-    top: 28%;
+  .bubbleActions button.isBookmark:hover {
+    background: #d4a020;
+    color: #fff;
   }
 </style>

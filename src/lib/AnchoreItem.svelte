@@ -205,7 +205,7 @@
               class="copyToBuffer"
               type="button"
               aria-label="Copy url"
-              on:click={(e) => copyToBuffer(e, url)}
+              on:click={(e: MouseEvent) => copyToBuffer(e, url)}
             >
               <Icon src={Duplicate} solid size={actionIconSize} />
             </button>

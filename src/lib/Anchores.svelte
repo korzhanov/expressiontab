@@ -13,6 +13,7 @@
     makeChunks,
     enqueueFavicon,
     type HostGroup,
+    type ChunkRow,
   } from "./bookmarks";
   import { isMockChrome } from "./chrome-mock";
   import { stashOpenTabs, loadOpenTabsForSession, mergeSessionIntoIndex, type StashChrome } from "./stash-tabs";
@@ -71,18 +72,22 @@
     windowHeight: number = 0,
     windowWidth: number = 0;
 
-  // Высота ряда ≈ max(anchorGroup с margin/border, крупные favicon) — без overflow:hidden
-  $: rowEstimate = titleVisible ? 48 : 220;
+  // VirtualScroll slot data — типизируем для HostItems
+  function chunkRowValue(data: unknown): HostGroup[] {
+    return (data as ChunkRow).value;
+  }
 
   const titleVisibleStore = writable(false);
   setContext("titleVisible", titleVisibleStore);
   $: titleVisibleStore.set(titleVisible);
   $: visible = Math.ceil((hh * ww) / 50 / 50) || 200;
 
-  async function getNodes(term: string): Promise<[any[], any[]]> {
+  async function getNodes(
+    term: string
+  ): Promise<[chrome.history.HistoryItem[], chrome.bookmarks.BookmarkTreeNode[]]> {
     const { startTime, endTime } = historySearchBounds(historyRange);
     return Promise.all([
-      new Promise((resolve) => {
+      new Promise<chrome.history.HistoryItem[]>((resolve) => {
         chrome.history.search(
           {
             text: term,
@@ -245,8 +250,8 @@
     try {
       if (
         typeof chrome !== "undefined" &&
-        chrome.tabs?.query &&
-        chrome.bookmarks?.create
+        typeof chrome.tabs?.query === "function" &&
+        typeof chrome.bookmarks?.create === "function"
       ) {
         return chrome as unknown as StashChrome;
       }
@@ -260,24 +265,24 @@
     if (stashBusy) return;
     const api = stashChrome();
     if (!api) {
-      stashNote = "Нужно расширение Chrome";
+      stashNote = "Need Chrome extension";
       return;
     }
-    const scope = allWindows ? "все вкладки" : "вкладки этого окна";
-    if (!confirm(`Сохранить в закладки и закрыть ${scope}?`)) return;
+    const scope = allWindows ? "all tabs" : "tabs in this window";
+    if (!confirm(`Save to bookmarks and close ${scope}?`)) return;
     stashBusy = true;
     stashNote = "";
     try {
       const result = await stashOpenTabs({ allWindows, chromeApi: api });
       if (!result.bookmarked) {
-        stashNote = "Нет вкладок для переноса";
+        stashNote = "No tabs to move";
       } else {
-        stashNote = `Перенесено ${result.bookmarked}`;
+        stashNote = `Moved ${result.bookmarked}`;
         await getBookmarks();
       }
     } catch (err) {
       console.error(err);
-      stashNote = "Не удалось перенести";
+      stashNote = "Failed to move tabs";
     } finally {
       stashBusy = false;
     }
@@ -286,7 +291,10 @@
   /** chrome.bookmarks для CSV-импорта (в т.ч. preview mock). */
   function importChrome(): ImportBookmarksChrome | null {
     try {
-      if (typeof chrome !== "undefined" && chrome.bookmarks?.create) {
+      if (
+        typeof chrome !== "undefined" &&
+        typeof chrome.bookmarks?.create === "function"
+      ) {
         return chrome as unknown as ImportBookmarksChrome;
       }
     } catch {
@@ -299,13 +307,13 @@
   function onExportCsv() {
     const nodes = get(nodesList) || [];
     const { rows } = downloadLinksCsv({ nodes });
-    stashNote = rows ? `CSV · ${rows} ссылок` : "CSV · пусто";
+    stashNote = rows ? `CSV · ${rows} links` : "CSV · empty";
   }
 
   function onImportCsvClick() {
     if (csvBusy) return;
     if (!importChrome()) {
-      stashNote = "Нужен chrome.bookmarks";
+      stashNote = "Need chrome.bookmarks";
       return;
     }
     csvFileInput?.click();
@@ -318,11 +326,11 @@
     if (!file) return;
     const api = importChrome();
     if (!api) {
-      stashNote = "Нужен chrome.bookmarks";
+      stashNote = "Need chrome.bookmarks";
       return;
     }
     csvBusy = true;
-    stashNote = "CSV · импорт…";
+    stashNote = "CSV · import…";
     try {
       const text = await file.text();
       const { imported, skipped } = await importLinksFromCsvText({
@@ -335,7 +343,7 @@
       if (imported) await getBookmarks();
     } catch (err) {
       console.error(err);
-      stashNote = "CSV · ошибка импорта";
+      stashNote = "CSV · import error";
     } finally {
       csvBusy = false;
     }
@@ -361,7 +369,7 @@
   <div class="filterRow searchRow">
     {#if previewMock}
       <Tooltip.Root
-        content="Нет chrome.history — демо-данные"
+        content="No chrome.history — mock data"
         side="bottom"
         delayDuration={300}
       >
@@ -374,7 +382,6 @@
       delayDuration={500}
       block
     > -->
-      <div>
       <input
         class="text-white"
         type="search"
@@ -385,7 +392,6 @@
         placeholder="Search history & bookmarks"
         autocomplete="off"
       />
-      </div>
     <!-- </Tooltip.Root> -->
   </div>
   <Keydown
@@ -397,7 +403,7 @@
   <div class="filterRow actionsRow">
     <div class="stashBtns">
       <Tooltip.Root
-        content="Сохранить вкладки этого окна в закладки и закрыть"
+        content="Save tabs in this window to bookmarks and close"
         side="bottom"
         delayDuration={350}
       >
@@ -407,11 +413,11 @@
           disabled={stashBusy}
           on:click={() => onStashTabs(false)}
         >
-          перенести табы окна
+          move the window tabs
         </button>
       </Tooltip.Root>
       <Tooltip.Root
-        content="Сохранить вкладки всех окон в закладки и закрыть"
+        content="Save tabs in all windows to bookmarks and close"
         side="bottom"
         delayDuration={350}
       >
@@ -421,11 +427,11 @@
           disabled={stashBusy}
           on:click={() => onStashTabs(true)}
         >
-          перенести все табы
+          move all tabs
         </button>
       </Tooltip.Root>
       <Tooltip.Root
-        content="Скачать текущие ссылки dial в CSV"
+        content="Download current dial links to CSV"
         side="bottom"
         delayDuration={350}
       >
@@ -439,7 +445,7 @@
         </button>
       </Tooltip.Root>
       <Tooltip.Root
-        content="Импорт ссылок из CSV в закладки"
+        content="Import links from CSV to bookmarks"
         side="bottom"
         delayDuration={350}
       >
@@ -612,7 +618,7 @@
       bottomThreshold={2}
     >
       <div class="itemWrapper lined" style:min-height="{rowEstimate}px">
-        <HostItems value={data.value} />
+        <HostItems value={chunkRowValue(data)} />
       </div>
     </VirtualScroll>
   {:else if bookmarkList.size && $nodesList.length}

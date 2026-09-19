@@ -12,6 +12,7 @@ import {
   type SimulationNodeDatum,
   type SimulationLinkDatum,
   type ForceLink,
+  type Force,
 } from "d3-force";
 import { BUBBLE_R_MAX, bubbleRadiusFromVisits } from "./bubble-radius";
 import type { BookmarkNode, HostGroup } from "./bookmarks";
@@ -93,7 +94,7 @@ function childId(host: string, nodeIndex: number): string {
  */
 export function gridSpawnXY({
   index,
-  count,
+  count: _count,
   width,
   height,
   r,
@@ -187,7 +188,7 @@ export function buildHostBubbles({
       linkR: d.linkR,
       visitCount: d.groupVisits,
       title: d.n.title || d.host,
-      url: d.n.url,
+      url: d.n.url || "",
       isBookmark: d.n.isBookmark,
       lastVisitTime: d.group.hostLastVisitTime ?? d.n.lastVisitTime,
       spawnIndex: i,
@@ -251,8 +252,8 @@ export function createBubbleWorld({
 }): BubbleWorld {
   const links: BubbleLink[] = [];
   const linkForce = forceLink<BubbleNode, BubbleLink>(links)
-    .id((d) => d.id)
-    .distance((l) => {
+    .id((d: BubbleNode) => d.id)
+    .distance((l: SimulationLinkDatum<BubbleNode>) => {
       const s = l.source as BubbleNode;
       const t = l.target as BubbleNode;
       // Зазор шире — unfold не схлопывается в плотное кольцо
@@ -269,7 +270,7 @@ export function createBubbleWorld({
     .force(
       "collide",
       forceCollide<BubbleNode>()
-        .radius((d) => (d.r || 40) + 1)
+        .radius((d: BubbleNode) => (d.r || 40) + 1)
         .strength(1)
         .iterations(6)
     )
@@ -346,7 +347,7 @@ export function resizeWorld(world: BubbleWorld, width: number, height: number): 
   world.simulation.force(
     "collide",
     forceCollide<BubbleNode>()
-      .radius((d) => (d.r || 40) + 1)
+      .radius((d: BubbleNode) => (d.r || 40) + 1)
       .strength(1)
       .iterations(6)
   );
@@ -443,7 +444,7 @@ export function expandHost({
   const overflowTail = needsOverflow ? pending.slice(directCount) : [];
 
   let ci = 0;
-  direct.forEach((nodeIndex, idx) => {
+  direct.forEach((nodeIndex: number, idx: number) => {
     const n = nodesList[nodeIndex];
     if (!n?.url) return;
     const visitCount = n.visitCount || 1;
@@ -518,7 +519,7 @@ export function expandOverflowNode({
   const existing = new Set(
     world.nodes.filter((n) => n.parentId === parent.id).map((n) => n.nodeIndex)
   );
-  const fresh = pending.filter((i) => !existing.has(i));
+  const fresh = pending.filter((i: number) => !existing.has(i));
   if (!fresh.length) {
     parent.isOverflowGroup = false;
     parent.overflowChildIndexes = [];
@@ -546,7 +547,7 @@ export function expandOverflowNode({
   }
 
   let ci = 0;
-  direct.forEach((nodeIndex, idx) => {
+  direct.forEach((nodeIndex: number, idx: number) => {
     const n = nodesList[nodeIndex];
     if (!n?.url) return;
     const visitCount = n.visitCount || 1;
@@ -700,7 +701,7 @@ export function startCraterFill({
     140
   );
 
-  const force = (alpha: number) => {
+  const force: Force<BubbleNode, undefined> = (alpha: number) => {
     const now =
       typeof performance !== "undefined" ? performance.now() : Date.now();
     const u = Math.min(1, (now - t0) / durationMs);
@@ -726,7 +727,7 @@ export function startCraterFill({
     }
   };
 
-  world.simulation.force("craterFill", force as any);
+  world.simulation.force("craterFill", force);
   // На время fill — чуть плотнее links; без alpha=1 (не разгонять поле)
   world.linkForce.strength(Math.min(0.7, BUBBLE_LINK_STRENGTH + 0.2));
   beginSoftRadiusAdjust(world);

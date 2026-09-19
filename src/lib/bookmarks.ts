@@ -93,8 +93,8 @@ export function makeChunks(
     const group: HostGroup = { ...value, host: hostKey };
     const firstNode = nodesList[group.nodes[0]];
     const itemWidth =
-      group.weightVisitsRadius * 2 ||
-      firstNode?.weightVisitsRadius * 2 ||
+      (group.weightVisitsRadius ?? 0) * 2 ||
+      (firstNode?.weightVisitsRadius ?? 0) * 2 ||
       150;
 
     if (titleVisible) {
@@ -345,10 +345,10 @@ export function enqueueFavicon(
     return Promise.resolve(cached);
   }
 
-  return new Promise((resolve) => {
+  return new Promise<string | undefined>((resolve) => {
     faviconQueue.push({ host, url, resolve });
     pumpFaviconQueue(toDataURL, faviconLocalhost);
-  }).then((data: string | undefined) => {
+  }).then((data) => {
     if (data && typeof localStorage !== "undefined") {
       localStorage.setItem("favicon_" + host, data);
     }
