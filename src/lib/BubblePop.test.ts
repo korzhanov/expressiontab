@@ -20,18 +20,26 @@ describe("BubblePop", () => {
 
   it("BubbleDot shows Bookmark Copy Delete menu and larger favicon", () => {
     const src = readFileSync(join(import.meta.dir, "BubbleDot.svelte"), "utf8");
-    expect(src).toContain('aria-label="Bookmark"');
-    expect(src).toContain('aria-label="Copy url"');
-    expect(src).toContain('aria-label="Delete"');
+    const actions = readFileSync(
+      join(import.meta.dir, "BubbleActions.svelte"),
+      "utf8"
+    );
+    expect(actions).toContain('aria-label="Bookmark"');
+    expect(actions).toContain('aria-label="Copy url"');
+    expect(actions).toContain('aria-label="Delete"');
     expect(src).toContain("onToggleBookmark");
     expect(src).toContain("onDelete");
     expect(src).toContain('width="22"');
     // Меню только по ПКМ, на портале как тултипы
-    expect(src).toContain("bubbleActions");
-    expect(src).toContain("tooltipPortal");
+    expect(src).toContain("BubbleActions");
+    expect(actions).toContain("bubbleActions");
+    expect(actions).toContain("tooltipPortal");
     expect(src).toContain("on:contextmenu={openMenu}");
     expect(src).not.toContain("showMenu()");
-    expect(src).toContain("Tooltip.Root");
+    // Tip: Bubble-политика (не close-on-scroll); не гасим на inflate
+    expect(src).toContain("Tooltip.Bubble");
+    expect(src).toContain("disabled={dragging || popping || multiButton}");
+    expect(src).not.toContain("inflating || popping");
   });
 
   it("bookmark bubbles use gold hue, white shine, no star under favicon", () => {

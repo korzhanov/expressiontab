@@ -78,7 +78,7 @@
       {/if}
     {/each}
   {:else}
-    <Tooltip.Root
+    <Tooltip.List
       content={groupHint}
       side="bottom"
       delayDuration={550}
@@ -103,7 +103,7 @@
           />
         {/if}
         <!-- Явная кнопка раскрытия группы (стандартный button + chevron) -->
-        <Tooltip.Root content={toggleLabel} side="left" delayDuration={250}>
+        <Tooltip.List content={toggleLabel} side="left" delayDuration={250}>
           <button
             type="button"
             class="groupToggle"
@@ -117,9 +117,9 @@
               <span class="groupToggleCount">{otherAnchores.length}</span>
             {/if}
           </button>
-        </Tooltip.Root>
+        </Tooltip.List>
       </anchorGroup>
-    </Tooltip.Root>
+    </Tooltip.List>
     {#if unfold}
       <div
         class="groupChildren"

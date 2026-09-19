@@ -22,6 +22,11 @@
   export let block: boolean = false;
   /** Выключить tooltip (например в lined, где title уже виден) */
   export let disabled: boolean = false;
+  /**
+   * List/VirtualScroll: закрывать на scroll (leave часто не приходит).
+   * Bubble: false — tip живёт до leave; на scroll только sync позиции.
+   */
+  export let closeOnScroll: boolean = true;
 
   let open = false;
   let rootEl: HTMLElement;
@@ -88,27 +93,30 @@
     }, 80);
   }
 
-  function onMove() {
-    if (open) syncPos(popupEl);
+  function onScrollOrResize() {
+    if (!open) return;
+    // List: закрыть. Bubble: подтянуть к триггеру (поле скроллится часто)
+    if (closeOnScroll) forceClose();
+    else syncPos(popupEl);
   }
 
   onMount(() => {
-    // capture — скролл virtual-list / страницы тоже двигает popup
     const opts: AddEventListenerOptions = { capture: true, passive: true };
-    window.addEventListener("scroll", onMove, opts);
-    window.addEventListener("resize", onMove);
+    window.addEventListener("scroll", onScrollOrResize, opts);
+    window.addEventListener("resize", onScrollOrResize);
     return () => {
-      window.removeEventListener("scroll", onMove, opts);
-      window.removeEventListener("resize", onMove);
+      window.removeEventListener("scroll", onScrollOrResize, opts);
+      window.removeEventListener("resize", onScrollOrResize);
     };
   });
 
   onDestroy(() => {
-    clearTimers();
-    // Закрываем claim; ноду снимет action destroy — не flush всего слоя (чужой pill жив)
-    if (open) open = false;
-    releaseActiveTooltip(claimToken);
+    // Unmount ряда VirtualScroll без mouseleave — сразу снять portal
+    forceClose();
   });
+
+  // disabled (lined title) — не оставлять висящий pill
+  $: if (disabled && open) forceClose();
 </script>
 
 <!-- role=group: обёртка триггера; popup уходит в #expressiontab-tooltip-layer -->

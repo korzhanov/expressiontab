@@ -77,6 +77,9 @@
     return (data as ChunkRow).value;
   }
 
+  // Высота ряда ≈ max(anchorGroup с margin/border, крупные favicon) — без overflow:hidden
+  $: rowEstimate = titleVisible ? 48 : 220;
+
   const titleVisibleStore = writable(false);
   setContext("titleVisible", titleVisibleStore);
   $: titleVisibleStore.set(titleVisible);
@@ -376,12 +379,6 @@
         <span class="previewBanner">Preview · mock data</span>
       </Tooltip.Root>
     {/if}
-    <!-- <Tooltip.Root
-      content="Type to filter. Esc clears. Press / to focus."
-      side="bottom"
-      delayDuration={500}
-      block
-    > -->
       <input
         class="text-white"
         type="search"
@@ -392,7 +389,6 @@
         placeholder="Search history & bookmarks"
         autocomplete="off"
       />
-    <!-- </Tooltip.Root> -->
   </div>
   <Keydown
     pauseOnInput

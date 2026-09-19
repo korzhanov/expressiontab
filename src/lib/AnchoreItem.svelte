@@ -2,6 +2,7 @@
   import Icon, { Star, Trash, Duplicate } from "svelte-hero-icons";
   import globe from "../assets/Globe.svg";
   import { fly, fade } from "svelte/transition";
+  import { onDestroy, onMount } from "svelte";
   import { favicons } from "./stores";
   import * as Tooltip from "./components/ui/tooltip";
   import BubblePop from "./BubblePop.svelte";
@@ -42,6 +43,14 @@
       : null) ||
     anchor?.img_data ||
     globe;
+
+  function closeMenu() {
+    if (closeTimer) {
+      clearTimeout(closeTimer);
+      closeTimer = null;
+    }
+    multiButton = false;
+  }
 
   /** Показать меню действий (hover / ПКМ); клик по ссылке не блокируем — pointer-events:none на оверлее */
   function showMenu() {
@@ -91,6 +100,11 @@
     }
   }
 
+  /** Обёртка без type-annot в разметке (Svelte 3 parser) */
+  function onCopyClick(e: Event) {
+    copyToBuffer(e, url);
+  }
+
   async function changeBookmark() {
     if (isBookmark) {
       chrome.bookmarks.remove(String(id));
@@ -117,16 +131,30 @@
     }
     // Сначала лопание пузырька (CodePen-мотив), потом убираем из списка
     popping = true;
-    multiButton = false;
+    closeMenu();
     setTimeout(() => {
       deleted = true;
       popping = false;
     }, 680);
   }
+
+  onMount(() => {
+    // pageMode VirtualScroll: mouseleave при скролле часто не приходит
+    const onScroll = () => {
+      if (multiButton) closeMenu();
+    };
+    const opts: AddEventListenerOptions = { capture: true, passive: true };
+    window.addEventListener("scroll", onScroll, opts);
+    return () => window.removeEventListener("scroll", onScroll, opts);
+  });
+
+  onDestroy(() => {
+    closeMenu();
+  });
 </script>
 
 {#if !deleted && anchor && url && (url.startsWith("http://") || url.startsWith("https://"))}
-  <Tooltip.Root
+  <Tooltip.List
     content={nested ? url : title || host}
     side="bottom"
     delayDuration={450}
@@ -190,7 +218,7 @@
           on:mouseenter={keepMenuOpen}
           on:mouseleave={scheduleCloseMenu}
         >
-          <Tooltip.Root content="Bookmark" side="top" delayDuration={200}>
+          <Tooltip.List content="Bookmark" side="top" delayDuration={200}>
             <button
               class:isBookmark
               type="button"
@@ -199,18 +227,18 @@
             >
               <Icon src={Star} solid size={actionIconSize} />
             </button>
-          </Tooltip.Root>
-          <Tooltip.Root content="Copy url" side="top" delayDuration={200}>
+          </Tooltip.List>
+          <Tooltip.List content="Copy url" side="top" delayDuration={200}>
             <button
               class="copyToBuffer"
               type="button"
               aria-label="Copy url"
-              on:click={(e: MouseEvent) => copyToBuffer(e, url)}
+              on:click={onCopyClick}
             >
               <Icon src={Duplicate} solid size={actionIconSize} />
             </button>
-          </Tooltip.Root>
-          <Tooltip.Root content="Delete" side="top" delayDuration={200}>
+          </Tooltip.List>
+          <Tooltip.List content="Delete" side="top" delayDuration={200}>
             <button
               type="button"
               aria-label="Delete"
@@ -218,11 +246,11 @@
             >
               <Icon src={Trash} solid size={actionIconSize} />
             </button>
-          </Tooltip.Root>
+          </Tooltip.List>
         </div>
       {/if}
     </anchor>
-  </Tooltip.Root>
+  </Tooltip.List>
 {/if}
 
 <style lang="scss">
