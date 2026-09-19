@@ -7,6 +7,46 @@ export type TooltipPos = { top: number; left: number };
 
 const GAP = 6;
 
+/** Закрыть предыдущий открытый tooltip (один на всё приложение). */
+let activeClose: (() => void) | null = null;
+let activeToken = 0;
+
+/**
+ * Заявить активный tooltip: предыдущий закрывается сразу.
+ * Возвращает token для releaseActiveTooltip.
+ */
+export function claimActiveTooltip(close: () => void): number {
+  const prev = activeClose;
+  const token = ++activeToken;
+  activeClose = close;
+  // Сначала новый closer — чтобы prev не обнулил текущего
+  if (prev) prev();
+  return token;
+}
+
+/** Снять claim, если это всё ещё наш token. */
+export function releaseActiveTooltip(token: number): void {
+  if (token === activeToken) {
+    activeClose = null;
+  }
+}
+
+/** Сброс singleton (тесты). */
+export function resetActiveTooltip(): void {
+  activeClose = null;
+  activeToken = 0;
+}
+
+/** Убрать сирот из слоя (после destroy / смены активного). */
+export function flushTooltipLayer(keep?: HTMLElement | null): void {
+  const layer = getTooltipLayer();
+  if (!layer) return;
+  for (const child of Array.from(layer.children)) {
+    if (keep && child === keep) continue;
+    child.remove();
+  }
+}
+
 /** Создать / вернуть fixed-слой на body. */
 export function getTooltipLayer(): HTMLElement | null {
   if (typeof document === "undefined") return null;
@@ -30,7 +70,11 @@ export function tooltipPortal(
   onPlaced?: (node: HTMLElement) => void
 ) {
   const layer = getTooltipLayer();
-  if (layer) layer.appendChild(node);
+  if (layer) {
+    // Один pill: выкидываем чужие ноды перед монтированием
+    flushTooltipLayer(null);
+    layer.appendChild(node);
+  }
   onPlaced?.(node);
   return {
     destroy() {

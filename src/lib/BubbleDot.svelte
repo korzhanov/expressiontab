@@ -1,58 +1,242 @@
 <script lang="ts">
   /**
    * Один пузырёк в BubbleField — позиция из d3-force, spawn CSS.
+   * Groupable: inflate 3с → BubblePop → expand.
+   * Тултипы — hover (портал). Действия Bookmark/Copy/Delete — только ПКМ на портале.
    */
+  import { onDestroy } from "svelte";
+  import globe from "../assets/Globe.svg";
+  import BubbleActions from "./BubbleActions.svelte";
+  import BubblePop from "./BubblePop.svelte";
   import * as Tooltip from "./components/ui/tooltip";
-  import type { BubbleNode } from "./bubble-physics";
+  import {
+    claimActiveTooltip,
+    releaseActiveTooltip,
+  } from "./components/ui/tooltip/portal";
+  import { longhover, GROUP_LONGHOVER_MS } from "./longhover";
+  import { favicons } from "./stores";
+  import type { BubbleEnterAnim, BubbleNode } from "./bubble-physics";
 
   export let bubble: BubbleNode;
   export let expanded: boolean = false;
-  export let expandable: boolean = false;
-  export let onToggleExpand: (b: BubbleNode) => void = () => {};
+  /** Несколько URL на хост — цвет-маркер, expand без «+» */
+  export let groupable: boolean = false;
   /** Кадр physics — пересчёт transform без remount */
   export let frame: number = 0;
+  /** Тик только при drag этого пузыря (остальные не инвалидируем) */
+  export let dragTick: number = 0;
+  /** Тик роста радиуса / лопания */
+  export let inflateTick: number = 0;
+  /** Пузырь сейчас тянут — grab/grabbing + без tooltip delay */
+  export let dragging: boolean = false;
+  /** Идёт изменение радиуса (unfold / hover-grow) */
+  export let inflating: boolean = false;
+  /** Активно лопание BubblePop */
+  export let popping: boolean = false;
+  /** Вход в viewport: initial / rise (скролл вниз) / fall (вверх) */
+  export let enterAnim: BubbleEnterAnim = "initial";
+  /** Сессия вкладок — другой hue */
+  export let session: boolean = false;
+  export let onInflateStart: () => void = () => {};
+  export let onInflateCancel: () => void = () => {};
+  export let onExpandCommit: () => void = () => {};
+  export let onExpandRequest: () => void = () => {};
+  export let onPointerDown: (e: PointerEvent) => void = () => {};
+  export let onLinkClick: (e: MouseEvent) => void = () => {};
+  /** Удалить пузырь из dial после pop */
+  export let onDelete: () => void = () => {};
+  /** Переключить закладку (Star) */
+  export let onToggleBookmark: () => void = () => {};
 
-  $: size = bubble.r * 2;
-  $: delay = Math.min(bubble.spawnIndex, 48) * 0.035;
-  // frame в зависимости — иначе Svelte не видит мутации x/y от d3
-  $: tx = frame >= 0 ? (bubble.x || 0) - bubble.r : 0;
-  $: ty = frame >= 0 ? (bubble.y || 0) - bubble.r : 0;
+  // frame | dragTick | inflateTick — Svelte видит мутации x/y/r
+  $: size =
+    frame + dragTick + inflateTick >= 0 ? bubble.r * 2 : bubble.r * 2;
+  // initial — staggered spawn; rise/fall — короткий stagger у края;
+  // child с spawnIndex 0 (burst из pop) — без задержки, вместе с лопанием
+  $: delay =
+    enterAnim === "initial"
+      ? Math.min(bubble.spawnIndex, 48) * 0.035
+      : Math.min((bubble.spawnIndex % 10) * 0.025, 0.18);
+  $: tx = (bubble.x || 0) - bubble.r;
+  $: ty = (bubble.y || 0) - bubble.r;
+  // зависимость от тиков (иначе tx/ty не обновятся при мутации bubble)
+  $: if (frame + dragTick + inflateTick >= 0) {
+    tx = (bubble.x || 0) - bubble.r;
+    ty = (bubble.y || 0) - bubble.r;
+  }
+
+  $: host = bubble.host;
+  $: faviconSrc =
+    $favicons.get(host) ||
+    (typeof localStorage !== "undefined"
+      ? localStorage.getItem("favicon_" + host)
+      : null) ||
+    globe;
+
+  /** Текст tooltip: title · visits · дата последнего визита */
+  $: visitLine = `${bubble.visitCount} visit${bubble.visitCount === 1 ? "" : "s"}`;
+  $: lastVisitLine =
+    bubble.lastVisitTime != null && bubble.lastVisitTime > 0
+      ? new Date(bubble.lastVisitTime).toLocaleDateString(undefined, {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : "";
+  $: tooltipText = [bubble.title, visitLine, lastVisitLine]
+    .filter(Boolean)
+    .join(" · ");
+
+  let multiButton = false;
+  let localBookmark = !!bubble.isBookmark;
+  $: localBookmark = !!bubble.isBookmark;
+  /** Якорь для BubbleActions / tip (тот же <a>) */
+  let anchorEl: HTMLAnchorElement | null = null;
+  let claimToken = 0;
+
+  function closeMenu() {
+    if (!multiButton) return;
+    multiButton = false;
+    releaseActiveTooltip(claimToken);
+  }
+
+  function openMenu(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    // Shift+ПКМ — expand (как раньше чистый contextmenu)
+    if (e.shiftKey && groupable) {
+      onExpandRequest();
+      return;
+    }
+    if (dragging || popping) return;
+    // Закрыть открытый тултип — меню занимает тот же слой
+    claimToken = claimActiveTooltip(closeMenu);
+    multiButton = true;
+  }
+
+  async function copyToBuffer(e: Event) {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(bubble.url);
+    } catch (err) {
+      console.error(err);
+    }
+    closeMenu();
+  }
+
+  function toggleBookmark(e: Event) {
+    e.preventDefault();
+    e.stopPropagation();
+    localBookmark = !localBookmark;
+    onToggleBookmark();
+  }
+
+  function deleteBubble(e: Event) {
+    e.preventDefault();
+    e.stopPropagation();
+    closeMenu();
+    onDelete();
+  }
+
+  onDestroy(() => {
+    releaseActiveTooltip(claimToken);
+  });
+
+  // Drag / pop — сразу спрятать меню
+  $: if (dragging || popping) closeMenu();
 </script>
 
-<!-- Обёртка двигает физикой; внутренний .bubbleDot — только spawn scale -->
+<!-- Обёртка двигает физикой; внутренний .bubbleDot — spawn / pop -->
 <div
   class="bubbleWrap"
+  class:host={bubble.kind === "host"}
+  class:child={bubble.kind === "child"}
+  class:dragging
+  class:inflating
+  class:popping
+  role="group"
   style="transform: translate({tx}px, {ty}px); width: {size}px; height: {size}px;"
 >
-  <Tooltip.Root content={bubble.title} side="bottom" delayDuration={400}>
+  <!-- Bubble tip: closeOnScroll=false — scroll поля не убивает подсказку -->
+  <Tooltip.Bubble
+    content={tooltipText}
+    side="bottom"
+    delayDuration={400}
+    disabled={dragging || popping || multiButton}
+  >
     <a
+      bind:this={anchorEl}
       class="bubbleDot"
       class:child={bubble.kind === "child"}
       class:host={bubble.kind === "host"}
+      class:groupable
       class:expanded
-      class:bookmark={bubble.isBookmark}
+      class:bookmark={localBookmark}
+      class:session
+      class:overflow={!!bubble.isOverflowGroup}
+      class:dragging
+      class:inflating
+      class:popping
+      class:enter-rise={enterAnim === "rise"}
+      class:enter-fall={enterAnim === "fall"}
       href={bubble.url}
       rel="noopener noreferrer"
+      draggable="false"
       style="animation-delay: {delay}s;"
-      on:contextmenu|preventDefault={() => {
-        if (expandable) onToggleExpand(bubble);
+      use:longhover={groupable && !dragging && !popping
+        ? GROUP_LONGHOVER_MS
+        : 86400000}
+      on:mouseenter={() => {
+        // Только inflate — меню только по ПКМ
+        if (groupable && !dragging && !popping) onInflateStart();
       }}
+      on:mouseleave={() => {
+        if (groupable) onInflateCancel();
+      }}
+      on:longhover|preventDefault={() => {
+        if (groupable && !dragging) onExpandCommit();
+      }}
+      on:contextmenu={openMenu}
+      on:dragstart|preventDefault
+      on:pointerdown={onPointerDown}
+      on:click={onLinkClick}
     >
-      <span class="bubbleDot__shine" />
-      {#if expandable}
-        <button
-          type="button"
-          class="bubbleDot__expand"
-          aria-label={expanded ? "Collapse group" : "Expand group"}
-          aria-expanded={expanded}
-          on:click|preventDefault|stopPropagation={() => onToggleExpand(bubble)}
-        >
-          {expanded ? "−" : "+"}
-        </button>
+      <div class="popLayer" aria-hidden="true">
+        <BubblePop active={popping} />
+      </div>
+      <span class="bubbleDot__shine"></span>
+      {#if groupable}
+        <span class="bubbleDot__groupRing" aria-hidden="true"></span>
+      {/if}
+      <!-- Фавикон по центру; закладка — золотой шар (--hue) -->
+      <span class="bubbleDot__faviconWrap">
+        <img
+          class="bubbleDot__favicon"
+          src={faviconSrc}
+          alt=""
+          width="22"
+          height="22"
+          loading="lazy"
+          draggable="false"
+        />
+      </span>
+      {#if bubble.isOverflowGroup && (bubble.overflowCount || 0) > 0}
+        <span class="bubbleDot__overflowBadge">+{bubble.overflowCount}</span>
       {/if}
     </a>
-  </Tooltip.Root>
+  </Tooltip.Bubble>
 </div>
+<!-- ПКМ-меню — отдельный компонент (политики close ≠ tip) -->
+<BubbleActions
+  open={multiButton && !dragging && !popping}
+  {anchorEl}
+  isBookmark={localBookmark}
+  onBookmark={toggleBookmark}
+  onCopy={copyToBuffer}
+  onDelete={deleteBubble}
+  onRequestClose={closeMenu}
+/>
 
 <style lang="scss">
   .bubbleWrap {
@@ -62,6 +246,13 @@
     will-change: transform;
     pointer-events: none;
   }
+  /* Host выше детей — inflate/hover не перекрывают дети */
+  .bubbleWrap.child {
+    z-index: 1;
+  }
+  .bubbleWrap.host {
+    z-index: 3;
+  }
   .bubbleWrap :global(.tooltip-root) {
     display: block;
     width: 100%;
@@ -69,7 +260,6 @@
     pointer-events: auto;
   }
 
-  /* Появление: мотив cassierossall — scale(0) → 1 */
   @keyframes bubbleSpawn {
     from {
       opacity: 0;
@@ -78,6 +268,30 @@
     to {
       opacity: 0.95;
       transform: scale(1) translateY(0);
+    }
+  }
+
+  /* Скролл вниз: всплытие — позиция из JS (offscreen→target), тут только scale/fade */
+  @keyframes bubbleRise {
+    from {
+      opacity: 0;
+      transform: scale(0.45);
+    }
+    to {
+      opacity: 0.95;
+      transform: scale(1);
+    }
+  }
+
+  /* Скролл вверх: падение — гравитация в timing, позиция из JS */
+  @keyframes bubbleFall {
+    from {
+      opacity: 0;
+      transform: scale(0.55);
+    }
+    to {
+      opacity: 0.95;
+      transform: scale(1);
     }
   }
 
@@ -100,13 +314,80 @@
       inset 0 -0.15em 0.35em hsla(0, 0%, 0%, 0.25),
       0 0.35em 0.75em hsla(0, 0%, 0%, 0.35);
     animation: bubbleSpawn 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
-    cursor: pointer;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+  .bubbleDot.enter-rise {
+    animation-name: bubbleRise;
+    animation-duration: 0.72s;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .bubbleDot.enter-fall {
+    animation-name: bubbleFall;
+    animation-duration: 0.58s;
+    /* ease-in → ощущение гравитации */
+    animation-timing-function: cubic-bezier(0.4, 0.05, 0.7, 1);
+  }
+  .bubbleDot.dragging {
+    cursor: grabbing;
+    filter: brightness(1.1);
+    z-index: 2;
+  }
+  .bubbleWrap.dragging,
+  .bubbleWrap.inflating {
+    z-index: 5;
+  }
+  .bubbleWrap.popping {
+    z-index: 6;
+  }
+  .bubbleDot.inflating {
+    filter: brightness(1.12);
+  }
+  /* Во время лопания прячем контент — виден BubblePop */
+  .bubbleDot.popping {
+    background: transparent;
+    box-shadow: none;
+    animation: none;
+  }
+  .bubbleDot.popping > :not(.popLayer) {
+    visibility: hidden;
+  }
+  .popLayer {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
   }
   .bubbleDot.child {
     --hue: 165;
   }
+  .bubbleDot.groupable {
+    --hue: 280;
+  }
+  /* Сессия вкладок — тёплый teal, отличается от history/group */
+  .bubbleDot.session {
+    --hue: 175;
+  }
+  .bubbleDot.session.groupable {
+    --hue: 175;
+  }
+  .bubbleDot.overflow {
+    --hue: 320;
+  }
+  /* Закладка: золотой шар (вместо звезды под фавиконом) */
   .bubbleDot.bookmark {
     --hue: 42;
+  }
+  .bubbleDot.bookmark.groupable {
+    box-shadow:
+      inset 0 -0.15em 0.35em hsla(0, 0%, 0%, 0.25),
+      0 0 0 2px hsl(42, 85%, 55%),
+      0 0.35em 0.75em hsla(0, 0%, 0%, 0.35);
+  }
+  .bubbleDot.bookmark .bubbleDot__groupRing {
+    border-color: hsla(42, 90%, 65%, 0.65);
   }
   .bubbleDot.expanded {
     box-shadow:
@@ -124,6 +405,7 @@
     width: 55%;
     height: 35%;
     border-radius: 50%;
+    /* Белый блик (не жёлтый) */
     background: radial-gradient(
       circle at top,
       rgba(255, 255, 255, 0.65),
@@ -131,24 +413,52 @@
     );
     pointer-events: none;
   }
-  .bubbleDot__expand {
+  .bubbleDot__groupRing {
     position: absolute;
-    right: 4%;
-    bottom: 4%;
-    width: 1.35rem;
-    height: 1.35rem;
-    border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.35);
-    background: rgba(20, 20, 20, 0.55);
-    color: #fff;
-    font-size: 14px;
-    line-height: 1;
-    padding: 0;
-    cursor: pointer;
-    display: grid;
-    place-items: center;
+    inset: 6%;
+    border-radius: 50%;
+    border: 2px solid hsla(280, 90%, 75%, 0.55);
+    pointer-events: none;
   }
-  .bubbleDot__expand:hover {
-    background: rgba(20, 20, 20, 0.8);
+  .bubbleDot.session .bubbleDot__groupRing {
+    border-color: hsla(175, 90%, 70%, 0.6);
+  }
+  .bubbleDot__faviconWrap {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 28px;
+    height: 28px;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+  .bubbleDot__favicon {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 22px;
+    height: 22px;
+    transform: translate(-50%, -50%);
+    object-fit: contain;
+    border-radius: 3px;
+    pointer-events: none;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+    z-index: 1;
+  }
+  .bubbleDot__overflowBadge {
+    position: absolute;
+    right: 8%;
+    bottom: 10%;
+    min-width: 1.35rem;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: rgba(20, 12, 28, 0.85);
+    color: #f8e8ff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.35rem;
+    text-align: center;
+    pointer-events: none;
+    z-index: 2;
   }
 </style>

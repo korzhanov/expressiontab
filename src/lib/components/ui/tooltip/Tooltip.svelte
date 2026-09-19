@@ -1,10 +1,13 @@
 <script lang="ts">
   // Tooltip в духе shadcn: delay → fade popup на портале (слой над overflow:hidden)
+  // Только один активный: claimActiveTooltip закрывает предыдущий
   import { fade } from "svelte/transition";
   import { onDestroy, onMount } from "svelte";
   import {
+    claimActiveTooltip,
     clampTooltipPos,
     placeTooltip,
+    releaseActiveTooltip,
     tooltipPortal,
     type TooltipSide,
   } from "./portal";
@@ -19,6 +22,11 @@
   export let block: boolean = false;
   /** Выключить tooltip (например в lined, где title уже виден) */
   export let disabled: boolean = false;
+  /**
+   * List/VirtualScroll: закрывать на scroll (leave часто не приходит).
+   * Bubble: false — tip живёт до leave; на scroll только sync позиции.
+   */
+  export let closeOnScroll: boolean = true;
 
   let open = false;
   let rootEl: HTMLElement;
@@ -26,6 +34,8 @@
   let pos = { top: 0, left: 0 };
   let showTimer: ReturnType<typeof setTimeout> | null = null;
   let hideTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Token singleton — чужой claim закрывает нас */
+  let claimToken = 0;
 
   function clearTimers() {
     if (showTimer) clearTimeout(showTimer);
@@ -39,7 +49,13 @@
     let next = placeTooltip(rootEl, side);
     if (popup && typeof window !== "undefined") {
       const r = popup.getBoundingClientRect();
-      next = clampTooltipPos(next, side, { width: r.width, height: r.height }, window.innerWidth, window.innerHeight);
+      next = clampTooltipPos(
+        next,
+        side,
+        { width: r.width, height: r.height },
+        window.innerWidth,
+        window.innerHeight
+      );
     }
     pos = next;
   }
@@ -48,41 +64,59 @@
     syncPos(node);
   }
 
+  /** Закрыть сразу (без delay) — вызывается и из claim другого tooltip. */
+  function forceClose() {
+    clearTimers();
+    if (!open) return;
+    open = false;
+    releaseActiveTooltip(claimToken);
+  }
+
+  function showNow() {
+    if (disabled || !content) return;
+    syncPos();
+    claimToken = claimActiveTooltip(forceClose);
+    open = true;
+  }
+
   function onEnter() {
     if (disabled || !content) return;
     clearTimers();
-    showTimer = setTimeout(() => {
-      syncPos();
-      open = true;
-    }, delayDuration);
+    showTimer = setTimeout(showNow, delayDuration);
   }
 
   function onLeave() {
     clearTimers();
     // Короткая задержка — меньше мерцания при переходе на контент
     hideTimer = setTimeout(() => {
-      open = false;
+      forceClose();
     }, 80);
   }
 
-  function onMove() {
-    if (open) syncPos(popupEl);
+  function onScrollOrResize() {
+    if (!open) return;
+    // List: закрыть. Bubble: подтянуть к триггеру (поле скроллится часто)
+    if (closeOnScroll) forceClose();
+    else syncPos(popupEl);
   }
 
   onMount(() => {
-    // capture — скролл virtual-list / страницы тоже двигает popup
     const opts: AddEventListenerOptions = { capture: true, passive: true };
-    window.addEventListener("scroll", onMove, opts);
-    window.addEventListener("resize", onMove);
+    window.addEventListener("scroll", onScrollOrResize, opts);
+    window.addEventListener("resize", onScrollOrResize);
     return () => {
-      window.removeEventListener("scroll", onMove, opts);
-      window.removeEventListener("resize", onMove);
+      window.removeEventListener("scroll", onScrollOrResize, opts);
+      window.removeEventListener("resize", onScrollOrResize);
     };
   });
 
   onDestroy(() => {
-    clearTimers();
+    // Unmount ряда VirtualScroll без mouseleave — сразу снять portal
+    forceClose();
   });
+
+  // disabled (lined title) — не оставлять висящий pill
+  $: if (disabled && open) forceClose();
 </script>
 
 <!-- role=group: обёртка триггера; popup уходит в #expressiontab-tooltip-layer -->
@@ -110,7 +144,7 @@
     class:right={side === "right"}
     role="tooltip"
     style="top: {pos.top}px; left: {pos.left}px;"
-    transition:fade={{ duration: 120 }}
+    transition:fade={{ duration: 80 }}
   >
     {content}
   </span>

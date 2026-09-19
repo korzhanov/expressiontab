@@ -1,48 +1,33 @@
 {
-    "extends": "@tsconfig/svelte/tsconfig.json",
-    "compilerOptions": {
-        "target": "esnext",
-        "module": "esnext",
-        "importsNotUsedAsValues": "error",
-        "isolatedModules": true,
-        "moduleResolution": "node",
-        "strict": true,
-        "sourceMap": true,
-        "skipLibCheck": true,
-        "resolveJsonModule": true,
-        "esModuleInterop": true,
-        "lib": [
-            "esnext",
-            "dom",
-        ],
-        "types": [
-            "@types/chrome",
-            "vite/client"
-        ],
-        "importHelpers": true,
-        "removeComments": true,
-        "forceConsistentCasingInFileNames": true,
-        "baseUrl": ".",
-        "paths": {
-            "@/*": [
-                "src/*"
-            ],
-        },
-        /**
-         * Typecheck JS in `.svelte` and `.js` files by default.
-         * Disable checkJs if you'd like to use dynamic types in JS.
-         * Note that setting allowJs false does not prevent the use
-         * of JS in `.svelte` files.
-         */
-        "allowJs": true,
-        "checkJs": true
-    },
-    "include": [
-        "src/**/*.d.ts",
-        "src/**/*.ts",
-        "src/**/*.js",
-        "src/*.svelte",
-        "src/**/*.svelte"
-        // "src/newtab/main.js"
-    ]
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    /** node — совместимо с TS 4.6 в package.json (не bundler) */
+    "moduleResolution": "node",
+    "lib": ["ESNext", "DOM"],
+    "strict": true,
+    /** Vite emit'ит сам — tsc только проверяет типы (иначе overwrite main.js) */
+    "noEmit": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "sourceMap": true,
+    "forceConsistentCasingInFileNames": true,
+    "importHelpers": true,
+    "allowJs": true,
+    "checkJs": true,
+    "types": ["chrome", "vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": [
+    "src/**/*.d.ts",
+    "src/**/*.ts",
+    "src/**/*.js",
+    "src/**/*.svelte"
+  ],
+  "exclude": ["node_modules", "builds", "src/**/*.test.ts"]
 }

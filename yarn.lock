@@ -312,6 +312,11 @@
     "@types/filesystem" "*"
     "@types/har-format" "*"
 
+"@types/d3-force@^3.0.10":
+  version "3.0.10"
+  resolved "https://registry.npmjs.org/@types/d3-force/-/d3-force-3.0.10.tgz"
+  integrity sha512-ZYeSaCF3p73RdOKcjj+swRlZfnYpK1EbaDiYICEEp5Q6sUiqFaFQ9qgoshp5CzIyyb/yD09kD9o2zEltCexlgw==
+
 "@types/filesystem@*":
   version "0.0.32"
   resolved "https://registry.npmjs.org/@types/filesystem/-/filesystem-0.0.32.tgz"

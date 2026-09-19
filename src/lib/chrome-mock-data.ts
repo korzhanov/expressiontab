@@ -17,8 +17,143 @@ export type MockBookmark = {
 
 const now = Date.now();
 const day = 86400000;
+/** 12 недель — горизонт bulk-истории для пресета «12 weeks». */
+export const MOCK_HISTORY_WEEKS = 12;
+/** Сколько дополнительных URL поверх curated-списка. */
+export const MOCK_BULK_HISTORY_COUNT = 1800;
 
-export const MOCK_HISTORY: MockHistoryItem[] = [
+/** Реалистичные хосты + пути — разнообразие пузырей в preview. */
+const HOST_POOL = [
+  "github.com",
+  "gitlab.com",
+  "stackoverflow.com",
+  "developer.mozilla.org",
+  "news.ycombinator.com",
+  "reddit.com",
+  "medium.com",
+  "dev.to",
+  "npmjs.com",
+  "crates.io",
+  "bun.sh",
+  "vitejs.dev",
+  "svelte.dev",
+  "typescriptlang.org",
+  "web.dev",
+  "css-tricks.com",
+  "smashingmagazine.com",
+  "figma.com",
+  "notion.so",
+  "linear.app",
+  "vercel.com",
+  "netlify.com",
+  "cloudflare.com",
+  "aws.amazon.com",
+  "console.cloud.google.com",
+  "azure.microsoft.com",
+  "docker.com",
+  "kubernetes.io",
+  "wikipedia.org",
+  "bbc.com",
+  "nytimes.com",
+  "theguardian.com",
+  "youtube.com",
+  "vimeo.com",
+  "spotify.com",
+  "twitch.tv",
+  "twitter.com",
+  "x.com",
+  "linkedin.com",
+  "instagram.com",
+  "facebook.com",
+  "mastodon.social",
+  "producthunt.com",
+  "dribbble.com",
+  "behance.net",
+  "unsplash.com",
+  "pexels.com",
+  "openai.com",
+  "anthropic.com",
+  "huggingface.co",
+];
+
+const PATH_POOL = [
+  "",
+  "/docs",
+  "/blog",
+  "/guide",
+  "/api",
+  "/issues",
+  "/pulls",
+  "/settings",
+  "/search",
+  "/explore",
+  "/pricing",
+  "/about",
+  "/changelog",
+  "/tutorials",
+  "/examples",
+  "/reference",
+  "/faq",
+  "/support",
+  "/download",
+  "/login",
+];
+
+/**
+ * Сгенерировать bulk history: count URL, lastVisitTime равномерно по weeks.
+ * Детерминированно (без Math.random) — стабильные тесты/snapshot.
+ */
+export function buildBulkMockHistory({
+  count = MOCK_BULK_HISTORY_COUNT,
+  weeks = MOCK_HISTORY_WEEKS,
+  nowMs = now,
+  idOffset = 100,
+}: {
+  count?: number;
+  weeks?: number;
+  nowMs?: number;
+  idOffset?: number;
+} = {}): MockHistoryItem[] {
+  const span = weeks * 7 * day;
+  const items: MockHistoryItem[] = [];
+  for (let i = 0; i < count; i++) {
+    // Часть — известные хосты, часть — siteN.example (больше уникальных пузырей)
+    const useSynth = i % 3 === 0;
+    const host = useSynth
+      ? `site${(i % 420) + 1}.example`
+      : HOST_POOL[i % HOST_POOL.length];
+    const path = PATH_POOL[i % PATH_POOL.length];
+    // Равномерно по горизонту weeks + суточный джиттер (детерминированно)
+    const age =
+      Math.floor((i / Math.max(count, 1)) * span) + ((i * 9973) % day);
+    const visitCount = 1 + ((i * 17) % 180);
+    items.push({
+      id: String(idOffset + i),
+      url: `https://${host}${path}${path ? `?i=${i}` : `/page/${i}`}`,
+      title: useSynth
+        ? `Site ${(i % 420) + 1} · ${path || "home"} #${i}`
+        : `${host}${path || "/"} · visit ${i}`,
+      visitCount,
+      lastVisitTime: nowMs - age,
+    });
+  }
+  return items;
+}
+
+/** Фильтр chrome.history.search по startTime/endTime (ms). */
+export function filterByVisitTime(
+  items: MockHistoryItem[],
+  startTime?: number,
+  endTime?: number
+): MockHistoryItem[] {
+  const start = startTime ?? 0;
+  const end = endTime ?? Number.POSITIVE_INFINITY;
+  return items.filter(
+    (i) => i.lastVisitTime >= start && i.lastVisitTime <= end
+  );
+}
+
+export const MOCK_HISTORY_CURATED: MockHistoryItem[] = [
   {
     id: "1",
     url: "https://github.com/korzhanov/expressiontab",
@@ -89,6 +224,17 @@ export const MOCK_HISTORY: MockHistoryItem[] = [
     visitCount: 25,
     lastVisitTime: now - day,
   },
+];
+
+/** Curated + 1800 bulk за 12 недель. */
+export const MOCK_HISTORY: MockHistoryItem[] = [
+  ...MOCK_HISTORY_CURATED,
+  ...buildBulkMockHistory({
+    count: MOCK_BULK_HISTORY_COUNT,
+    weeks: MOCK_HISTORY_WEEKS,
+    nowMs: now,
+    idOffset: 100,
+  }),
 ];
 
 /** Открытые вкладки для preview: окно 1 = current, окно 2 = другое. */

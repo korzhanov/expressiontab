@@ -51,6 +51,19 @@ describe("buildBookmarkIndex", () => {
     expect(maxVisits).toBeGreaterThanOrEqual(1);
     expect(nodesList.some((n) => n.isBookmark)).toBe(true);
   });
+
+  it("keeps max lastVisitTime per host", () => {
+    const t1 = 1000;
+    const t2 = 5000;
+    const { bookmarkList } = buildBookmarkIndex(
+      [
+        { url: "https://a.example/1", visitCount: 1, lastVisitTime: t1 },
+        { url: "https://a.example/2", visitCount: 1, lastVisitTime: t2 },
+      ],
+      []
+    );
+    expect(bookmarkList.get("a.example")?.hostLastVisitTime).toBe(t2);
+  });
 });
 
 describe("makeChunks", () => {

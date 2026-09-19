@@ -12,6 +12,7 @@
   $: anchores = hostItem?.nodes || [];
   $: hostAnchore = $nodesList[anchores[0]] || {};
   $: otherAnchores = anchores[1] ? anchores.slice(1) : [];
+  $: isSessionGroup = !!(hostItem?.isSession || hostAnchore?.isSession);
   $: groupHint = `${otherAnchores.length} more — arrow toggles, hover 3s or right-click`;
   $: toggleLabel = unfold
     ? `Hide ${otherAnchores.length} more links`
@@ -77,7 +78,7 @@
       {/if}
     {/each}
   {:else}
-    <Tooltip.Root
+    <Tooltip.List
       content={groupHint}
       side="bottom"
       delayDuration={550}
@@ -86,6 +87,7 @@
       <anchorGroup
         class="hovicon effect-8"
         class:lined={$titleVisibleStore}
+        class:session={isSessionGroup}
         use:longhover={GROUP_LONGHOVER_MS}
         on:longhover|stopPropagation|preventDefault={openGroup}
         on:contextmenu|stopPropagation|preventDefault={openGroup}
@@ -101,7 +103,7 @@
           />
         {/if}
         <!-- Явная кнопка раскрытия группы (стандартный button + chevron) -->
-        <Tooltip.Root content={toggleLabel} side="left" delayDuration={250}>
+        <Tooltip.List content={toggleLabel} side="left" delayDuration={250}>
           <button
             type="button"
             class="groupToggle"
@@ -115,9 +117,9 @@
               <span class="groupToggleCount">{otherAnchores.length}</span>
             {/if}
           </button>
-        </Tooltip.Root>
+        </Tooltip.List>
       </anchorGroup>
-    </Tooltip.Root>
+    </Tooltip.List>
     {#if unfold}
       <div
         class="groupChildren"
@@ -165,20 +167,20 @@
   anchorGroup.lined {
     width: 100%;
     height: auto;
-    min-height: 44px;
-    border-radius: 10px;
+    min-height: 48px;
+    border-radius: 12px;
     border-width: 1px !important;
-    border-color: rgba(255, 255, 255, 0.08) !important;
-    margin: 2px 0;
+    border-color: rgba(255, 255, 255, 0.09) !important;
+    margin: 4px 0;
     // Одна строка: заголовок хоста + кнопка «ещё N» (без переноса)
     flex-wrap: nowrap;
     flex-direction: row;
     justify-content: flex-start;
     align-items: center;
-    padding: 0 8px 0 0;
+    padding: 2px 10px 2px 2px;
     filter: none;
-    background-color: rgba(255, 255, 255, 0.03);
-    gap: 4px;
+    background-color: rgba(255, 255, 255, 0.04);
+    gap: 6px;
   }
   // Заголовок занимает оставшуюся ширину; иначе .tooltip-root.block { width:100% } выталкивает кнопку вниз
   anchorGroup.lined :global(.tooltip-root.block) {
@@ -246,10 +248,11 @@
     margin-right: 4px;
   }
   .groupToggleCount {
-    font-size: 11px;
-    font-weight: 600;
+    font-size: 12px;
+    font-weight: 650;
     line-height: 1;
-    color: rgba(255, 255, 255, 0.75);
+    color: rgba(255, 255, 255, 0.8);
+    font-variant-numeric: tabular-nums;
   }
   anchorGroup:hover {
     border: 12px solid #1d1d1df2 !important;
@@ -258,15 +261,24 @@
     border-width: 1px !important;
     border-color: rgba(255, 255, 255, 0.14) !important;
   }
+  /* Session tabs — teal accent в lined */
+  anchorGroup.lined.session {
+    border-color: rgba(64, 200, 180, 0.35) !important;
+    background-color: rgba(40, 160, 140, 0.1);
+  }
+  anchorGroup.lined.session:hover {
+    border-color: rgba(64, 200, 180, 0.5) !important;
+    background-color: rgba(40, 160, 140, 0.16);
+  }
 
   // Вложенные ссылки группы в lined — отступ + направляющая слева
   .groupChildren.lined {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    margin: 2px 0 10px 14px;
-    padding: 4px 0 4px 14px;
-    border-left: 2px solid rgba(255, 255, 255, 0.12);
+    gap: 3px;
+    margin: 4px 0 14px 18px;
+    padding: 6px 0 6px 16px;
+    border-left: 2px solid rgba(255, 255, 255, 0.14);
     animation: groupReveal 0.38s cubic-bezier(0.22, 1, 0.36, 1);
   }
   @keyframes groupReveal {
@@ -281,22 +293,24 @@
   }
 
   .showMore {
-    background: transparent;
-    color: #aaa;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 8px;
-    padding: 6px 12px;
-    margin: 4px 0;
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 10px;
+    padding: 8px 14px;
+    margin: 6px 0 2px;
     cursor: pointer;
     font-size: 12px;
+    font-weight: 550;
+    letter-spacing: 0.02em;
     align-self: flex-start;
     transition: background-color 0.25s ease, color 0.25s ease,
       border-color 0.25s ease;
   }
   .showMore:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: #eee;
-    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.09);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.28);
   }
 
   .hovicon {
