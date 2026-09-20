@@ -125,15 +125,15 @@ describe("utils clamp / bgOpacity", () => {
 });
 
 describe("favicon quiet load", () => {
-  it("faviconSourceUrls order: s2 64 → s2 32 → ico → (chrome) → s2", () => {
+  it("faviconSourceUrls order: s2 32 → ico → (chrome) → s2; no sz=64", () => {
     const urls = faviconSourceUrls(
       "https://dead.example/remote-workers?x=1"
     );
     expect(urls[0]).toContain("domain=dead.example");
-    expect(urls[0]).toContain("sz=64");
-    expect(urls[1]).toContain("sz=32");
-    expect(urls[2]).toBe("https://dead.example/favicon.ico");
-    // Chrome API только в расширении; в bun:test его нет
+    expect(urls[0]).toContain("sz=32");
+    expect(urls[1]).toBe("https://dead.example/favicon.ico");
+    // sz=64 не используем — то же пиксельное s2
+    expect(urls.every((u) => !u.includes("sz=64"))).toBe(true);
     const last = urls[urls.length - 1];
     expect(last).toContain("domain=dead.example");
     expect(last).not.toContain("sz=");
@@ -162,12 +162,13 @@ describe("favicon quiet load", () => {
       expect(u).toContain("chrome-extension://testid/_favicon/");
       expect(u).toContain("pageUrl=");
       expect(u).toContain("size=64");
-      // В порядке кандидатов Chrome идёт после /favicon.ico
+      // Порядок: s2 32 → ico → Chrome → s2
       const urls = faviconSourceUrls("https://ex.com/path");
-      expect(urls[2]).toBe("https://ex.com/favicon.ico");
-      expect(urls[3]).toContain("/_favicon/");
-      expect(urls[4]).toContain("domain=ex.com");
-      expect(urls[4]).not.toContain("sz=");
+      expect(urls[0]).toContain("sz=32");
+      expect(urls[1]).toBe("https://ex.com/favicon.ico");
+      expect(urls[2]).toContain("/_favicon/");
+      expect(urls[3]).toContain("domain=ex.com");
+      expect(urls[3]).not.toContain("sz=");
     } finally {
       (globalThis as { chrome?: unknown }).chrome = prev;
     }

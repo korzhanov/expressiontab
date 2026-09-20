@@ -1,16 +1,11 @@
 /**
  * Крупные иконки для фона больших / starred-пузырей.
- * Полный перебор; любая сетевая/parse ошибка → тихо next (catch / null).
- * Chrome DevTools всё равно может показать 404 в Network — это не uncaught.
- *
- * Порядок: Chrome 128 → speculative manifest (host+parent) → HTML →
- * link rel=manifest → apple/og.
+ * Без Chrome _favicon / обычных favicon (пикселятся).
+ * Порядок: speculative manifest → HTML rel=manifest → apple/og/twitter;
+ * SVG допустимы даже без большого sizes.
+ * Ошибки → catch / null (Chrome Network 404 всё равно может писать).
  */
-import {
-  FAVICON_MISS,
-  chromeFaviconUrl,
-  getHostFromUrl,
-} from "./bookmarks";
+import { FAVICON_MISS, getHostFromUrl } from "./bookmarks";
 
 /** Маркер miss в localStorage */
 export const COVER_MISS = "__miss__";
@@ -44,6 +39,30 @@ export function absolutizeUrl(href: string, baseUrl: string): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Cover не берём из пиксельных favicon-сервисов / .ico.
+ * SVG и apple/og/manifest large — ок.
+ */
+export function isCoverWorthyUrl(href: string): boolean {
+  const u = (href || "").toLowerCase();
+  if (!u) return false;
+  // SVG — вектор, на большом пузыре не пикселится
+  if (
+    u.includes(".svg") ||
+    u.includes("image/svg") ||
+    u.includes("format=svg")
+  ) {
+    return true;
+  }
+  // Chrome Favicon API / Google s2 / gstatic — мелкий растр
+  if (u.includes("/_favicon/")) return false;
+  if (u.includes("s2.googleusercontent.com/s2/favicons")) return false;
+  if (u.includes("gstatic.com/favicon")) return false;
+  if (u.includes("favicon.ico")) return false;
+  if (/\/favicon(\?|$)/.test(u)) return false;
+  return true;
 }
 
 /**
@@ -117,6 +136,8 @@ function pushScored(
   const abs = absolutizeUrl(href.trim(), baseUrl);
   if (!abs || seen.has(abs)) return;
   if (!/^https?:/i.test(abs)) return;
+  // Пиксельные favicon в cover не пускаем
+  if (!isCoverWorthyUrl(abs)) return;
   seen.add(abs);
   scored.push({ href: abs, score });
 }
@@ -131,23 +152,33 @@ export function parseManifestIcons(
   const icons = (manifest as { icons?: unknown })?.icons;
   if (!Array.isArray(icons)) return [];
   for (const raw of icons) {
-    const ic = raw as { src?: string; sizes?: string; purpose?: string };
+    const ic = raw as {
+      src?: string;
+      sizes?: string;
+      purpose?: string;
+      type?: string;
+    };
     if (!ic?.src) continue;
     const sizes = ic.sizes || "";
     const dim = Math.max(
       0,
       ...sizes.split(/\s+/).map((s) => parseInt(s, 10) || 0)
     );
-    const effective = dim > 0 ? dim : 192;
-    if (effective < 128 && dim > 0) continue;
+    const isSvg =
+      /\.svg(\?|$)/i.test(ic.src) ||
+      (ic.type || "").toLowerCase().includes("svg");
+    const effective = dim > 0 ? dim : isSvg ? 512 : 192;
+    // Мелкий растр без SVG — skip
+    if (effective < 128 && dim > 0 && !isSvg) continue;
     const purpose = (ic.purpose || "any").toLowerCase();
     const purposeBoost = purpose.includes("monochrome") ? -40 : 0;
+    const svgBoost = isSvg ? 80 : 0;
     pushScored(
       scored,
       seen,
       ic.src,
       baseUrl,
-      300 + Math.min(effective, 512) + purposeBoost
+      300 + Math.min(effective, 512) + purposeBoost + svgBoost
     );
   }
   scored.sort((a, b) => b.score - a.score);
@@ -292,7 +323,8 @@ async function tryIconUrls(
   toDataURL: (url: string) => Promise<string | undefined>,
   limit = 4
 ): Promise<string | undefined> {
-  for (const src of candidates.slice(0, limit)) {
+  const worthy = candidates.filter(isCoverWorthyUrl);
+  for (const src of worthy.slice(0, limit)) {
     if (probeMiss.has(src)) continue;
     try {
       const data = await toDataURL(src);
@@ -310,21 +342,9 @@ async function runCoverJob(
   toDataURL: (url: string) => Promise<string | undefined>
 ): Promise<void> {
   try {
-    // 1) Chrome large favicon
-    const chrome128 = chromeFaviconUrl(job.url, 128);
-    if (chrome128) {
-      try {
-        const data = await toDataURL(chrome128);
-        if (data && data.length > 32) {
-          job.resolve(data);
-          return;
-        }
-      } catch {
-        /* next */
-      }
-    }
+    // Без Chrome _favicon / s2 favicon — только app icons / SVG / og
 
-    // 2) Speculative manifest host + parent (404 → null, без throw)
+    // 1) Speculative manifest host + parent
     for (const mUrl of manifestCandidateUrls(job.url)) {
       const icons = await fetchManifestIconUrls(mUrl);
       if (!icons.length) continue;
@@ -347,7 +367,7 @@ async function runCoverJob(
       return;
     }
 
-    // 3) HTML → link rel=manifest + apple/og
+    // 2) HTML → link rel=manifest + apple/og (не favicon.ico)
     const html = await xhrText(origin, 120_000);
     if (!html) {
       job.resolve(undefined);

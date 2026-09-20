@@ -269,8 +269,8 @@ export function chromeFaviconUrl(
 
 /**
  * Кандидаты favicon по порядку:
- * 1) s2 sz=64 → 2) s2 sz=32 → 3) origin/favicon.ico
- * → Chrome _favicon API → 4) s2 без sz
+ * 1) s2 sz=32 → 2) origin/favicon.ico → 3) Chrome _favicon
+ * → 4) s2 без sz. (sz=64 убран — то же пиксельное s2, без выигрыша)
  */
 export function faviconSourceUrls(pageUrl: string): string[] {
   let u: URL;
@@ -285,22 +285,19 @@ export function faviconSourceUrls(pageUrl: string): string[] {
   const list: string[] = [];
 
   if (!isLocal) {
-    // 1–2: Google s2 по hostname (не полный path)
-    list.push(
-      `https://s2.googleusercontent.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`
-    );
+    // 1: s2 sz=32 (быстрый мелкий; sz=64 тот же растр — не дублируем)
     list.push(
       `https://s2.googleusercontent.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32`
     );
-    // 3: классический /favicon.ico
+    // 2: классический /favicon.ico
     list.push(`${u.origin}/favicon.ico`);
   }
 
-  // После 3: встроенный Chrome Favicon API (кэш браузера)
+  // 3: Chrome Favicon API (кэш браузера)
   const chromeUrl = chromeFaviconUrl(`${u.protocol}//${host}/`, 64);
   if (chromeUrl) list.push(chromeUrl);
 
-  // 4-й: s2 без sz
+  // 4: s2 без sz
   if (!isLocal) {
     list.push(
       `https://s2.googleusercontent.com/s2/favicons?domain=${encodeURIComponent(host)}`

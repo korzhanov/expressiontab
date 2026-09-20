@@ -4,6 +4,7 @@ import {
   MANIFEST_PATHS,
   absolutizeUrl,
   coverOriginHosts,
+  isCoverWorthyUrl,
   manifestCandidateUrls,
   parseCoverIconUrls,
   parseManifestIcons,
@@ -65,20 +66,40 @@ describe("manifest first (quiet probe)", () => {
     );
   });
 
-  it("parseManifestIcons prefers larger sizes", () => {
+  it("parseManifestIcons prefers larger sizes and keeps SVG", () => {
     const urls = parseManifestIcons(
       {
         icons: [
           { src: "/i48.png", sizes: "48x48" },
           { src: "/i512.png", sizes: "512x512" },
           { src: "/i192.png", sizes: "192x192" },
+          { src: "/logo.svg", sizes: "any", type: "image/svg+xml" },
         ],
       },
       "https://ex.com/manifest.json"
     );
-    expect(urls[0]).toBe("https://ex.com/i512.png");
-    expect(urls).toContain("https://ex.com/i192.png");
+    expect(urls[0]).toMatch(/logo\.svg|i512/);
+    expect(urls).toContain("https://ex.com/logo.svg");
+    expect(urls).toContain("https://ex.com/i512.png");
     expect(urls.some((u) => u.includes("i48"))).toBe(false);
+  });
+});
+
+describe("isCoverWorthyUrl", () => {
+  it("rejects favicon services and ico; allows svg and og", () => {
+    expect(isCoverWorthyUrl("https://ex.com/favicon.ico")).toBe(false);
+    expect(
+      isCoverWorthyUrl(
+        "chrome-extension://id/_favicon/?pageUrl=https://ex.com/&size=128"
+      )
+    ).toBe(false);
+    expect(
+      isCoverWorthyUrl(
+        "https://s2.googleusercontent.com/s2/favicons?domain=ex.com&sz=64"
+      )
+    ).toBe(false);
+    expect(isCoverWorthyUrl("https://ex.com/icon.svg")).toBe(true);
+    expect(isCoverWorthyUrl("https://cdn.ex.com/og.png")).toBe(true);
   });
 });
 
