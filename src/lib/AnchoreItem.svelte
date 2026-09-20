@@ -55,8 +55,10 @@
   let multiButton = false;
   let menuFlip = false;
   let deleted = false;
-  /** Идёт анимация лопания перед удалением из DOM */
+  /** Идёт анимация лопания перед удалением из DOM (bubble) */
   let popping = false;
+  /** Lined: slide/fade вместо BubblePop */
+  let listRemoving = false;
   let closeTimer: ReturnType<typeof setTimeout> | null = null;
   let anchorEl: HTMLElement;
 
@@ -148,7 +150,7 @@
   }
 
   async function deleteAnchore() {
-    if (popping || deleted) return;
+    if (popping || listRemoving || deleted) return;
     // Bookmark + history (и дубли закладок по URL) — иначе снова в индексе
     try {
       if (typeof chrome !== "undefined") {
@@ -162,9 +164,18 @@
       console.log(e);
     }
     isBookmark = false;
-    // Сначала лопание пузырька (CodePen-мотив), потом убираем из списка
-    popping = true;
     closeMenu();
+    if (titleVisible) {
+      // Список: уезд вправо + fade (не BubblePop)
+      listRemoving = true;
+      setTimeout(() => {
+        deleted = true;
+        listRemoving = false;
+      }, 280);
+      return;
+    }
+    // Bubble: лопание, потом убираем из DOM
+    popping = true;
     setTimeout(() => {
       deleted = true;
       popping = false;
@@ -204,14 +215,15 @@
       class:nested={nested && titleVisible}
       class:menuFlip
       class:popping
+      class:listRemoving
       on:contextmenu={openMenu}
       on:mouseleave={scheduleCloseMenu}
       on:mouseenter={showMenu}
     >
-      <div class="popLayer" aria-hidden="true">
-        <BubblePop active={popping} />
-      </div>
       {#if !titleVisible}
+        <div class="popLayer" aria-hidden="true">
+          <BubblePop active={popping} />
+        </div>
         <bgcircle
           style="
     transform: translateZ(0) scale({(Math.min(weightVisits, 2) * 0.35 + 1).toFixed(2)});
@@ -223,7 +235,6 @@
       <a
         href={url}
         rel="noopener noreferrer"
-        class:hasMenu={multiButton && titleVisible}
         on:click|stopPropagation
       >
         <anchoricon style:background-image="url('{src}')" />
@@ -352,6 +363,13 @@
     visibility: hidden;
     transition: opacity 0.12s ease;
   }
+  /* Lined delete: сдвиг вправо + fade */
+  anchor.titleVisible.listRemoving {
+    opacity: 0;
+    transform: translateX(28px);
+    pointer-events: none;
+    transition: opacity 0.26s var(--ease-out), transform 0.26s var(--ease-out);
+  }
   .popLayer {
     position: absolute;
     inset: -4px;
@@ -367,7 +385,8 @@
     border-width: 1px;
     border-color: rgba(255, 255, 255, 0.07);
     margin: 0;
-    padding: 6px 8px;
+    /* Справа место под 3 кнопки — title ellipsis не залезает на меню */
+    padding: 6px 6.75rem 6px 8px;
     background-color: rgba(255, 255, 255, 0.035);
     box-sizing: border-box;
     overflow: hidden;
@@ -376,7 +395,7 @@
   anchor.titleVisible.nested {
     background-color: transparent;
     border-color: transparent;
-    padding: 4px 8px 4px 4px;
+    padding: 4px 6.75rem 4px 4px;
     min-height: 32px;
     border-radius: 8px;
   }
@@ -423,7 +442,7 @@
     border-width: 1px !important;
     border-color: rgba(240, 192, 64, 0.35);
     background-color: rgba(240, 192, 64, 0.06);
-    padding: 8px 12px;
+    padding: 6px 6.75rem 6px 8px;
   }
   .multiButton {
     z-index: 1000;
@@ -444,24 +463,33 @@
     right: auto;
     transform: translate(-50%, -50%);
   }
-  // Lined list: кнопки справа в ряд — не перекрывают заголовок и соседей
+  // Lined: кнопки поверх ссылки справа, с градиентной подложкой
   .multiButton.lined {
-    top: 50%;
+    top: 0;
+    bottom: 0;
     left: auto;
-    right: 10px;
+    right: 0;
     width: auto;
     height: auto;
-    border-radius: 0;
-    transform: translateY(-50%);
+    border-radius: 0 10px 10px 0;
+    transform: none;
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
+    padding: 0 8px 0 20px;
+    z-index: 30;
+    background: linear-gradient(
+      90deg,
+      rgba(22, 22, 22, 0) 0%,
+      rgba(22, 22, 22, 0.92) 28%,
+      rgba(22, 22, 22, 0.98) 100%
+    );
   }
   .multiButton.lined.menuFlip {
-    right: 10px;
+    right: 0;
     left: auto;
-    transform: translateY(-50%);
+    transform: none;
   }
   .multiButton button {
     display: inline-flex;
@@ -554,15 +582,14 @@
     max-width: 100%;
     height: auto;
     min-height: 28px;
-    padding-right: 0.5rem;
+    padding-right: 0;
     color: rgba(255, 255, 255, 0.9);
     gap: 2px;
     min-width: 0;
     box-sizing: border-box;
-  }
-  /* Место под кнопки только когда меню открыто — иначе лишний гориз. скролл */
-  anchor.titleVisible a.hasMenu {
-    padding-right: 7rem;
+    /* Ссылка под кнопками — клик по тексту; кнопки выше по z-index */
+    position: relative;
+    z-index: 1;
   }
   anchor a span {
     display: block;
@@ -574,7 +601,7 @@
     display: block;
     min-width: 0;
     width: auto;
-    flex: 1;
+    flex: 1 1 0%;
     opacity: 1;
     overflow: hidden;
     text-overflow: ellipsis;

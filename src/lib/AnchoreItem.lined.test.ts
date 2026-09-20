@@ -16,8 +16,16 @@ describe("AnchoreItem lined title + delete", () => {
     expect(src).toContain("chromeApi: chrome");
   });
 
-  it("lined link reserves menu padding only when open", () => {
-    expect(src).toContain("class:hasMenu={multiButton && titleVisible}");
-    expect(src).toContain("a.hasMenu");
+  it("lined reserves space and overlays action buttons", () => {
+    expect(src).toContain("padding: 6px 6.75rem 6px 8px");
+    expect(src).toContain(".multiButton.lined");
+    expect(src).toContain("linear-gradient");
+  });
+
+  it("lined delete uses listRemoving slide, not BubblePop", () => {
+    expect(src).toContain("listRemoving");
+    expect(src).toContain("titleVisible.listRemoving");
+    // BubblePop только вне lined
+    expect(src).toMatch(/\{#if !titleVisible\}[\s\S]*BubblePop/);
   });
 });
