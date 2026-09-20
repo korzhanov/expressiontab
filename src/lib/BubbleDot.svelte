@@ -24,6 +24,7 @@
   import { ensureIconsForAnchor } from "./icon-ensure";
   import { covers, favicons, tipImages } from "./stores";
   import type { BubbleEnterAnim, BubbleNode } from "./bubble-physics";
+  import { buildAnchorTooltip } from "./age-format";
 
   export let bubble: BubbleNode;
   export let expanded: boolean = false;
@@ -103,19 +104,17 @@
     });
   }
 
-  /** Текст tooltip: title · visits · дата последнего визита */
-  $: visitLine = `${bubble.visitCount} visit${bubble.visitCount === 1 ? "" : "s"}`;
-  $: lastVisitLine =
-    bubble.lastVisitTime != null && bubble.lastVisitTime > 0
-      ? new Date(bubble.lastVisitTime).toLocaleDateString(undefined, {
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-        })
-      : "";
-  $: tooltipText = [bubble.title, visitLine, lastVisitLine]
-    .filter(Boolean)
-    .join(" · ");
+  /** Текст tooltip: title · visits · last visit / added / open duration */
+  $: tipMeta = buildAnchorTooltip({
+    title: bubble.title,
+    visitCount: bubble.visitCount,
+    lastVisitTime: bubble.lastVisitTime,
+    dateAdded: bubble.dateAdded,
+    isBookmark: localBookmark,
+    isSession: session || !!bubble.isSession,
+    openedAt: bubble.openedAt ?? bubble.lastVisitTime,
+  });
+  $: tooltipText = tipMeta.text;
 
   /** Якорь для BubbleActions / tip (тот же <a>) */
   let anchorEl: HTMLAnchorElement | null = null;
@@ -202,6 +201,7 @@
       class:expanded
       class:bookmark={localBookmark}
       class:session
+      class:aged={tipMeta.aged}
       class:overflow={!!bubble.isOverflowGroup}
       class:has-cover={showCoverBg}
       class:dragging
@@ -414,6 +414,13 @@
   }
   .bubbleDot.session.groupable {
     --hue: 175;
+  }
+  /* Давно: визит / закладка / долго открыта — приглушённое кольцо */
+  .bubbleDot.aged {
+    box-shadow:
+      inset 0 -0.15em 0.35em hsla(0, 0%, 0%, 0.35),
+      0 0 0 2px hsla(35, 40%, 55%, 0.55),
+      0 0.35em 0.75em hsla(0, 0%, 0%, 0.35);
   }
   .bubbleDot.overflow {
     --hue: 320;

@@ -51,6 +51,10 @@ export type BubbleNode = SimulationNodeDatum & {
   isSession?: boolean;
   /** Число вкладок в session-группе (центр шара вместо favicon) */
   tabCount?: number;
+  /** chrome.bookmarks.dateAdded */
+  dateAdded?: number;
+  /** Session: момент появления в dial */
+  openedAt?: number;
 };
 
 /** Зазор между ячейками сетки (разграничение ≈ gap/2). */
@@ -200,6 +204,8 @@ export function buildHostBubbles({
         d.group.isSession || d.n.isSession
           ? d.group.nodes.length
           : undefined,
+      dateAdded: d.n.dateAdded,
+      openedAt: d.n.openedAt ?? (d.n.isSession ? d.n.lastVisitTime : undefined),
       x,
       y,
       vx: 0,
@@ -476,6 +482,9 @@ export function expandHost({
       url: n.url,
       isBookmark: n.isBookmark,
       lastVisitTime: n.lastVisitTime as number | undefined,
+      dateAdded: n.dateAdded,
+      openedAt: n.openedAt,
+      isSession: n.isSession,
       parentId: parent.id,
       spawnIndex: spawnIndexBase + ci,
       x: px + jx,
@@ -577,6 +586,9 @@ export function expandOverflowNode({
       url: n.url,
       isBookmark: n.isBookmark,
       lastVisitTime: n.lastVisitTime as number | undefined,
+      dateAdded: n.dateAdded,
+      openedAt: n.openedAt,
+      isSession: n.isSession,
       parentId: parent.id,
       spawnIndex: spawnIndexBase + ci,
       x: px + jx,

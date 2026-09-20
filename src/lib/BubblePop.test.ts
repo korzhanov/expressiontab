@@ -59,6 +59,9 @@ describe("BubblePop", () => {
     // Session host: число вкладок вместо favicon
     expect(src).toContain("bubbleDot__tabCount");
     expect(src).toContain("showSessionCount");
+    // Age tooltip + aged ring
+    expect(src).toContain("buildAnchorTooltip");
+    expect(src).toContain("class:aged={tipMeta.aged}");
     // Cover только при реальной крупной иконке — не подставляем favicon
     expect(src).toContain("coverBgUrl = coverSrc");
     expect(src).toContain("image={tipImageSrc}");

@@ -70,6 +70,16 @@ describe("buildBookmarkIndex", () => {
     );
     expect(bookmarkList.get("a.example")?.hostLastVisitTime).toBe(t2);
   });
+
+  it("preserves dateAdded on bookmark nodes", () => {
+    const added = 1_600_000_000_000;
+    const { nodesList } = buildBookmarkIndex(
+      [],
+      [{ url: "https://bm.example/", title: "star", dateAdded: added }]
+    );
+    const bm = nodesList.find((n) => n.isBookmark);
+    expect(bm?.dateAdded).toBe(added);
+  });
 });
 
 describe("makeChunks", () => {

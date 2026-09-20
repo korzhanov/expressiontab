@@ -260,6 +260,8 @@ export function buildOpenTabsSession({
       title: (tab.title || host).trim() || host,
       visitCount: 8,
       lastVisitTime: now,
+      // Session: момент появления в dial (для «Open for»)
+      openedAt: now,
       host,
       isSession: true,
       id: `tab:${tab.id}`,
@@ -273,6 +275,7 @@ export function buildOpenTabsSession({
     title: `Open tabs · ${primary} · ${nodes.length}`,
     host: SESSION_HOST_KEY,
     hostVisitCount: nodes.length * 8,
+    openedAt: now,
   };
   const group: HostGroup = {
     nodes: nodes.map((_, i) => i),

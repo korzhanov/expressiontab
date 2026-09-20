@@ -8,6 +8,7 @@
   import { ensureIconsForAnchor } from "./icon-ensure";
   import * as Tooltip from "./components/ui/tooltip";
   import BubblePop from "./BubblePop.svelte";
+  import { buildAnchorTooltip } from "./age-format";
 
   export let anchor: any = {};
   export let unfold: boolean | null = null;
@@ -23,6 +24,17 @@
   $: visitCount = anchor?.visitCount || 1;
   $: hostVisitCount = anchor?.hostVisitCount || 0;
   $: host = anchor?.host || "localhost";
+  // Тултип: last visit / added / open duration
+  $: tipMeta = buildAnchorTooltip({
+    title: nested ? url : title || host,
+    visitCount: unfold ? visitCount : hostVisitCount || visitCount,
+    lastVisitTime: anchor?.lastVisitTime,
+    dateAdded: anchor?.dateAdded,
+    isBookmark,
+    isSession: !!anchor?.isSession,
+    openedAt: anchor?.openedAt ?? anchor?.lastVisitTime,
+  });
+  $: tipContent = tipMeta.text || title || host || url;
   // В lined кнопки чуть меньше ряда; в bubble — крупнее
   $: actionIconSize = titleVisible ? "16" : "22";
   $: weightVisits = Math.log10(
@@ -162,7 +174,7 @@
 
 {#if !deleted && anchor && url && (url.startsWith("http://") || url.startsWith("https://"))}
   <Tooltip.List
-    content={nested ? url : title || host}
+    content={tipContent}
     side="bottom"
     delayDuration={450}
     block={titleVisible}
@@ -172,6 +184,7 @@
       bind:this={anchorEl}
       style:margin={titleVisible ? "2px 0" : `${Math.min(weightVisits, 2) * 8 + 8}px`}
       class:isBookmark
+      class:aged={tipMeta.aged}
       class:invisible={!childrenInvisible}
       class:titleVisible
       class:nested={nested && titleVisible}
@@ -371,6 +384,14 @@
     border-color: #353535;
     border-style: solid;
     padding: 3px;
+  }
+  /* Давно не заходили / старая закладка */
+  anchor.aged:not(.titleVisible) {
+    box-shadow: 0 0 0 2px hsla(35, 40%, 55%, 0.55);
+  }
+  anchor.aged.titleVisible {
+    outline: 1px dashed hsla(35, 45%, 50%, 0.7);
+    outline-offset: 1px;
   }
   anchor.titleVisible.isBookmark {
     border-width: 1px !important;

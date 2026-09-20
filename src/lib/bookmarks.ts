@@ -25,6 +25,10 @@ export type BookmarkNode = {
   visitCount?: number;
   /** chrome.history lastVisitTime (ms) */
   lastVisitTime?: number;
+  /** chrome.bookmarks.dateAdded (ms) — только закладки */
+  dateAdded?: number;
+  /** Session: когда вкладка попала в dial (ms) */
+  openedAt?: number;
   hostVisitCount?: number;
   weightVisits?: number;
   weightVisitsRadius?: number;
@@ -139,6 +143,7 @@ export function buildBookmarkIndex(
   const nodesList: BookmarkNode[] = [];
   let maxVisits = 1;
 
+  // Закладки: isBookmark; dateAdded уже на BookmarkNode из chrome.bookmarks
   const all: BookmarkNode[] = [
     ...historyItems,
     ...bookmarkItems.map((b) => ({ ...b, isBookmark: true })),
