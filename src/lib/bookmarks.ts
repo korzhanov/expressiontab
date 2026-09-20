@@ -1,4 +1,5 @@
 import { ignoreUrl } from "./utils";
+import { scheduleIdle } from "./idle-schedule";
 
 export type HostGroup = {
   nodes: number[];
@@ -227,7 +228,8 @@ type FaviconJob = {
 
 const faviconQueue: FaviconJob[] = [];
 let faviconActive = 0;
-const FAVICON_CONCURRENCY = 3;
+/** 1 — не душить new-tab сетью/decode; дальше через idle */
+const FAVICON_CONCURRENCY = 1;
 /** Маркер «хост мёртв / нет иконки» — не долбить сеть снова */
 export const FAVICON_MISS = "__miss__";
 /** Prefixed localStorage: host → favicon_${host}; page → favicon_page_${pageKey} */
@@ -409,15 +411,22 @@ function pumpFaviconQueue(
   toDataURL: (url: string) => Promise<string | undefined>,
   faviconLocalhost: string | undefined
 ) {
-  while (faviconActive < FAVICON_CONCURRENCY && faviconQueue.length > 0) {
+  if (faviconActive >= FAVICON_CONCURRENCY || faviconQueue.length === 0) {
+    return;
+  }
+  // Следующий job — в idle, чтобы physics/UI не лагали
+  scheduleIdle(() => {
+    if (faviconActive >= FAVICON_CONCURRENCY || faviconQueue.length === 0) {
+      return;
+    }
     const job = faviconQueue.shift();
-    if (!job) break;
+    if (!job) return;
     faviconActive++;
     runFaviconJob(job, toDataURL, faviconLocalhost).finally(() => {
       faviconActive--;
       pumpFaviconQueue(toDataURL, faviconLocalhost);
     });
-  }
+  });
 }
 
 /** Запомнить miss, чтобы не ретраить мёртвый host. */
@@ -454,7 +463,8 @@ export function enqueueFavicon(
   if (pending) return pending;
 
   const promise = new Promise<string | undefined>((resolve) => {
-    faviconQueue.push({
+    // Видимый запрос — в голову очереди
+    faviconQueue.unshift({
       cacheKey: host,
       url,
       pageSpecific: false,
@@ -496,7 +506,7 @@ export function enqueuePageFavicon(
   if (pending) return pending;
 
   const promise = new Promise<string | undefined>((resolve) => {
-    faviconQueue.push({
+    faviconQueue.unshift({
       cacheKey: pageKey,
       url,
       pageSpecific: true,

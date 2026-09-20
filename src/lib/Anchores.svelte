@@ -6,19 +6,15 @@
   import { draw } from "svelte/transition";
   import VirtualScroll from "svelte-virtual-scroll-list";
   import HostItems from "./HostItems.svelte";
-  import { filteredListSliced, nodesList, favicons, covers, tipImages } from "./stores";
+  import { filteredListSliced, nodesList } from "./stores";
   import { toDataURL } from "./utils";
   import {
     buildBookmarkIndex,
     makeChunks,
-    enqueueFavicon,
-    enqueuePageFavicon,
-    faviconPageKey,
-    wantsPageFavicon,
     type HostGroup,
     type ChunkRow,
   } from "./bookmarks";
-  import { enqueueCover, shouldLoadCover } from "./cover-icons";
+  import { configureIconLoader, resetIconEnsure } from "./icon-ensure";
   import { clearUnfoldedHosts } from "./unfold-limit";
   import { isMockChrome } from "./chrome-mock";
   import { stashOpenTabs, loadOpenTabsForSession, mergeSessionIntoIndex, type StashChrome } from "./stash-tabs";
@@ -47,6 +43,10 @@
 
   let searchTerm: string = localStorage.searchTerm || "";
   let favicon_localhost = localStorage.favicon_localhost;
+  // Уже есть кэш — сразу отдать в ensure
+  if (favicon_localhost) {
+    configureIconLoader({ faviconLocalhost: favicon_localhost });
+  }
   /** Диапазон history.search — пресеты + custom from–to */
   let historyRange: HistoryRangeState = loadHistoryRangeFromStorage();
   let rangePopoverOpen = false;
@@ -65,6 +65,7 @@
         localStorage.setItem("favicon_localhost", favicon_localhost);
       }
     }
+    configureIconLoader({ faviconLocalhost: favicon_localhost });
   })();
 
   let bookmarkList: Map<string, HostGroup> = new Map(),
@@ -167,65 +168,14 @@
 
     bookmarkList = built.bookmarkList;
     nodesList.set(built.nodesList);
-    // Новая выдача — сбросить lined unfold LRU
+    // Новая выдача — сбросить lined unfold LRU и asked-иконки
     clearUnfoldedHosts();
+    resetIconEnsure();
+    // deps для ленивого ensure из BubbleDot / AnchoreItem
+    configureIconLoader({ faviconLocalhost: favicon_localhost });
     localStorage.maxVisits = built.maxVisits + "";
 
-    // Favicon + cover (крупные/starred) только в расширении
-    if (!previewMock) {
-      for (const [host, group] of bookmarkList) {
-        const node = built.nodesList[group.nodes[0]];
-        if (!node?.url) continue;
-        // Общая иконка домена/субдомена
-        enqueueFavicon(node.url, toDataURL, favicon_localhost).then((data) => {
-          if (data) {
-            favicons.update((map) => {
-              map.set(host, data);
-              return map;
-            });
-          }
-        });
-        // Page-level: Docs sheet ≠ doc, Notion page — свой favicon
-        for (const idx of group.nodes) {
-          const n = built.nodesList[idx];
-          if (!n?.url || !wantsPageFavicon(n.url)) continue;
-          const pageKey = faviconPageKey(n.url);
-          if (!pageKey) continue;
-          enqueuePageFavicon(n.url, toDataURL, favicon_localhost).then(
-            (data) => {
-              if (!data) return;
-              favicons.update((map) => {
-                map.set(pageKey, data);
-                return map;
-              });
-            }
-          );
-        }
-        // Cover в фоне: только крупные пузыри и закладки
-        if (
-          shouldLoadCover({
-            radius: group.weightVisitsRadius ?? 40,
-            isBookmark: !!node.isBookmark,
-          })
-        ) {
-          enqueueCover(node.url, toDataURL).then((result) => {
-            if (result.cover) {
-              covers.update((map) => {
-                map.set(host, result.cover!);
-                return map;
-              });
-            }
-            // twitter:image — только tip, не фон шара
-            if (result.tip) {
-              tipImages.update((map) => {
-                map.set(host, result.tip!);
-                return map;
-              });
-            }
-          });
-        }
-      }
-    }
+    // Иконки/cover — НЕ blast на все хосты: ensureIconsForAnchor у видимых
 
     await rebuildChunks();
     loader = false;

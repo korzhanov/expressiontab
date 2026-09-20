@@ -7,6 +7,7 @@
  * Ошибки → catch / null (Chrome Network 404 всё равно может писать).
  */
 import { FAVICON_MISS, getHostFromUrl } from "./bookmarks";
+import { scheduleIdle } from "./idle-schedule";
 
 /** Маркер miss в localStorage */
 export const COVER_MISS = "__miss__";
@@ -34,7 +35,8 @@ type CoverJob = {
 
 const queue: CoverJob[] = [];
 let active = 0;
-const CONCURRENCY = 2;
+/** 1 + idle: HTML/manifest parse тяжёлый для main thread */
+const CONCURRENCY = 1;
 const inflight = new Map<string, Promise<CoverLoadResult>>();
 /** Session: URL уже 404 / пустой — не долбить снова */
 const probeMiss = new Set<string>();
@@ -457,15 +459,17 @@ async function runCoverJob(
 }
 
 function pump(toDataURL: (url: string) => Promise<string | undefined>) {
-  while (active < CONCURRENCY && queue.length > 0) {
+  if (active >= CONCURRENCY || queue.length === 0) return;
+  scheduleIdle(() => {
+    if (active >= CONCURRENCY || queue.length === 0) return;
     const job = queue.shift();
-    if (!job) break;
+    if (!job) return;
     active++;
     runCoverJob(job, toDataURL).finally(() => {
       active--;
       pump(toDataURL);
     });
-  }
+  });
 }
 
 /** Фоновая очередь cover (+ twitter tip) для крупных / starred хостов. */
@@ -520,7 +524,7 @@ export function enqueueCover(
   if (pending) return pending;
 
   const promise = new Promise<CoverLoadResult>((resolve) => {
-    queue.push({ host, url, resolve });
+    queue.unshift({ host, url, resolve });
     pump(toDataURL);
   }).then((data) => {
     inflight.delete(host);

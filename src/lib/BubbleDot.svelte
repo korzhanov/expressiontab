@@ -21,6 +21,7 @@
     resolveCoverSrc,
     resolveTipImageSrc,
   } from "./cover-icons";
+  import { ensureIconsForAnchor } from "./icon-ensure";
   import { covers, favicons, tipImages } from "./stores";
   import type { BubbleEnterAnim, BubbleNode } from "./bubble-physics";
 
@@ -84,6 +85,15 @@
   $: tipImageSrc = resolveTipImageSrc(host, $tipImages, $covers, "");
   $: showCoverBg = !!coverSrc && (size >= COVER_MIN_SIZE || localBookmark);
   $: coverBgUrl = coverSrc;
+
+  // Лениво: только этот видимый пузырь (idle-очередь)
+  $: if (bubble.url) {
+    ensureIconsForAnchor({
+      url: bubble.url,
+      radius: bubble.r,
+      isBookmark: localBookmark,
+    });
+  }
 
   /** Текст tooltip: title · visits · дата последнего визита */
   $: visitLine = `${bubble.visitCount} visit${bubble.visitCount === 1 ? "" : "s"}`;

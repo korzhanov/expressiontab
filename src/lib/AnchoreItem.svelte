@@ -5,6 +5,7 @@
   import { onDestroy, onMount } from "svelte";
   import { favicons } from "./stores";
   import { resolveFaviconSrc } from "./bookmarks";
+  import { ensureIconsForAnchor } from "./icon-ensure";
   import * as Tooltip from "./components/ui/tooltip";
   import BubblePop from "./BubblePop.svelte";
 
@@ -39,6 +40,15 @@
 
   // miss/нет кэша → page → host → img_data/Globe
   $: src = resolveFaviconSrc(host, $favicons, anchor?.img_data || globe, url);
+
+  // Лениво: ряд VirtualScroll виден → поставить в idle-очередь
+  $: if (url) {
+    ensureIconsForAnchor({
+      url,
+      radius: (weightVisitsRadius || 50) / 2,
+      isBookmark,
+    });
+  }
 
   function closeMenu() {
     if (closeTimer) {
