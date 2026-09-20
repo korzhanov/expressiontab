@@ -77,17 +77,25 @@
   let multiButton = false;
   let localBookmark = !!bubble.isBookmark;
   $: localBookmark = !!bubble.isBookmark;
+  // Session host: число вкладок вместо favicon/globe
+  $: sessionTabCount =
+    session && bubble.kind === "host" && (bubble.tabCount || 0) > 0
+      ? bubble.tabCount!
+      : 0;
+  $: showSessionCount = sessionTabCount > 0;
   // miss → Globe; page → host → globe (Docs/Notion свой favicon)
   $: faviconSrc = resolveFaviconSrc(host, $favicons, globe, bubble.url);
   // Cover только из meta/apple-touch — без twitter и без мелкого favicon
   $: coverSrc = resolveCoverSrc(host, $covers, "");
   // Tip: twitter предпочтительнее, иначе cover
   $: tipImageSrc = resolveTipImageSrc(host, $tipImages, $covers, "");
-  $: showCoverBg = !!coverSrc && (size >= COVER_MIN_SIZE || localBookmark);
+  // Session count — без cover/favicon
+  $: showCoverBg =
+    !showSessionCount && !!coverSrc && (size >= COVER_MIN_SIZE || localBookmark);
   $: coverBgUrl = coverSrc;
 
-  // Лениво: только этот видимый пузырь (idle-очередь)
-  $: if (bubble.url) {
+  // Лениво: только этот видимый пузырь (idle-очередь); session host — без иконок
+  $: if (bubble.url && !showSessionCount) {
     ensureIconsForAnchor({
       url: bubble.url,
       radius: bubble.r,
@@ -239,8 +247,10 @@
       {#if groupable}
         <span class="bubbleDot__groupRing" aria-hidden="true"></span>
       {/if}
-      <!-- Favicon: тоже только in — иначе outro висит на сотнях шаров -->
-      {#if !showCoverBg}
+      <!-- Session host: N вкладок в центре; иначе favicon -->
+      {#if showSessionCount}
+        <span class="bubbleDot__tabCount" aria-hidden="true">{sessionTabCount}</span>
+      {:else if !showCoverBg}
         <span class="bubbleDot__faviconWrap" in:fade={{ duration: 320 }}>
           <img
             class="bubbleDot__favicon"
@@ -506,6 +516,21 @@
     pointer-events: none;
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
     z-index: 1;
+  }
+  /* Session: число вкладок вместо favicon */
+  .bubbleDot__tabCount {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1;
+    pointer-events: none;
+    font-size: clamp(14px, 28%, 28px);
+    font-weight: 700;
+    line-height: 1;
+    color: #e8fffb;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+    font-variant-numeric: tabular-nums;
   }
   .bubbleDot__overflowBadge {
     position: absolute;

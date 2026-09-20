@@ -9,6 +9,7 @@ import {
   worldHeightForCount,
 } from "./bubble-physics";
 import type { HostGroup, BookmarkNode } from "./bookmarks";
+import { SESSION_HOST_KEY } from "./bookmarks";
 
 describe("bubble-physics", () => {
   it("buildHostBubbles creates capped host nodes with radius", () => {
@@ -29,6 +30,41 @@ describe("bubble-physics", () => {
     expect(bubbles.length).toBe(2);
     expect(bubbles[1].r).toBeGreaterThan(bubbles[0].r);
     expect(bubbles.length).toBeLessThanOrEqual(BUBBLE_SIM_CAP);
+    expect(bubbles.every((b) => b.tabCount == null)).toBe(true);
+  });
+
+  it("buildHostBubbles sets tabCount on session host (not favicon count)", () => {
+    const nodesList: BookmarkNode[] = [
+      {
+        url: "https://a.test/",
+        title: "Open tabs · a.test · 3",
+        visitCount: 8,
+        host: SESSION_HOST_KEY,
+        isSession: true,
+      },
+      { url: "https://b.test/", title: "B", visitCount: 8, isSession: true },
+      { url: "https://c.test/", title: "C", visitCount: 8, isSession: true },
+    ];
+    const map = new Map<string, HostGroup>([
+      [
+        SESSION_HOST_KEY,
+        {
+          nodes: [0, 1, 2],
+          hostVisitCount: 24,
+          host: SESSION_HOST_KEY,
+          isSession: true,
+        },
+      ],
+    ]);
+    const bubbles = buildHostBubbles({
+      bookmarkList: map,
+      nodesList,
+      width: 800,
+      height: 600,
+    });
+    expect(bubbles).toHaveLength(1);
+    expect(bubbles[0].isSession).toBe(true);
+    expect(bubbles[0].tabCount).toBe(3);
   });
 
   it("buildHostBubbles uses uniform grid cell so hosts do not spawn overlapped", () => {

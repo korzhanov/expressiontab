@@ -49,6 +49,8 @@ export type BubbleNode = SimulationNodeDatum & {
   overflowCount?: number;
   /** Сессия вкладок — отдельный визуал */
   isSession?: boolean;
+  /** Число вкладок в session-группе (центр шара вместо favicon) */
+  tabCount?: number;
 };
 
 /** Зазор между ячейками сетки (разграничение ≈ gap/2). */
@@ -193,6 +195,11 @@ export function buildHostBubbles({
       lastVisitTime: d.group.hostLastVisitTime ?? d.n.lastVisitTime,
       spawnIndex: i,
       isSession: !!(d.group.isSession || d.n.isSession),
+      // Session host: N вкладок в центре шара (не favicon/globe)
+      tabCount:
+        d.group.isSession || d.n.isSession
+          ? d.group.nodes.length
+          : undefined,
       x,
       y,
       vx: 0,

@@ -56,6 +56,9 @@ describe("BubblePop", () => {
     // Только in:fade — out блокировал unmount BubbleField при смене viewMode
     expect(src).toContain("in:fade");
     expect(src).not.toContain("transition:fade");
+    // Session host: число вкладок вместо favicon
+    expect(src).toContain("bubbleDot__tabCount");
+    expect(src).toContain("showSessionCount");
     // Cover только при реальной крупной иконке — не подставляем favicon
     expect(src).toContain("coverBgUrl = coverSrc");
     expect(src).toContain("image={tipImageSrc}");
