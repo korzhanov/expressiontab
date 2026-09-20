@@ -51,4 +51,27 @@ describe("lazy icon load wiring", () => {
     );
     expect(item).toContain("skipCover: titleVisible");
   });
+
+  it("Anchores debounces chunk rebuild for VirtualScroll stability", () => {
+    const src = readFileSync(join(import.meta.dir, "Anchores.svelte"), "utf8");
+    expect(src).toContain("lastChunksKey");
+    expect(src).toContain("syncChunksIfNeeded");
+    // Не зависеть от clientWidth anchores (прыжок при скролле)
+    expect(src).toContain("НЕ зависеть от ww/hh");
+    // rebuildChunks без loader=true
+    const fn = src.slice(src.indexOf("async function rebuildChunks"));
+    const body = fn.slice(0, fn.indexOf("function syncChunksIfNeeded"));
+    expect(body).not.toContain("loader = true");
+  });
+
+  it("view toggle uses button and DialViewMode (no hidden checkbox)", () => {
+    const src = readFileSync(join(import.meta.dir, "Anchores.svelte"), "utf8");
+    expect(src).toContain("function toggleViewMode");
+    expect(src).toContain("nextDialViewMode");
+    expect(src).toContain("on:click|stopPropagation={toggleViewMode}");
+    expect(src).not.toContain("window.scrollTo");
+    expect(src).not.toContain('bind:checked={titleVisible}');
+    expect(src).toContain('id="changeView"');
+    expect(src).toContain('data-view-mode={viewMode}');
+  });
 });

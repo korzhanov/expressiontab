@@ -226,22 +226,22 @@
       <div class="popLayer" aria-hidden="true">
         <BubblePop active={popping} />
       </div>
-      <!-- Cover / крупная иконка — плавный fade, tint на том же слое -->
+      <!-- Cover: только in:fade — out блокировал unmount BubbleField при смене viewMode -->
       {#if showCoverBg && coverBgUrl}
         <span
           class="bubbleDot__cover"
           style="background-image: url('{coverBgUrl}');"
           aria-hidden="true"
-          transition:fade={{ duration: 480 }}
+          in:fade={{ duration: 480 }}
         ></span>
       {/if}
       <span class="bubbleDot__shine"></span>
       {#if groupable}
         <span class="bubbleDot__groupRing" aria-hidden="true"></span>
       {/if}
-      <!-- При cover центральный favicon уходит тем же fade -->
+      <!-- Favicon: тоже только in — иначе outro висит на сотнях шаров -->
       {#if !showCoverBg}
-        <span class="bubbleDot__faviconWrap" transition:fade={{ duration: 320 }}>
+        <span class="bubbleDot__faviconWrap" in:fade={{ duration: 320 }}>
           <img
             class="bubbleDot__favicon"
             src={faviconSrc}
@@ -421,7 +421,7 @@
   .bubbleDot.bookmark .bubbleDot__groupRing {
     border-color: hsla(42, 90%, 65%, 0.65);
   }
-  /* Cover: картинка + полупрозрачный tint; появление через transition:fade */
+  /* Cover: картинка + полупрозрачный tint; появление через in:fade */
   .bubbleDot__cover {
     position: absolute;
     inset: 0;

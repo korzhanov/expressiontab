@@ -53,7 +53,9 @@ describe("BubblePop", () => {
     expect(src).toContain("bubbleDot__cover::after");
     expect(src).toContain("hsla(42");
     expect(src).toContain("bubbleDot__cover");
-    expect(src).toContain("transition:fade");
+    // Только in:fade — out блокировал unmount BubbleField при смене viewMode
+    expect(src).toContain("in:fade");
+    expect(src).not.toContain("transition:fade");
     // Cover только при реальной крупной иконке — не подставляем favicon
     expect(src).toContain("coverBgUrl = coverSrc");
     expect(src).toContain("image={tipImageSrc}");

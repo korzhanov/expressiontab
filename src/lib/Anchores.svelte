@@ -26,6 +26,13 @@
   import * as Tooltip from "./components/ui/tooltip";
   import BubbleField from "./BubbleField.svelte";
   import {
+    isLinedView,
+    loadDialViewMode,
+    nextDialViewMode,
+    saveDialViewMode,
+    type DialViewMode,
+  } from "./dial-view-mode";
+  import {
     datesForPreset,
     draftDatesFromRange,
     formatHistoryRangeLabel,
@@ -74,16 +81,21 @@
   let bookmarkList: Map<string, HostGroup> = new Map(),
     bookmarkListSize: number = 0,
     loader: boolean = false,
-    titleVisible = false,
+    /** Активный dial-вид: в DOM только один (if/else if) */
+    viewMode: DialViewMode = loadDialViewMode(),
     hh: number = 0,
     ww: number = 0,
     visible = 200,
     windowHeight: number = 0,
     windowWidth: number = 0;
 
-  // VirtualScroll slot data — типизируем для HostItems
+  // Совместимость: lined = старый titleVisible (CSS / HostItem context)
+  $: titleVisible = isLinedView(viewMode);
+
+  // VirtualScroll slot data — только value ряда
   function chunkRowValue(data: unknown): HostGroup[] {
-    return (data as ChunkRow).value;
+    const row = data as { value?: HostGroup[] } | null;
+    return row?.value || [];
   }
 
   // Высота ряда ≈ max(anchorGroup с margin/border, крупные favicon) — без overflow:hidden
@@ -187,18 +199,40 @@
     console.log(`getBookmarks took ${performance.now() - startTime}ms`);
   }
 
+  /** Ключ последней сборки — не дергать VirtualScroll без нужды */
+  let lastChunksKey = "";
+
   async function rebuildChunks() {
     const startTime = performance.now();
-    loader = true;
+    // Без loader=true — иначе мигание и прыжок скролла при смене ширины/режима
+    const width = windowWidth || ww || 800;
+    lastChunksKey = `${titleVisible ? 1 : 0}:${width}:${bookmarkList.size}`;
     const chankList = makeChunks(
       bookmarkList,
       $nodesList,
-      windowWidth,
+      width,
       titleVisible
     );
     filteredListSliced.set(chankList);
-    loader = false;
     console.log(`makechanks took ${performance.now() - startTime}ms`);
+  }
+
+  function syncChunksIfNeeded() {
+    if (!bookmarkList.size) return;
+    const width = windowWidth || ww || 800;
+    // Lined: width почти не влияет на число рядов — всё равно ключ стабилен
+    if (!width && !titleVisible) return;
+    const key = `${titleVisible ? 1 : 0}:${width}:${bookmarkList.size}`;
+    if (key === lastChunksKey) return;
+    rebuildChunks();
+  }
+
+  /** Цикл dial-видов (bubble ↔ lined); без scrollTo — позицию страницы не трогаем */
+  function toggleViewMode() {
+    viewMode = nextDialViewMode(viewMode);
+    saveDialViewMode(viewMode);
+    lastChunksKey = "";
+    syncChunksIfNeeded();
   }
 
   let timer: ReturnType<typeof setTimeout>;
@@ -211,11 +245,14 @@
   let csvBusy = false;
 
   $: newSearch(searchTerm);
-  $: if (titleVisible !== undefined && bookmarkList.size) {
-    rebuildChunks();
-  }
-  $: if (windowWidth && bookmarkList.size && initialLoadDone) {
-    rebuildChunks();
+  // НЕ зависеть от ww/hh (clientWidth anchores) — VirtualScroll меняет высоту
+  // при скролле → иначе rebuild → прыжок
+  $: {
+    titleVisible;
+    windowWidth;
+    bookmarkList.size;
+    initialLoadDone;
+    if (initialLoadDone || bookmarkList.size) syncChunksIfNeeded();
   }
 
   async function newSearch(term: string) {
@@ -556,12 +593,18 @@
       {#if stashNote} · {stashNote}{/if}
     </span>
     <Tooltip.Root
-      content={titleVisible ? "Bubble view" : "Lined list view"}
+      content={viewMode === "lined" ? "Bubble view" : "Lined list view"}
       side="bottom"
       delayDuration={350}
     >
-      <label id="changeView">
-        <input type="checkbox" bind:checked={titleVisible} />
+      <button
+        type="button"
+        id="changeView"
+        aria-pressed={viewMode === "lined"}
+        aria-label={viewMode === "lined" ? "Switch to bubble view" : "Switch to list view"}
+        data-view-mode={viewMode}
+        on:click|stopPropagation={toggleViewMode}
+      >
         <icon>
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -647,12 +690,13 @@
             {/if}
           </svg>
         </icon>
-      </label>
+      </button>
     </Tooltip.Root>
   </div>
 </filterBar>
-<anchores bind:clientHeight={hh} bind:clientWidth={ww} class:titleVisible>
-  {#if titleVisible}
+<anchores bind:clientHeight={hh} bind:clientWidth={ww} class:titleVisible data-view-mode={viewMode}>
+  <!-- Взаимоисключающие виды: без {#key}+outro (fade на шарах держал BubbleField в DOM) -->
+  {#if viewMode === "lined"}
     <VirtualScroll
       let:data
       data={$filteredListSliced}
@@ -667,13 +711,15 @@
         <HostItems value={chunkRowValue(data)} />
       </div>
     </VirtualScroll>
-  {:else if bookmarkList.size && $nodesList.length}
-    <!-- Bubble field: d3-force + viewport cull (lined выше) -->
-    <BubbleField
-      {bookmarkList}
-      nodesList={$nodesList}
-      width={windowWidth || ww || 800}
-    />
+  {:else if viewMode === "bubble"}
+    {#if bookmarkList.size && $nodesList.length}
+      <!-- Bubble field: d3-force + viewport cull -->
+      <BubbleField
+        {bookmarkList}
+        nodesList={$nodesList}
+        width={windowWidth || ww || 800}
+      />
+    {/if}
   {/if}
   {#if loader}<loader><div class="lds-circle"><div /></div></loader>{/if}
 </anchores>
@@ -713,10 +759,20 @@
     margin-left: auto;
     flex-shrink: 0;
     cursor: pointer;
+    background: none;
+    border: none;
+    padding: 4px;
+    color: inherit;
+    line-height: 0;
+    display: inline-flex;
+    align-items: center;
   }
-  #changeView input {
-    opacity: 0;
-    display: none;
+  #changeView:hover {
+    opacity: 0.85;
+  }
+  #changeView:focus-visible {
+    outline: 1px solid #395e9d;
+    outline-offset: 2px;
   }
   .text-white {
     color: #fff;
@@ -876,6 +932,8 @@
     padding-top: 20px;
     z-index: 1;
     background: rgb(20, 20, 20);
+    /* Смена высоты bubble↔lined — без авто-якоря скролла браузера */
+    overflow-anchor: none;
   }
   anchores .itemWrapper {
     display: flex;
