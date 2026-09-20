@@ -5,6 +5,7 @@
    * Тултипы — hover (портал). Действия Bookmark/Copy/Delete — только ПКМ на портале.
    */
   import { onDestroy } from "svelte";
+  import { fade } from "svelte/transition";
   import globe from "../assets/Globe.svg";
   import BubbleActions from "./BubbleActions.svelte";
   import BubblePop from "./BubblePop.svelte";
@@ -14,7 +15,12 @@
     releaseActiveTooltip,
   } from "./components/ui/tooltip/portal";
   import { longhover, GROUP_LONGHOVER_MS } from "./longhover";
-  import { favicons } from "./stores";
+  import { resolveFaviconSrc } from "./bookmarks";
+  import {
+    COVER_MIN_SIZE,
+    resolveCoverSrc,
+  } from "./cover-icons";
+  import { covers, favicons } from "./stores";
   import type { BubbleEnterAnim, BubbleNode } from "./bubble-physics";
 
   export let bubble: BubbleNode;
@@ -66,12 +72,15 @@
   }
 
   $: host = bubble.host;
-  $: faviconSrc =
-    $favicons.get(host) ||
-    (typeof localStorage !== "undefined"
-      ? localStorage.getItem("favicon_" + host)
-      : null) ||
-    globe;
+  let multiButton = false;
+  let localBookmark = !!bubble.isBookmark;
+  $: localBookmark = !!bubble.isBookmark;
+  // miss → Globe; не подставлять __miss__ в <img src>
+  $: faviconSrc = resolveFaviconSrc(host, $favicons, globe);
+  // Cover только из meta/apple-touch — без fallback на мелкий favicon
+  $: coverSrc = resolveCoverSrc(host, $covers, "");
+  $: showCoverBg = !!coverSrc && (size >= COVER_MIN_SIZE || localBookmark);
+  $: coverBgUrl = coverSrc;
 
   /** Текст tooltip: title · visits · дата последнего визита */
   $: visitLine = `${bubble.visitCount} visit${bubble.visitCount === 1 ? "" : "s"}`;
@@ -87,9 +96,6 @@
     .filter(Boolean)
     .join(" · ");
 
-  let multiButton = false;
-  let localBookmark = !!bubble.isBookmark;
-  $: localBookmark = !!bubble.isBookmark;
   /** Якорь для BubbleActions / tip (тот же <a>) */
   let anchorEl: HTMLAnchorElement | null = null;
   let claimToken = 0;
@@ -175,6 +181,7 @@
       class:bookmark={localBookmark}
       class:session
       class:overflow={!!bubble.isOverflowGroup}
+      class:has-cover={showCoverBg}
       class:dragging
       class:inflating
       class:popping
@@ -205,22 +212,33 @@
       <div class="popLayer" aria-hidden="true">
         <BubblePop active={popping} />
       </div>
+      <!-- Cover / крупная иконка — плавный fade, tint на том же слое -->
+      {#if showCoverBg && coverBgUrl}
+        <span
+          class="bubbleDot__cover"
+          style="background-image: url('{coverBgUrl}');"
+          aria-hidden="true"
+          transition:fade={{ duration: 480 }}
+        ></span>
+      {/if}
       <span class="bubbleDot__shine"></span>
       {#if groupable}
         <span class="bubbleDot__groupRing" aria-hidden="true"></span>
       {/if}
-      <!-- Фавикон по центру; закладка — золотой шар (--hue) -->
-      <span class="bubbleDot__faviconWrap">
-        <img
-          class="bubbleDot__favicon"
-          src={faviconSrc}
-          alt=""
-          width="22"
-          height="22"
-          loading="lazy"
-          draggable="false"
-        />
-      </span>
+      <!-- При cover центральный favicon уходит тем же fade -->
+      {#if !showCoverBg}
+        <span class="bubbleDot__faviconWrap" transition:fade={{ duration: 320 }}>
+          <img
+            class="bubbleDot__favicon"
+            src={faviconSrc}
+            alt=""
+            width="22"
+            height="22"
+            loading="lazy"
+            draggable="false"
+          />
+        </span>
+      {/if}
       {#if bubble.isOverflowGroup && (bubble.overflowCount || 0) > 0}
         <span class="bubbleDot__overflowBadge">+{bubble.overflowCount}</span>
       {/if}
@@ -376,18 +394,50 @@
   .bubbleDot.overflow {
     --hue: 320;
   }
-  /* Закладка: золотой шар (вместо звезды под фавиконом) */
+  /* Закладка: золотой --hue; tint поверх cover — в ::after (fade вместе с cover) */
   .bubbleDot.bookmark {
     --hue: 42;
   }
   .bubbleDot.bookmark.groupable {
     box-shadow:
       inset 0 -0.15em 0.35em hsla(0, 0%, 0%, 0.25),
-      0 0 0 2px hsl(42, 85%, 55%),
+      0 0 0 2px hsla(42, 85%, 55%, 0.75),
       0 0.35em 0.75em hsla(0, 0%, 0%, 0.35);
   }
   .bubbleDot.bookmark .bubbleDot__groupRing {
     border-color: hsla(42, 90%, 65%, 0.65);
+  }
+  /* Cover: картинка + полупрозрачный tint; появление через transition:fade */
+  .bubbleDot__cover {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: 50%;
+    background-size: cover;
+    background-position: center;
+    pointer-events: none;
+  }
+  .bubbleDot__cover::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    /* hue-tint поверх фото — тот же слой, что и fade */
+    // background: radial-gradient(
+    //   circle at 30% 25%,
+    //   hsla(var(--hue), 70%, 72%, 0.35),
+    //   hsla(var(--hue), 75%, 42%, 0.48) 62%,
+    //   hsla(var(--hue), 80%, 28%, 0.65)
+    // );
+    pointer-events: none;
+  }
+  .bubbleDot.bookmark .bubbleDot__cover::after {
+    // background: radial-gradient(
+    //   circle at 30% 25%,
+    //   hsla(42, 85%, 70%, 0.42),
+    //   hsla(42, 80%, 48%, 0.5) 55%,
+    //   hsla(42, 75%, 32%, 0.62)
+    // );
   }
   .bubbleDot.expanded {
     box-shadow:
@@ -405,6 +455,7 @@
     width: 55%;
     height: 35%;
     border-radius: 50%;
+    z-index: 1;
     /* Белый блик (не жёлтый) */
     background: radial-gradient(
       circle at top,
@@ -416,6 +467,7 @@
   .bubbleDot__groupRing {
     position: absolute;
     inset: 6%;
+    z-index: 1;
     border-radius: 50%;
     border: 2px solid hsla(280, 90%, 75%, 0.55);
     pointer-events: none;
@@ -431,6 +483,7 @@
     height: 28px;
     transform: translate(-50%, -50%);
     pointer-events: none;
+    z-index: 1;
   }
   .bubbleDot__favicon {
     position: absolute;

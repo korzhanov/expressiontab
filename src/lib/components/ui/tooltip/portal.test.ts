@@ -1,4 +1,6 @@
 import { describe, expect, it } from "bun:test";
+import { readFileSync } from "fs";
+import { join } from "path";
 import {
   claimActiveTooltip,
   clampTooltipPos,
@@ -90,5 +92,16 @@ describe("claimActiveTooltip singleton", () => {
 describe("tooltip layer id", () => {
   it("uses a stable layer id for the portal", () => {
     expect(TOOLTIP_LAYER_ID).toBe("expressiontab-tooltip-layer");
+  });
+});
+
+describe("tooltipPortal destroy policy", () => {
+  it("does not removeChild in action.destroy (Svelte detach owns it)", () => {
+    const src = readFileSync(join(import.meta.dir, "portal.ts"), "utf8");
+    expect(src).not.toContain("flushTooltipLayer(null)");
+    // destroy action — пустой; не вызывает removeChild сам
+    const destroyBlock = src.match(/return \{\s*destroy\(\) \{([\s\S]*?)\},\s*\};/);
+    expect(destroyBlock?.[1] ?? "").not.toContain("removeChild");
+    expect(destroyBlock?.[1] ?? "").not.toContain(".remove(");
   });
 });

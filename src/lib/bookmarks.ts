@@ -224,67 +224,89 @@ type FaviconJob = {
 const faviconQueue: FaviconJob[] = [];
 let faviconActive = 0;
 const FAVICON_CONCURRENCY = 3;
+/** Маркер «хост мёртв / нет иконки» — не долбить сеть снова */
+export const FAVICON_MISS = "__miss__";
+/** In-flight по host — не ставить одну и ту же очередь дважды */
+const faviconInflight = new Map<string, Promise<string | undefined>>();
 
-/** URL-кандидаты favicon: s2 с sz, /favicon.ico, базовый s2. */
-export function faviconSourceUrls(pageUrl: string): string[] {
-  let origin = "";
+/** src для <img>/CSS: map → localStorage → globe; miss → globe */
+export function resolveFaviconSrc(
+  host: string,
+  map: Map<string, string> | undefined,
+  globe: string
+): string {
+  const fromMap = map?.get(host);
+  if (fromMap && fromMap !== FAVICON_MISS) return fromMap;
+  if (typeof localStorage !== "undefined") {
+    const cached = localStorage.getItem("favicon_" + host);
+    if (cached && cached !== FAVICON_MISS) return cached;
+  }
+  return globe;
+}
+
+/**
+ * Chrome MV3 Favicon API:
+ * chrome-extension://ID/_favicon/?pageUrl=…&size=…
+ * @see https://developer.chrome.com/docs/extensions/how-to/ui/favicons
+ */
+export function chromeFaviconUrl(
+  pageUrl: string,
+  size = 64
+): string | null {
   try {
-    origin = new URL(pageUrl).origin;
+    const runtime = (
+      globalThis as { chrome?: { runtime?: { getURL?: (p: string) => string } } }
+    ).chrome?.runtime;
+    if (typeof runtime?.getURL !== "function") return null;
+    const url = new URL(runtime.getURL("/_favicon/"));
+    url.searchParams.set("pageUrl", pageUrl);
+    url.searchParams.set("size", String(size));
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Кандидаты favicon по порядку:
+ * 1) s2 sz=64 → 2) s2 sz=32 → 3) origin/favicon.ico
+ * → Chrome _favicon API → 4) s2 без sz
+ */
+export function faviconSourceUrls(pageUrl: string): string[] {
+  let u: URL;
+  try {
+    u = new URL(pageUrl);
   } catch {
     return [];
   }
-  const enc = encodeURIComponent(pageUrl);
-  const list = [
-    `https://s2.googleusercontent.com/s2/favicons?domain_url=${enc}&sz=64`,
-    `https://s2.googleusercontent.com/s2/favicons?domain_url=${enc}&sz=32`,
-    `${origin}/favicon.ico`,
-    `https://s2.googleusercontent.com/s2/favicons?domain_url=${enc}`,
-  ];
-  return list;
-}
+  const host = u.hostname;
+  const isLocal =
+    !host || host === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(host);
+  const list: string[] = [];
 
-/** Lazy: link[rel~=icon] и manifest icons (только в расширении с host access). */
-async function discoverFaviconUrls(pageUrl: string): Promise<string[]> {
-  const found: string[] = [];
-  try {
-    const res = await fetch(pageUrl, { credentials: "omit" });
-    if (!res.ok) return found;
-    const html = await res.text();
-    const linkRe =
-      /<link[^>]+rel=["']([^"']*)["'][^>]*href=["']([^"']+)["'][^>]*>/gi;
-    let m: RegExpExecArray | null;
-    while ((m = linkRe.exec(html))) {
-      const rel = m[1].toLowerCase();
-      if (!rel.includes("icon")) continue;
-      try {
-        found.push(new URL(m[2], pageUrl).href);
-      } catch {
-        /* skip */
-      }
-    }
-    const manifestMatch = html.match(
-      /<link[^>]+rel=["']manifest["'][^>]*href=["']([^"']+)["']/i
+  if (!isLocal) {
+    // 1–2: Google s2 по hostname (не полный path)
+    list.push(
+      `https://s2.googleusercontent.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`
     );
-    if (manifestMatch?.[1]) {
-      try {
-        const manifestUrl = new URL(manifestMatch[1], pageUrl).href;
-        const mr = await fetch(manifestUrl, { credentials: "omit" });
-        if (mr.ok) {
-          const manifest = (await mr.json()) as {
-            icons?: { src?: string }[];
-          };
-          for (const ic of manifest.icons || []) {
-            if (ic.src) found.push(new URL(ic.src, manifestUrl).href);
-          }
-        }
-      } catch {
-        /* CORS / parse */
-      }
-    }
-  } catch {
-    /* preview CORS — fallback на s2 */
+    list.push(
+      `https://s2.googleusercontent.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32`
+    );
+    // 3: классический /favicon.ico
+    list.push(`${u.origin}/favicon.ico`);
   }
-  return found;
+
+  // После 3: встроенный Chrome Favicon API (кэш браузера)
+  const chromeUrl = chromeFaviconUrl(`${u.protocol}//${host}/`, 64);
+  if (chromeUrl) list.push(chromeUrl);
+
+  // 4-й: s2 без sz
+  if (!isLocal) {
+    list.push(
+      `https://s2.googleusercontent.com/s2/favicons?domain=${encodeURIComponent(host)}`
+    );
+  }
+  return list;
 }
 
 async function runFaviconJob(
@@ -292,14 +314,8 @@ async function runFaviconJob(
   toDataURL: (url: string) => Promise<string | undefined>,
   faviconLocalhost: string | undefined
 ): Promise<void> {
-  const sources = [
-    ...faviconSourceUrls(job.url),
-    ...(await discoverFaviconUrls(job.url)),
-  ];
-  const seen = new Set<string>();
-  for (const src of sources) {
-    if (seen.has(src)) continue;
-    seen.add(src);
+  // Перебираем кандидатов по порядку, пока не получим data URL
+  for (const src of faviconSourceUrls(job.url)) {
     const data = await toDataURL(src);
     if (data && data.length && data !== faviconLocalhost) {
       job.resolve(data);
@@ -324,6 +340,16 @@ function pumpFaviconQueue(
   }
 }
 
+/** Запомнить miss, чтобы не ретраить мёртвый host. */
+export function markFaviconMiss(host: string): void {
+  if (typeof localStorage === "undefined" || !host) return;
+  try {
+    localStorage.setItem("favicon_" + host, FAVICON_MISS);
+  } catch {
+    /* quota */
+  }
+}
+
 /** Enqueue a single favicon fetch with concurrency limit. */
 export function enqueueFavicon(
   url: string,
@@ -341,23 +367,40 @@ export function enqueueFavicon(
     typeof localStorage !== "undefined"
       ? localStorage.getItem("favicon_" + host)
       : null;
+  // Miss — сразу Globe, без сети
+  if (cached === FAVICON_MISS) {
+    return Promise.resolve(undefined);
+  }
   if (cached?.length) {
     return Promise.resolve(cached);
   }
 
-  return new Promise<string | undefined>((resolve) => {
+  // Уже в полёте — один промис на host
+  const pending = faviconInflight.get(host);
+  if (pending) return pending;
+
+  const promise = new Promise<string | undefined>((resolve) => {
     faviconQueue.push({ host, url, resolve });
     pumpFaviconQueue(toDataURL, faviconLocalhost);
   }).then((data) => {
-    if (data && typeof localStorage !== "undefined") {
-      localStorage.setItem("favicon_" + host, data);
+    faviconInflight.delete(host);
+    if (typeof localStorage !== "undefined") {
+      try {
+        if (data) localStorage.setItem("favicon_" + host, data);
+        else localStorage.setItem("favicon_" + host, FAVICON_MISS);
+      } catch {
+        /* quota */
+      }
     }
     return data;
   });
+  faviconInflight.set(host, promise);
+  return promise;
 }
 
 /** Clear pending favicon jobs (for tests). */
 export function clearFaviconQueue(): void {
   faviconQueue.length = 0;
   faviconActive = 0;
+  faviconInflight.clear();
 }

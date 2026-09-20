@@ -7,6 +7,9 @@ export const filteredListSliced = writable<ChunkRow[]>([]);
 
 export const favicons = writable(new Map<string, string>());
 
+/** Крупные og/apple-touch cover для фона больших / starred пузырей */
+export const covers = writable(new Map<string, string>());
+
 /** Flat list of history/bookmark nodes — persisted for faster cold start. */
 export const nodesList = persist(
   writable<BookmarkNode[]>([]),

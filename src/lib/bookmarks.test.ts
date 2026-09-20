@@ -5,6 +5,10 @@ import {
   buildBookmarkIndex,
   getUnfoldSlice,
   UNFOLD_PAGE_SIZE,
+  faviconSourceUrls,
+  chromeFaviconUrl,
+  resolveFaviconSrc,
+  FAVICON_MISS,
   type HostGroup,
 } from "./bookmarks";
 import { clamp, bgOpacityFromScroll, ignoreUrl } from "./utils";
@@ -117,5 +121,55 @@ describe("utils clamp / bgOpacity", () => {
     expect(bgOpacityFromScroll(0, 1000)).toBe(1);
     expect(bgOpacityFromScroll(1000, 1000)).toBe(0);
     expect(bgOpacityFromScroll(500, 1000)).toBe(0.5);
+  });
+});
+
+describe("favicon quiet load", () => {
+  it("faviconSourceUrls order: s2 64 → s2 32 → ico → (chrome) → s2", () => {
+    const urls = faviconSourceUrls(
+      "https://dead.example/remote-workers?x=1"
+    );
+    expect(urls[0]).toContain("domain=dead.example");
+    expect(urls[0]).toContain("sz=64");
+    expect(urls[1]).toContain("sz=32");
+    expect(urls[2]).toBe("https://dead.example/favicon.ico");
+    // Chrome API только в расширении; в bun:test его нет
+    const last = urls[urls.length - 1];
+    expect(last).toContain("domain=dead.example");
+    expect(last).not.toContain("sz=");
+    expect(urls.some((u) => u.includes("remote-workers"))).toBe(false);
+  });
+
+  it("skips s2/ico for localhost and raw IP", () => {
+    expect(faviconSourceUrls("http://127.0.0.1:7860/")).toEqual([]);
+    expect(faviconSourceUrls("http://localhost:3000/")).toEqual([]);
+  });
+
+  it("resolveFaviconSrc ignores miss marker", () => {
+    const map = new Map([["x.com", FAVICON_MISS]]);
+    expect(resolveFaviconSrc("x.com", map, "globe.svg")).toBe("globe.svg");
+  });
+
+  it("chromeFaviconUrl builds _favicon URL when chrome.runtime exists", () => {
+    const prev = (globalThis as { chrome?: unknown }).chrome;
+    (globalThis as { chrome?: unknown }).chrome = {
+      runtime: {
+        getURL: (p: string) => `chrome-extension://testid${p}`,
+      },
+    };
+    try {
+      const u = chromeFaviconUrl("https://ex.com/", 64);
+      expect(u).toContain("chrome-extension://testid/_favicon/");
+      expect(u).toContain("pageUrl=");
+      expect(u).toContain("size=64");
+      // В порядке кандидатов Chrome идёт после /favicon.ico
+      const urls = faviconSourceUrls("https://ex.com/path");
+      expect(urls[2]).toBe("https://ex.com/favicon.ico");
+      expect(urls[3]).toContain("/_favicon/");
+      expect(urls[4]).toContain("domain=ex.com");
+      expect(urls[4]).not.toContain("sz=");
+    } finally {
+      (globalThis as { chrome?: unknown }).chrome = prev;
+    }
   });
 });

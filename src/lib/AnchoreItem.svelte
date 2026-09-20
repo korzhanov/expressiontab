@@ -4,6 +4,7 @@
   import { fly, fade } from "svelte/transition";
   import { onDestroy, onMount } from "svelte";
   import { favicons } from "./stores";
+  import { resolveFaviconSrc } from "./bookmarks";
   import * as Tooltip from "./components/ui/tooltip";
   import BubblePop from "./BubblePop.svelte";
 
@@ -36,13 +37,8 @@
   let closeTimer: ReturnType<typeof setTimeout> | null = null;
   let anchorEl: HTMLElement;
 
-  $: src =
-    $favicons.get(host) ||
-    (typeof localStorage !== "undefined"
-      ? localStorage.getItem("favicon_" + host)
-      : null) ||
-    anchor?.img_data ||
-    globe;
+  // miss/нет кэша → img_data или Globe (не строка __miss__ в url())
+  $: src = resolveFaviconSrc(host, $favicons, anchor?.img_data || globe);
 
   function closeMenu() {
     if (closeTimer) {

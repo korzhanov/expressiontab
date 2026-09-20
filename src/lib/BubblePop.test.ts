@@ -46,8 +46,16 @@ describe("BubblePop", () => {
     const src = readFileSync(join(import.meta.dir, "BubbleDot.svelte"), "utf8");
     // Белый блик остаётся общим
     expect(src).toContain("rgba(255, 255, 255, 0.65)");
-    // Закладка — золотой --hue, без звезды под фавиконом
+    // Закладка — золотой --hue + tint на cover::after (fade вместе с картинкой)
     expect(src).toMatch(/\.bubbleDot\.bookmark\s*\{[^}]*--hue:\s*42/);
+    expect(src).toContain("class:has-cover={showCoverBg}");
+    expect(src).toContain("bubbleDot__cover::after");
+    expect(src).toContain("hsla(42");
+    expect(src).toContain("bubbleDot__cover");
+    expect(src).toContain("transition:fade");
+    // Cover только при реальной крупной иконке — не подставляем favicon
+    expect(src).toContain("coverBgUrl = coverSrc");
+    expect(src).not.toContain("localBookmark ? faviconSrc");
     expect(src).not.toContain("bubbleDot__star");
     expect(src).not.toContain("starred={localBookmark}");
   });

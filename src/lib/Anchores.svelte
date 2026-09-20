@@ -6,7 +6,7 @@
   import { draw } from "svelte/transition";
   import VirtualScroll from "svelte-virtual-scroll-list";
   import HostItems from "./HostItems.svelte";
-  import { filteredListSliced, nodesList, favicons } from "./stores";
+  import { filteredListSliced, nodesList, favicons, covers } from "./stores";
   import { toDataURL } from "./utils";
   import {
     buildBookmarkIndex,
@@ -15,6 +15,7 @@
     type HostGroup,
     type ChunkRow,
   } from "./bookmarks";
+  import { enqueueCover, shouldLoadCover } from "./cover-icons";
   import { isMockChrome } from "./chrome-mock";
   import { stashOpenTabs, loadOpenTabsForSession, mergeSessionIntoIndex, type StashChrome } from "./stash-tabs";
   import {
@@ -164,14 +165,29 @@
     nodesList.set(built.nodesList);
     localStorage.maxVisits = built.maxVisits + "";
 
-    // Favicon queue только в расширении — в CursorBrowser CORS на s2.googleusercontent
+    // Favicon + cover (крупные/starred) только в расширении
     if (!previewMock) {
       for (const [host, group] of bookmarkList) {
         const node = built.nodesList[group.nodes[0]];
-        if (node?.url) {
-          enqueueFavicon(node.url, toDataURL, favicon_localhost).then((data) => {
+        if (!node?.url) continue;
+        enqueueFavicon(node.url, toDataURL, favicon_localhost).then((data) => {
+          if (data) {
+            favicons.update((map) => {
+              map.set(host, data);
+              return map;
+            });
+          }
+        });
+        // Cover в фоне: только крупные пузыри и закладки
+        if (
+          shouldLoadCover({
+            radius: group.weightVisitsRadius ?? 40,
+            isBookmark: !!node.isBookmark,
+          })
+        ) {
+          enqueueCover(node.url, toDataURL).then((data) => {
             if (data) {
-              favicons.update((map) => {
+              covers.update((map) => {
                 map.set(host, data);
                 return map;
               });

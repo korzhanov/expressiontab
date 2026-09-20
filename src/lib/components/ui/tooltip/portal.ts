@@ -37,14 +37,9 @@ export function resetActiveTooltip(): void {
   activeToken = 0;
 }
 
-/** Убрать сирот из слоя (после destroy / смены активного). */
-export function flushTooltipLayer(keep?: HTMLElement | null): void {
-  const layer = getTooltipLayer();
-  if (!layer) return;
-  for (const child of Array.from(layer.children)) {
-    if (keep && child === keep) continue;
-    child.remove();
-  }
+/** Не вызывать: агрессивный remove ломает Svelte detach (removeChild null). */
+export function flushTooltipLayer(_keep?: HTMLElement | null): void {
+  // claimActiveTooltip → forceClose → {#if} destroy — единственный путь очистки
 }
 
 /** Создать / вернуть fixed-слой на body. */
@@ -64,21 +59,24 @@ export function getTooltipLayer(): HTMLElement | null {
   return layer;
 }
 
-/** Svelte 3 action: переносит ноду в tooltip-слой. */
+/**
+ * Svelte 3 action: переносит ноду в tooltip-слой.
+ * destroy — no-op: Svelte detach сам снимет с layer.
+ * Нельзя child.remove() / flush до detach — иначе removeChild(null).
+ */
 export function tooltipPortal(
   node: HTMLElement,
   onPlaced?: (node: HTMLElement) => void
 ) {
   const layer = getTooltipLayer();
   if (layer) {
-    // Один pill: выкидываем чужие ноды перед монтированием
-    flushTooltipLayer(null);
+    // claimActiveTooltip уже закрыл предыдущий tip — не flush'ить DOM
     layer.appendChild(node);
   }
   onPlaced?.(node);
   return {
     destroy() {
-      if (node.parentNode) node.parentNode.removeChild(node);
+      // no-op: detach Svelte снимет ноду с layer сам
     },
   };
 }

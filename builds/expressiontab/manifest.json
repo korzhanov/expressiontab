@@ -10,7 +10,8 @@
         "bookmarks",
         "storage",
         "sessions",
-        "history"
+        "history",
+        "favicon"
     ],
     "chrome_url_overrides": {
         "newtab": "newtab/index.html"
