@@ -89,6 +89,7 @@ describe("BubblePop", () => {
     expect(body).toContain("startShrinkToWeight");
     expect(body).toContain("b.linkR");
     expect(body).toContain("skipSpawn");
+    expect(src).toContain("listHostDescendants");
     expect(src).toContain("commitCollapseAbsorb");
     expect(src).toContain("GROUP_ABSORB_MS");
     expect(src).toContain("poppingChildIds");

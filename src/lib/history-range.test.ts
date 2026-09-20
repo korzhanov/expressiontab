@@ -4,6 +4,7 @@ import {
   draftDatesFromRange,
   formatHistoryRangeLabel,
   historySearchBounds,
+  shouldDismissRangePopover,
   toDateInputValue,
   type HistoryRangeState,
 } from "./history-range";
@@ -86,5 +87,56 @@ describe("history-range", () => {
       toDate: "2024-02-01",
     };
     expect(formatHistoryRangeLabel(custom)).toContain("2024-01-01");
+  });
+});
+
+describe("shouldDismissRangePopover", () => {
+  it("keeps open when click or focus inside root", () => {
+    const inside = { nodeType: 1 } as unknown as Node;
+    const outside = { nodeType: 1 } as unknown as Node;
+    const root = {
+      contains: (n: Node | null) => n === inside,
+    };
+    expect(
+      shouldDismissRangePopover({
+        root,
+        eventTarget: inside,
+        activeElement: null,
+      })
+    ).toBe(false);
+    expect(
+      shouldDismissRangePopover({
+        root,
+        eventTarget: outside,
+        activeElement: inside as unknown as Element,
+      })
+    ).toBe(false);
+  });
+
+  it("dismisses when click and focus are outside", () => {
+    const outside = { nodeType: 1 } as unknown as Node;
+    const root = { contains: () => false };
+    expect(
+      shouldDismissRangePopover({
+        root,
+        eventTarget: outside,
+        activeElement: outside as unknown as Element,
+      })
+    ).toBe(true);
+  });
+
+  it("keeps open while focused element is inside (native date calendar)", () => {
+    const dateInput = { nodeType: 1 } as unknown as Element;
+    const outsideClick = { nodeType: 1 } as unknown as Node;
+    const root = {
+      contains: (n: Node | null) => n === dateInput,
+    };
+    expect(
+      shouldDismissRangePopover({
+        root,
+        eventTarget: outsideClick,
+        activeElement: dateInput,
+      })
+    ).toBe(false);
   });
 });

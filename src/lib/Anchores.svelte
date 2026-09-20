@@ -32,6 +32,7 @@
     historySearchBounds,
     loadHistoryRangeFromStorage,
     saveHistoryRangeToStorage,
+    shouldDismissRangePopover,
     type HistoryRangePreset,
     type HistoryRangeState,
   } from "./history-range";
@@ -50,6 +51,8 @@
   /** Диапазон history.search — пресеты + custom from–to */
   let historyRange: HistoryRangeState = loadHistoryRangeFromStorage();
   let rangePopoverOpen = false;
+  /** Корень trigger + popover — для outside-click */
+  let rangeRootEl: HTMLElement | null = null;
   // Date inputs сразу с датами текущего пресета
   let rangeDraftFrom = historyRange.fromDate;
   let rangeDraftTo = historyRange.toDate;
@@ -225,7 +228,50 @@
     }, timeout);
   }
 
+  function closeRangePopover() {
+    rangePopoverOpen = false;
+  }
+
+  function toggleRangePopover() {
+    rangePopoverOpen = !rangePopoverOpen;
+    if (rangePopoverOpen) {
+      // Всегда подставить актуальные даты в inputs
+      const draft = draftDatesFromRange(historyRange);
+      rangeDraftFrom = draft.fromDate;
+      rangeDraftTo = draft.toDate;
+    }
+  }
+
+  /** Клик мимо — закрыть; нативный date calendar не в DOM — не трогаем, пока focus на date */
+  function onRangeDocPointerDown(e: PointerEvent) {
+    if (!rangePopoverOpen) return;
+    if (
+      !shouldDismissRangePopover({
+        root: rangeRootEl,
+        eventTarget: e.target,
+        activeElement: document.activeElement,
+      })
+    ) {
+      return;
+    }
+    closeRangePopover();
+  }
+
+  /** Фокус ушёл из wrap (в т.ч. после закрытия native picker + клик мимо) */
+  function onRangeFocusOut() {
+    setTimeout(() => {
+      if (!rangePopoverOpen || !rangeRootEl) return;
+      if (rangeRootEl.contains(document.activeElement)) return;
+      closeRangePopover();
+    }, 0);
+  }
+
   function clearSearch() {
+    // Escape: сначала свернуть date range, потом search
+    if (rangePopoverOpen) {
+      closeRangePopover();
+      return;
+    }
     searchTerm = "";
     searchInputEl?.blur();
   }
@@ -351,10 +397,13 @@
   onMount(() => {
     // focus search shortly after open for quicker filtering
     setTimeout(() => searchInputEl?.focus(), 100);
+    // capture: закрыть range до других handlers
+    window.addEventListener("pointerdown", onRangeDocPointerDown, true);
   });
 
   onDestroy(() => {
     clearTimeout(timer);
+    window.removeEventListener("pointerdown", onRangeDocPointerDown, true);
   });
 </script>
 
@@ -462,45 +511,50 @@
     <span class="status">
       {#if searchTerm}“{searchTerm}” · {/if}
       {bookmarkListSize} sites ·
-      <button
-        type="button"
-        class="rangeTrigger"
-        aria-expanded={rangePopoverOpen}
-        on:click={() => {
-          rangePopoverOpen = !rangePopoverOpen;
-          // Всегда подставить актуальные даты в inputs
-          const draft = draftDatesFromRange(historyRange);
-          rangeDraftFrom = draft.fromDate;
-          rangeDraftTo = draft.toDate;
-        }}
+      <span
+        class="rangeWrap"
+        bind:this={rangeRootEl}
+        on:focusout={onRangeFocusOut}
       >
-        {rangeStatusLabel}
-      </button>
+        <button
+          type="button"
+          class="rangeTrigger"
+          aria-expanded={rangePopoverOpen}
+          aria-haspopup="dialog"
+          on:click={toggleRangePopover}
+        >
+          {rangeStatusLabel}
+        </button>
+        {#if rangePopoverOpen}
+          <div
+            class="rangePopover"
+            role="dialog"
+            aria-label="History date range"
+          >
+            <div class="rangePresets">
+              <button type="button" on:click={() => setHistoryPreset("today")}>Today</button>
+              <button type="button" on:click={() => setHistoryPreset("yesterday")}>Yesterday</button>
+              <button type="button" on:click={() => setHistoryPreset("1w")}>1 week</button>
+              <button type="button" on:click={() => setHistoryPreset("4w")}>4 weeks</button>
+              <button type="button" on:click={() => setHistoryPreset("12w")}>12 weeks</button>
+              <button type="button" on:click={() => setHistoryPreset("all")}>All time</button>
+            </div>
+            <div class="rangeCustom">
+              <label>
+                From
+                <input type="date" bind:value={rangeDraftFrom} />
+              </label>
+              <label>
+                To
+                <input type="date" bind:value={rangeDraftTo} />
+              </label>
+              <button type="button" class="rangeApply" on:click={applyCustomRange}>Apply</button>
+            </div>
+          </div>
+        {/if}
+      </span>
       {#if stashNote} · {stashNote}{/if}
     </span>
-    {#if rangePopoverOpen}
-      <div class="rangePopover" role="dialog" aria-label="History date range">
-        <div class="rangePresets">
-          <button type="button" on:click={() => setHistoryPreset("today")}>Today</button>
-          <button type="button" on:click={() => setHistoryPreset("yesterday")}>Yesterday</button>
-          <button type="button" on:click={() => setHistoryPreset("1w")}>1 week</button>
-          <button type="button" on:click={() => setHistoryPreset("4w")}>4 weeks</button>
-          <button type="button" on:click={() => setHistoryPreset("12w")}>12 weeks</button>
-          <button type="button" on:click={() => setHistoryPreset("all")}>All time</button>
-        </div>
-        <div class="rangeCustom">
-          <label>
-            From
-            <input type="date" bind:value={rangeDraftFrom} />
-          </label>
-          <label>
-            To
-            <input type="date" bind:value={rangeDraftTo} />
-          </label>
-          <button type="button" class="rangeApply" on:click={applyCustomRange}>Apply</button>
-        </div>
-      </div>
-    {/if}
     <Tooltip.Root
       content={titleVisible ? "Bubble view" : "Lined list view"}
       side="bottom"
@@ -721,9 +775,14 @@
   filterBar .rangeTrigger:hover {
     color: #fff;
   }
+  /* Якорь для absolute popover; inline чтобы не ломать status-строку */
+  filterBar .rangeWrap {
+    position: relative;
+    display: inline;
+  }
   filterBar .rangePopover {
     position: absolute;
-    right: 32px;
+    right: 0;
     bottom: calc(100% + 6px);
     z-index: 20;
     background: rgb(28, 28, 32);

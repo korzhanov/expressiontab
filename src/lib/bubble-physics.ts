@@ -603,26 +603,64 @@ export function expandOverflowNode({
   return ci;
 }
 
-/** Дети хоста (для absorb / orbit). */
+/** Прямые дети хоста (parentId === host:…). */
 export function listHostChildren(world: BubbleWorld, host: string): BubbleNode[] {
   const pid = hostId(host);
   return world.nodes.filter((n) => n.parentId === pid);
 }
 
-/** Свернуть children хоста и вернуть родителю groupR (сложенный вес). */
+/**
+ * Все потомки хоста: дети + субдети overflow (BFS по parentId).
+ * Нужно для fold — иначе вложенные остаются на поле.
+ */
+export function listHostDescendants(
+  world: BubbleWorld,
+  host: string
+): BubbleNode[] {
+  const pid = hostId(host);
+  const byParent = new Map<string, BubbleNode[]>();
+  for (const n of world.nodes) {
+    if (!n.parentId) continue;
+    let list = byParent.get(n.parentId);
+    if (!list) {
+      list = [];
+      byParent.set(n.parentId, list);
+    }
+    list.push(n);
+  }
+  const out: BubbleNode[] = [];
+  const stack = [...(byParent.get(pid) || [])];
+  while (stack.length) {
+    const n = stack.pop()!;
+    out.push(n);
+    const kids = byParent.get(n.id);
+    if (kids) for (const k of kids) stack.push(k);
+  }
+  return out;
+}
+
+/** Свернуть всех потомков хоста (вкл. overflow) и вернуть родителю groupR. */
 export function collapseHost(world: BubbleWorld, host: string): void {
   const pid = hostId(host);
   const parent = world.nodes.find((n) => n.id === pid);
-  world.nodes = world.nodes.filter((n) => n.parentId !== pid);
+  const dropIds = new Set(listHostDescendants(world, host).map((n) => n.id));
+  world.nodes = world.nodes.filter((n) => !dropIds.has(n.id));
   world.links = world.links.filter((l) => {
-    const s = typeof l.source === "object" ? (l.source as BubbleNode).id : l.source;
-    const t = typeof l.target === "object" ? (l.target as BubbleNode).id : l.target;
-    return s !== pid && t !== pid;
+    const s =
+      typeof l.source === "object" ? (l.source as BubbleNode).id : l.source;
+    const t =
+      typeof l.target === "object" ? (l.target as BubbleNode).id : l.target;
+    // Убрать рёбра к удалённым и «осиротевшие» к host
+    return !dropIds.has(String(s)) && !dropIds.has(String(t));
   });
   if (parent) {
     const g = parent.groupR ?? parent.baseR ?? parent.r;
     parent.r = g;
     parent.baseR = g;
+    // Сброс overflow-метки на host (если вдруг висела)
+    parent.isOverflowGroup = undefined;
+    parent.overflowChildIndexes = undefined;
+    parent.overflowCount = undefined;
   }
   world.simulation.nodes(world.nodes);
   world.linkForce.links(world.links);

@@ -31,7 +31,7 @@
     GROUP_MAX_CHILDREN,
     inflateRadius,
     isHostExpanded,
-    listHostChildren,
+    listHostDescendants,
     absorbChildrenFrame,
     shrinkHostFrame,
     startCraterFill,
@@ -954,13 +954,14 @@
     shrinkRaf = requestAnimationFrame(loop);
   }
 
-  /** Fold: рост → втягивание → pop детей → groupR. */
+  /** Fold: рост → втягивание → pop всех потомков (вкл. overflow) → groupR. */
   function commitCollapseAbsorb(b: BubbleNode) {
     if (!world || collapsingId || poppingId) return;
     // Кратер-fill мешает absorb — снимаем
     stopCraterFill?.();
     stopCraterFill = null;
-    const children = listHostChildren(world, b.host);
+    // Дети + субдети overflow — иначе вложенные остаются на поле
+    const children = listHostDescendants(world, b.host);
     if (!children.length) {
       collapseHost(world, b.host);
       registerCollapsed(b.host);
@@ -975,7 +976,7 @@
     b.groupR = groupR;
     // Потолок роста при fold — размер группы, не площадь детей
     const r1 = groupR;
-    // Снапшот стартовых позиций детей для стабильного lerp
+    // Снапшот стартовых позиций всех потомков для стабильного lerp
     const starts = children.map((c) => ({
       node: c,
       x: c.x ?? 0,
@@ -1008,7 +1009,7 @@
         absorbRaf = requestAnimationFrame(loop);
         return;
       }
-      // Финал absorb: лопание детей, затем collapse → groupR
+      // Финал absorb: лопание всех потомков, затем collapse → groupR
       const nextPop: Record<string, boolean> = {};
       for (const c of children) nextPop[c.id] = true;
       poppingChildIds = nextPop;

@@ -183,3 +183,32 @@ export function saveHistoryRangeToStorage(range: HistoryRangeState): void {
   localStorage.setItem("historyRangeFrom", range.fromDate);
   localStorage.setItem("historyRangeTo", range.toDate);
 }
+
+/**
+ * Закрывать range popover?
+ * Клик/фокус снаружи — да; клик по корню — нет;
+ * пока focus на элементе внутри — нет (нативный calendar вне DOM).
+ */
+export function shouldDismissRangePopover({
+  root,
+  eventTarget,
+  activeElement,
+}: {
+  root: { contains: (n: Node | null) => boolean } | null | undefined;
+  eventTarget: EventTarget | null;
+  activeElement: Element | null;
+}): boolean {
+  if (!root) return true;
+  // Duck-type Node: в bun:test нет DOM global Node
+  if (
+    eventTarget &&
+    typeof (eventTarget as Node).nodeType === "number" &&
+    root.contains(eventTarget as Node)
+  ) {
+    return false;
+  }
+  if (activeElement && root.contains(activeElement)) {
+    return false;
+  }
+  return true;
+}

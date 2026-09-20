@@ -486,6 +486,19 @@ describe("bubble-physics", () => {
     });
     expect(added).toBe(50);
     expect(world.nodes.filter((x) => x.kind === "child").length).toBe(150);
+    // Fold хоста — убрать и прямых, и субдетей overflow
+    const {
+      collapseHost,
+      listHostDescendants,
+      listHostChildren,
+    } = await import("./bubble-physics");
+    expect(listHostChildren(world, "c.test").length).toBe(100);
+    expect(listHostDescendants(world, "c.test").length).toBe(150);
+    collapseHost(world, "c.test");
+    expect(world.nodes.filter((x) => x.kind === "child").length).toBe(0);
+    expect(world.nodes.some((x) => x.host === "c.test" && x.kind === "host")).toBe(
+      true
+    );
     stopWorld(world);
   });
 
