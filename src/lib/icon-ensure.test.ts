@@ -44,5 +44,11 @@ describe("lazy icon load wiring", () => {
     expect(cov).toContain("scheduleIdle");
     expect(cov).toContain("CONCURRENCY = 1");
     expect(ens).toContain("ensureIconsForAnchor");
+    expect(ens).toContain("skipCover");
+    const item = readFileSync(
+      join(import.meta.dir, "AnchoreItem.svelte"),
+      "utf8"
+    );
+    expect(item).toContain("skipCover: titleVisible");
   });
 });

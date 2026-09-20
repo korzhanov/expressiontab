@@ -26,5 +26,7 @@ describe("HostItem lined group row", () => {
     expect(src).toContain("unfoldedHostOrder");
     expect(src).toContain("unfoldHost(hostKey)");
     expect(src).toContain("foldHost(hostKey)");
+    // recycle VirtualScroll — fold при unmount
+    expect(src).toContain("onDestroy");
   });
 });

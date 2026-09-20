@@ -41,12 +41,13 @@
   // miss/нет кэша → page → host → img_data/Globe
   $: src = resolveFaviconSrc(host, $favicons, anchor?.img_data || globe, url);
 
-  // Лениво: ряд VirtualScroll виден → поставить в idle-очередь
+  // Лениво: ряд VirtualScroll виден → idle-очередь (cover только bubble)
   $: if (url) {
     ensureIconsForAnchor({
       url,
       radius: (weightVisitsRadius || 50) / 2,
       isBookmark,
+      skipCover: titleVisible,
     });
   }
 

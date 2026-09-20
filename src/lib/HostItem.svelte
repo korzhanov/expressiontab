@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getContext } from "svelte";
+  import { getContext, onDestroy } from "svelte";
   import Icon, { ChevronDown } from "svelte-hero-icons";
   import AnchoreItem from "./AnchoreItem.svelte";
   import { longhover, GROUP_LONGHOVER_MS } from "./longhover";
@@ -34,6 +34,12 @@
   $: unfoldSlice = getUnfoldSlice(otherAnchores, visibleChildCount);
 
   const titleVisibleStore = getContext("titleVisible");
+
+  // VirtualScroll recycle: свернуть при unmount — иначе remount с unfold
+  // даёт ряд высотой >> estimateSize и ломает список
+  onDestroy(() => {
+    if (hostKey) foldHost(hostKey);
+  });
 
   function openGroup(e?: Event) {
     if (e) {

@@ -35,15 +35,18 @@ export function resetIconEnsure(): void {
 
 /**
  * Host + page favicon + cover по мере надобности для одного видимого узла.
+ * skipCover — lined list: cover не нужен, только грузит HTML.
  */
 export function ensureIconsForAnchor({
   url,
   radius,
   isBookmark,
+  skipCover = false,
 }: {
   url: string;
   radius?: number;
   isBookmark?: boolean;
+  skipCover?: boolean;
 }): void {
   if (!url) return;
   let host: string;
@@ -82,8 +85,9 @@ export function ensureIconsForAnchor({
     }
   }
 
-  // 3) Cover/tip — только крупные / закладки
+  // 3) Cover/tip — bubble only (lined не показывает cover-фон)
   if (
+    !skipCover &&
     shouldLoadCover({
       radius: radius ?? 40,
       isBookmark: !!isBookmark,
