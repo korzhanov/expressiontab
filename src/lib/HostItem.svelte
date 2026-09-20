@@ -83,12 +83,12 @@
       {/if}
     {/each}
   {:else}
-    <Tooltip.List
+    <!-- <Tooltip.List
       content={groupHint}
       side="bottom"
       delayDuration={550}
       block={!!$titleVisibleStore}
-    >
+    > -->
       <anchorGroup
         class="hovicon effect-8"
         class:lined={$titleVisibleStore}
@@ -99,16 +99,8 @@
         on:click|stopPropagation={onGroupClick}
         class:unfold
       >
-        {#if hostAnchore?.url}
-          <AnchoreItem
-            anchor={hostAnchore}
-            {unfold}
-            childrenInvisible={true}
-            titleVisible={$titleVisibleStore}
-          />
-        {/if}
         <!-- Явная кнопка раскрытия группы (стандартный button + chevron) -->
-        <Tooltip.List content={toggleLabel} side="left" delayDuration={250}>
+        <!-- <Tooltip.List content={toggleLabel} side="left" delayDuration={250}> -->
           <button
             type="button"
             class="groupToggle"
@@ -122,9 +114,17 @@
               <span class="groupToggleCount">{otherAnchores.length}</span>
             {/if}
           </button>
-        </Tooltip.List>
+        <!-- </Tooltip.List> -->
+        {#if hostAnchore?.url}
+          <AnchoreItem
+            anchor={hostAnchore}
+            {unfold}
+            childrenInvisible={true}
+            titleVisible={$titleVisibleStore}
+          />
+        {/if}
       </anchorGroup>
-    </Tooltip.List>
+    <!-- </Tooltip.List> -->
     {#if unfold}
       <div
         class="groupChildren"
