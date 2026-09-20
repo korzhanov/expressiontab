@@ -1,15 +1,10 @@
 <script lang="ts">
-  import { getContext, onDestroy } from "svelte";
+  import { getContext } from "svelte";
   import Icon, { ChevronDown } from "svelte-hero-icons";
   import AnchoreItem from "./AnchoreItem.svelte";
   import { longhover, GROUP_LONGHOVER_MS } from "./longhover";
   import { nodesList } from "./stores";
   import { getUnfoldSlice, UNFOLD_PAGE_SIZE } from "./bookmarks";
-  import {
-    foldHost,
-    unfoldHost,
-    unfoldedHostOrder,
-  } from "./unfold-limit";
   import * as Tooltip from "./components/ui/tooltip";
 
   export let hostItem: any;
@@ -18,16 +13,17 @@
   $: hostAnchore = $nodesList[anchores[0]] || {};
   $: otherAnchores = anchores[1] ? anchores.slice(1) : [];
   $: isSessionGroup = !!(hostItem?.isSession || hostAnchore?.isSession);
-  // Стабильный ключ группы для LRU unfold
-  $: hostKey =
-    hostItem?.host || hostAnchore?.host || String(anchores[0] ?? "");
-  // Общий лимит 3 — подписка на store, не локальный флаг
-  $: unfold = !!hostKey && $unfoldedHostOrder.includes(hostKey);
   $: groupHint = `${otherAnchores.length} more — arrow toggles, hover 3s or right-click`;
   $: toggleLabel = unfold
     ? `Hide ${otherAnchores.length} more links`
     : `Show ${otherAnchores.length} more links`;
 
+  /**
+   * Локальный unfold — НЕ store.
+   * VirtualScroll recycle уничтожает компонент → unfold сбрасывается сам,
+   * без глобального store (иначе mid-scroll менялись высоты → прыжки).
+   */
+  let unfold = false;
   let childrenInvisible = false;
   let visibleChildCount = UNFOLD_PAGE_SIZE;
 
@@ -35,20 +31,13 @@
 
   const titleVisibleStore = getContext("titleVisible");
 
-  // VirtualScroll recycle: свернуть при unmount — иначе remount с unfold
-  // даёт ряд высотой >> estimateSize и ломает список
-  onDestroy(() => {
-    if (hostKey) foldHost(hostKey);
-  });
-
   function openGroup(e?: Event) {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
-    if (!hostKey) return;
     if (!unfold) {
-      unfoldHost(hostKey);
+      unfold = true;
       childrenInvisible = true;
       visibleChildCount = UNFOLD_PAGE_SIZE;
     }
@@ -59,9 +48,8 @@
       e.preventDefault();
       e.stopPropagation();
     }
-    if (!hostKey) return;
     if (unfold) {
-      foldHost(hostKey);
+      unfold = false;
       childrenInvisible = false;
       visibleChildCount = UNFOLD_PAGE_SIZE;
     } else {
@@ -161,7 +149,6 @@
     {/if}
   {/if}
 {/if}
-
 <style lang="scss">
   anchorGroup {
     --ease-out: cubic-bezier(0.22, 1, 0.36, 1);

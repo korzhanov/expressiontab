@@ -5,6 +5,6 @@
   export let value: any;
 </script>
 
-{#each value as hostItem (hostItem.nodes[0])}
+{#each value || [] as hostItem (hostItem?.nodes?.[0] ?? hostItem)}
   <HostItem {hostItem} />
 {/each}

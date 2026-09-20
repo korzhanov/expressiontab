@@ -22,11 +22,12 @@ describe("HostItem lined group row", () => {
     expect(src).toContain("aria-expanded={unfold}");
   });
 
-  it("shares unfold via unfold-limit store (max 3)", () => {
-    expect(src).toContain("unfoldedHostOrder");
-    expect(src).toContain("unfoldHost(hostKey)");
-    expect(src).toContain("foldHost(hostKey)");
-    // recycle VirtualScroll — fold при unmount
-    expect(src).toContain("onDestroy");
+  it("uses local unfold (not global store) to avoid VirtualScroll jumps", () => {
+    // Глобальный store + fold onDestroy ломали scroll mid-recycle
+    expect(src).toContain("let unfold = false");
+    expect(src).not.toContain("unfoldedHostOrder");
+    expect(src).not.toContain("foldHost");
+    expect(src).not.toContain("unfoldHost");
+    expect(src).not.toContain("import { onDestroy");
   });
 });
