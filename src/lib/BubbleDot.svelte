@@ -75,8 +75,8 @@
   let multiButton = false;
   let localBookmark = !!bubble.isBookmark;
   $: localBookmark = !!bubble.isBookmark;
-  // miss → Globe; не подставлять __miss__ в <img src>
-  $: faviconSrc = resolveFaviconSrc(host, $favicons, globe);
+  // miss → Globe; page → host → globe (Docs/Notion свой favicon)
+  $: faviconSrc = resolveFaviconSrc(host, $favicons, globe, bubble.url);
   // Cover только из meta/apple-touch — без fallback на мелкий favicon
   $: coverSrc = resolveCoverSrc(host, $covers, "");
   $: showCoverBg = !!coverSrc && (size >= COVER_MIN_SIZE || localBookmark);
@@ -433,36 +433,7 @@
     pointer-events: none;
   }
   .bubbleDot.bookmark .bubbleDot__cover::after {
-    // background: radial-gradient(
-    //   circle at 30% 25%,
-    //   hsla(42, 85%, 70%, 0.42),
-    //   hsla(42, 80%, 48%, 0.5) 55%,
-    //   hsla(42, 75%, 32%, 0.62)
-    // );
-    // https://docs.google.com/a/examle.com/forms/d/xxxxxx/viewform?edit_requested=true
-    // https://docs.google.com/document/d/xxxx/edit#
-    // https://docs.google.com/spreadsheets/d/xxxx/edit#gid=xxxx
-    // https://docs.google.com/presentation/d/xxxx/edit#slide=id.g1234567890
-    // https://docs.google.com/drawings/d/xxxx/edit
-    // https://docs.google.com/maps/d/xxxx/edit
-    // https://docs.google.com/forms/d/xxxx/viewform?edit_requested=true
-    // https://docs.google.com/document/d/xxxx/edit#
-    // https://docs.google.com/spreadsheets/d/xxxx/edit#gid=xxxx
-    // https://docs.google.com/presentation/d/xxxx/edit#slide=id.g1234567890
-    // https://docs.google.com/drawings/d/xxxx/edit
-    // https://docs.google.com/maps/d/xxxx/edit
-    // https://docs.google.com/forms/d/xxxx/viewform?edit_requested=true
-    // https://docs.google.com/document/d/xxxx/edit#
-    // https://docs.google.com/spreadsheets/d/xxxx/edit#gid=xxxx
-    // https://docs.google.com/presentation/d/xxxx/edit#slide=id.g1234567890
-    // https://docs.google.com/drawings/d/xxxx/edit
-    // https://docs.google.com/maps/d/xxxx/edit
-    // https://docs.google.com/forms/d/xxxx/viewform?edit_requested=true
-    // https://docs.google.com/document/d/xxxx/edit#
-    // https://docs.google.com/spreadsheets/d/xxxx/edit#gid=xxxx
-    // https://docs.google.com/presentation/d/xxxx/edit#slide=id.g1234567890
-    // https://docs.google.com/drawings/d/xxxx/edit
-    // https://docs.google.com/maps/d/xxxx/edit
+    // Золотой тинт для закладок — сейчас выключен (cover + hue достаточно)
   }
   .bubbleDot.expanded {
     box-shadow:

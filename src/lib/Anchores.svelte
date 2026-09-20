@@ -12,6 +12,9 @@
     buildBookmarkIndex,
     makeChunks,
     enqueueFavicon,
+    enqueuePageFavicon,
+    faviconPageKey,
+    wantsPageFavicon,
     type HostGroup,
     type ChunkRow,
   } from "./bookmarks";
@@ -170,6 +173,7 @@
       for (const [host, group] of bookmarkList) {
         const node = built.nodesList[group.nodes[0]];
         if (!node?.url) continue;
+        // Общая иконка домена/субдомена
         enqueueFavicon(node.url, toDataURL, favicon_localhost).then((data) => {
           if (data) {
             favicons.update((map) => {
@@ -178,6 +182,22 @@
             });
           }
         });
+        // Page-level: Docs sheet ≠ doc, Notion page — свой favicon
+        for (const idx of group.nodes) {
+          const n = built.nodesList[idx];
+          if (!n?.url || !wantsPageFavicon(n.url)) continue;
+          const pageKey = faviconPageKey(n.url);
+          if (!pageKey) continue;
+          enqueuePageFavicon(n.url, toDataURL, favicon_localhost).then(
+            (data) => {
+              if (!data) return;
+              favicons.update((map) => {
+                map.set(pageKey, data);
+                return map;
+              });
+            }
+          );
+        }
         // Cover в фоне: только крупные пузыри и закладки
         if (
           shouldLoadCover({

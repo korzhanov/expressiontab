@@ -8,6 +8,8 @@ import {
   faviconSourceUrls,
   chromeFaviconUrl,
   resolveFaviconSrc,
+  faviconPageKey,
+  wantsPageFavicon,
   FAVICON_MISS,
   type HostGroup,
 } from "./bookmarks";
@@ -140,14 +142,75 @@ describe("favicon quiet load", () => {
     expect(urls.some((u) => u.includes("remote-workers"))).toBe(false);
   });
 
+  it("pageSpecific: Chrome full pageUrl first (Docs/Notion)", () => {
+    const prev = (globalThis as { chrome?: unknown }).chrome;
+    (globalThis as { chrome?: unknown }).chrome = {
+      runtime: {
+        getURL: (p: string) => `chrome-extension://testid${p}`,
+      },
+    };
+    try {
+      const doc =
+        "https://docs.google.com/document/d/xxxx/edit#heading=h.1";
+      const urls = faviconSourceUrls(doc, { pageSpecific: true });
+      // Полный pageUrl в первом кандидате
+      expect(urls[0]).toContain("/_favicon/");
+      expect(urls[0]).toContain(encodeURIComponent(doc));
+      expect(urls[0]).toContain("size=64");
+      // Потом host s2
+      expect(urls.some((u) => u.includes("domain=docs.google.com"))).toBe(
+        true
+      );
+    } finally {
+      (globalThis as { chrome?: unknown }).chrome = prev;
+    }
+  });
+
+  it("faviconPageKey strips query/hash; wantsPageFavicon for deep paths", () => {
+    expect(
+      faviconPageKey(
+        "https://docs.google.com/spreadsheets/d/abc/edit#gid=1"
+      )
+    ).toBe("docs.google.com/spreadsheets/d/abc/edit");
+    expect(
+      faviconPageKey("https://www.notion.so/Workspace/Page-xyz?v=1")
+    ).toBe("www.notion.so/Workspace/Page-xyz");
+    expect(wantsPageFavicon("https://docs.google.com/")).toBe(false);
+    expect(
+      wantsPageFavicon("https://docs.google.com/document/d/xxxx/edit")
+    ).toBe(true);
+  });
+
   it("skips s2/ico for localhost and raw IP", () => {
     expect(faviconSourceUrls("http://127.0.0.1:7860/")).toEqual([]);
     expect(faviconSourceUrls("http://localhost:3000/")).toEqual([]);
   });
 
-  it("resolveFaviconSrc ignores miss marker", () => {
-    const map = new Map([["x.com", FAVICON_MISS]]);
+  it("resolveFaviconSrc: page → host → globe; ignores miss", () => {
+    const map = new Map([
+      ["x.com", FAVICON_MISS],
+      ["docs.google.com/document/d/a/edit", "data:page"],
+      ["docs.google.com", "data:host"],
+    ]);
     expect(resolveFaviconSrc("x.com", map, "globe.svg")).toBe("globe.svg");
+    // Page выигрывает у host
+    expect(
+      resolveFaviconSrc(
+        "docs.google.com",
+        map,
+        "globe.svg",
+        "https://docs.google.com/document/d/a/edit"
+      )
+    ).toBe("data:page");
+    // Нет page — host
+    expect(
+      resolveFaviconSrc(
+        "docs.google.com",
+        map,
+        "globe.svg",
+        "https://docs.google.com/forms/d/missing/viewform"
+      )
+    ).toBe("data:host");
   });
 
   it("chromeFaviconUrl builds _favicon URL when chrome.runtime exists", () => {
@@ -162,7 +225,7 @@ describe("favicon quiet load", () => {
       expect(u).toContain("chrome-extension://testid/_favicon/");
       expect(u).toContain("pageUrl=");
       expect(u).toContain("size=64");
-      // Порядок: s2 32 → ico → Chrome → s2
+      // Порядок host: s2 32 → ico → Chrome → s2
       const urls = faviconSourceUrls("https://ex.com/path");
       expect(urls[0]).toContain("sz=32");
       expect(urls[1]).toBe("https://ex.com/favicon.ico");

@@ -37,8 +37,8 @@
   let closeTimer: ReturnType<typeof setTimeout> | null = null;
   let anchorEl: HTMLElement;
 
-  // miss/нет кэша → img_data или Globe (не строка __miss__ в url())
-  $: src = resolveFaviconSrc(host, $favicons, anchor?.img_data || globe);
+  // miss/нет кэша → page → host → img_data/Globe
+  $: src = resolveFaviconSrc(host, $favicons, anchor?.img_data || globe, url);
 
   function closeMenu() {
     if (closeTimer) {
