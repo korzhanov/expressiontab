@@ -5,6 +5,7 @@
    */
   import { onDestroy, onMount } from "svelte";
   import type { BookmarkNode, HostGroup } from "./bookmarks";
+  import { deleteDialUrl } from "./delete-dial-url";
   import {
     assignEnterAnims,
     buildHostBubbles,
@@ -1265,10 +1266,11 @@
       refreshVisible();
       try {
         if (typeof chrome !== "undefined") {
-          if (node?.isBookmark && node.id != null) {
-            chrome.bookmarks.remove(String(node.id));
-          }
-          chrome.history?.deleteUrl?.({ url });
+          void deleteDialUrl({
+            chromeApi: chrome,
+            url,
+            bookmarkId: node?.isBookmark ? node.id : null,
+          });
         }
       } catch (err) {
         console.error(err);

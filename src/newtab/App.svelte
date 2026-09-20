@@ -1,11 +1,15 @@
 <script lang="ts">
-  import { persist, localStorage } from "@macfja/svelte-persistent-store";
+  import { onMount } from "svelte";
   import { fade } from "svelte/transition";
-  import { writable } from "svelte/store";
   import firstbg from "../assets/expression-drops-xfactorial-com-copyright.jpg";
   import Anchores from "../lib/Anchores.svelte";
   import Timer from "../lib/Timer.svelte";
   import { bgOpacityFromScroll } from "../lib/utils";
+  import {
+    createBackgroundStore,
+    loadBackgroundUrl,
+    saveBackgroundUrl,
+  } from "../lib/background-persist";
   import {
     fileToBackgroundDataUrl,
     openUrlForSource,
@@ -24,7 +28,12 @@
   let dropBusy = false;
   let dropError = "";
 
-  let background = persist(writable(firstbg), localStorage(), "background");
+  // Не persist(localStorage) — data URL фона не влезает в ~5MB квоту
+  const background = createBackgroundStore(firstbg);
+
+  onMount(() => {
+    void loadBackgroundUrl(firstbg).then((url) => background.set(url));
+  });
 
   // Пассивный scroll без bind:scrollY — меньше реактивных проходов Svelte на кадр
   function onScroll() {
@@ -87,17 +96,21 @@
     try {
       let dataUrl: string;
       if (pendingDrop.kind === "url") {
-        // Внешний URL — ставим напрямую (cover/bg уже так работают)
+        // Внешний / data URL — как есть (маленький https ок)
         dataUrl = pendingDrop.url;
       } else {
-        // Сжать file → JPEG data URL под квоту localStorage
+        // Сжать file → JPEG; крупные — chrome.storage.local
         dataUrl = await fileToBackgroundDataUrl(pendingDrop.file);
       }
+      await saveBackgroundUrl(dataUrl);
       background.set(dataUrl);
       cancelDrop();
     } catch (err) {
       console.error(err);
-      dropError = "Could not set background";
+      dropError =
+        err instanceof Error && /large|full|storage/i.test(err.message)
+          ? "Image too large — try a smaller file"
+          : "Could not set background";
       dropBusy = false;
     }
   }

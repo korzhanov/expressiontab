@@ -30,4 +30,9 @@ describe("HostItem lined group row", () => {
     expect(src).not.toContain("unfoldHost");
     expect(src).not.toContain("import { onDestroy");
   });
+
+  it("lined groupToggle has no fill/border", () => {
+    expect(src).toMatch(/\.groupToggle\.lined\s*\{[^}]*background:\s*transparent/);
+    expect(src).toMatch(/\.groupToggle\.lined\s*\{[^}]*border:\s*none/);
+  });
 });

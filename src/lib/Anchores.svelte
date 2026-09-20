@@ -491,7 +491,7 @@
           disabled={stashBusy}
           on:click={() => onStashTabs(false)}
         >
-          move the window tabs
+          Clear the window tabs
         </button>
       </Tooltip.Root>
       <Tooltip.Root
@@ -505,7 +505,7 @@
           disabled={stashBusy}
           on:click={() => onStashTabs(true)}
         >
-          move all tabs
+          Clear all tabs
         </button>
       </Tooltip.Root>
       <Tooltip.Root
@@ -935,6 +935,16 @@
     /* Смена высоты bubble↔lined — без авто-якоря скролла браузера */
     overflow-anchor: none;
   }
+  /* Lined: без горизонтального скролла (VirtualScroll pageMode) */
+  anchores.titleVisible {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+  anchores.titleVisible :global(.virtual-scroll-item),
+  anchores.titleVisible :global([style*="overflow-y"]) {
+    overflow-x: hidden !important;
+    max-width: 100%;
+  }
   anchores .itemWrapper {
     display: flex;
     flex-wrap: wrap;
@@ -959,9 +969,12 @@
     align-items: stretch;
     justify-content: flex-start;
     align-content: stretch;
-    overflow: visible;
+    overflow: hidden;
+    overflow-x: hidden;
+    max-width: 100%;
     gap: 2px;
-    padding: 4px 8px;
+    padding: 2px 0;
+    box-sizing: border-box;
   }
 
   .lds-circle {
