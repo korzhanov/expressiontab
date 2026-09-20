@@ -7,9 +7,10 @@ describe("App image drop wiring", () => {
     const src = readFileSync(join(import.meta.dir, "../newtab/App.svelte"), "utf8");
     expect(src).toContain("parseImageDrop");
     expect(src).toContain("fileToBackgroundDataUrl");
+    expect(src).toContain("saveBackgroundUrl");
     expect(src).toContain("Open in new window");
     expect(src).toContain("Set as background");
     expect(src).toContain("on:drop={onDrop}");
-    expect(src).toContain("background.set");
+    expect(src).not.toContain("persist(writable");
   });
 });

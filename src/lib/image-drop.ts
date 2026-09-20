@@ -73,33 +73,104 @@ export function parseImageDrop(dt: DataTransferLike | null | undefined): DropIma
   return null;
 }
 
-/** Сжать File → JPEG data URL (maxEdge) для localStorage quota */
+/** Сжать File → JPEG data URL (maxEdge) под квоту storage */
 export async function fileToBackgroundDataUrl(
   file: File,
   {
     maxEdge = 1920,
     quality = 0.85,
-  }: { maxEdge?: number; quality?: number } = {}
+    maxChars = 2_800_000,
+  }: { maxEdge?: number; quality?: number; maxChars?: number } = {}
 ): Promise<string> {
-  // data: уже мелкий — отдать как есть через FileReader
   if (file.type === "image/svg+xml") {
     return readFileAsDataUrl(file);
   }
-  const bitmap = await createImageBitmap(file);
+
+  const steps: { edge: number; q: number }[] = [
+    { edge: maxEdge, q: quality },
+    { edge: 1280, q: 0.72 },
+    { edge: 960, q: 0.62 },
+    { edge: 720, q: 0.55 },
+  ];
+
+  let lastErr: unknown;
+  for (const step of steps) {
+    try {
+      const dataUrl = await encodeFileJpeg(file, step.edge, step.q);
+      if (dataUrl.length <= maxChars) return dataUrl;
+      lastErr = new Error(`encoded too large: ${dataUrl.length}`);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  // Последний шанс — сырой FileReader (может тоже не влезть)
   try {
-    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+    const raw = await readFileAsDataUrl(file);
+    if (raw.length <= maxChars) return raw;
+  } catch (e) {
+    lastErr = e;
+  }
+  throw lastErr instanceof Error ? lastErr : new Error("encode failed");
+}
+
+async function encodeFileJpeg(
+  file: File,
+  maxEdge: number,
+  quality: number
+): Promise<string> {
+  let bitmap: ImageBitmap | null = null;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    // createImageBitmap недоступен / формат — через <img> + FileReader
+    return drawViaHtmlImage(file, maxEdge, quality);
+  }
+  try {
+    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height, 1));
     const w = Math.max(1, Math.round(bitmap.width * scale));
     const h = Math.max(1, Math.round(bitmap.height * scale));
     const canvas = document.createElement("canvas");
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return readFileAsDataUrl(file);
+    if (!ctx) throw new Error("no 2d context");
     ctx.drawImage(bitmap, 0, 0, w, h);
     return canvas.toDataURL("image/jpeg", quality);
   } finally {
     bitmap.close?.();
   }
+}
+
+async function drawViaHtmlImage(
+  file: File,
+  maxEdge: number,
+  quality: number
+): Promise<string> {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const img = await loadHtmlImage(objectUrl);
+    const scale = Math.min(1, maxEdge / Math.max(img.naturalWidth, img.naturalHeight, 1));
+    const w = Math.max(1, Math.round(img.naturalWidth * scale));
+    const h = Math.max(1, Math.round(img.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return readFileAsDataUrl(file);
+    ctx.drawImage(img, 0, 0, w, h);
+    return canvas.toDataURL("image/jpeg", quality);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+function loadHtmlImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("image load failed"));
+    img.src = src;
+  });
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {
