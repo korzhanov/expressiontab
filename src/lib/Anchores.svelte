@@ -1,429 +1,729 @@
 <script lang="ts">
-  import { onMount, tick, setContext, onDestroy } from "svelte";
-  import { writable } from "svelte/store";
-  import { tweened } from "svelte/motion";
+  import { onMount, setContext, onDestroy } from "svelte";
+  import { writable, get } from "svelte/store";
   import Keydown from "svelte-keydown";
   import { cubicOut, quintOut } from "svelte/easing";
-  import { draw, fade } from "svelte/transition";
-  // import VirtualList from "@sveltejs/svelte-virtual-list";
-  // import VirtualList from "./VirtualList.svelte";
-  // import InfiniteScroll from "svelte-infinite-scroll";
+  import { draw } from "svelte/transition";
   import VirtualScroll from "svelte-virtual-scroll-list";
-  import HostItem from "./HostItem.svelte";
   import HostItems from "./HostItems.svelte";
   import { filteredListSliced, nodesList } from "./stores";
-  import { toDataURL, ignoreUrl } from "./utils";
+  import { toDataURL } from "./utils";
+  import {
+    buildBookmarkIndex,
+    makeChunks,
+    type HostGroup,
+    type ChunkRow,
+  } from "./bookmarks";
+  import { configureIconLoader, resetIconEnsure } from "./icon-ensure";
+  import { clearUnfoldedHosts } from "./unfold-limit";
+  import { isMockChrome } from "./chrome-mock";
+  import { stashOpenTabs, loadOpenTabsForSession, mergeSessionIntoIndex, type StashChrome } from "./stash-tabs";
+  import {
+    downloadLinksCsv,
+    importLinksFromCsvText,
+    type ImportBookmarksChrome,
+  } from "./links-csv";
+  import * as Tooltip from "./components/ui/tooltip";
+  import BubbleField from "./BubbleField.svelte";
+  import {
+    isLinedView,
+    loadDialViewMode,
+    nextDialViewMode,
+    saveDialViewMode,
+    type DialViewMode,
+  } from "./dial-view-mode";
+  import {
+    datesForPreset,
+    draftDatesFromRange,
+    formatHistoryRangeLabel,
+    historySearchBounds,
+    loadHistoryRangeFromStorage,
+    saveHistoryRangeToStorage,
+    shouldDismissRangePopover,
+    type HistoryRangePreset,
+    type HistoryRangeState,
+  } from "./history-range";
 
   let online = true;
-  let persistloading = true;
-  let page = 0;
-  let size = 200;
+  let initialLoadDone = false;
+  let searchInputEl: HTMLInputElement;
+  const previewMock = isMockChrome();
 
   let searchTerm: string = localStorage.searchTerm || "";
   let favicon_localhost = localStorage.favicon_localhost;
+  // Уже есть кэш — сразу отдать в ensure
+  if (favicon_localhost) {
+    configureIconLoader({ faviconLocalhost: favicon_localhost });
+  }
+  /** Диапазон history.search — пресеты + custom from–to */
+  let historyRange: HistoryRangeState = loadHistoryRangeFromStorage();
+  let rangePopoverOpen = false;
+  /** Корень trigger + popover — для outside-click */
+  let rangeRootEl: HTMLElement | null = null;
+  // Date inputs сразу с датами текущего пресета
+  let rangeDraftFrom = historyRange.fromDate;
+  let rangeDraftTo = historyRange.toDate;
 
   (async () => {
-    if (!favicon_localhost || favicon_localhost?.lenth == 0) {
+    // В preview (localhost) XHR к googleusercontent → CORS; в unpacked OK
+    if (previewMock) return;
+    if (!favicon_localhost || favicon_localhost?.length == 0) {
       favicon_localhost = await toDataURL(
         "https://s2.googleusercontent.com/s2/favicons?domain_url=http://localhost"
       );
-      localStorage.setItem("favicon_localhost", favicon_localhost);
+      if (favicon_localhost) {
+        localStorage.setItem("favicon_localhost", favicon_localhost);
+      }
     }
+    configureIconLoader({ faviconLocalhost: favicon_localhost });
   })();
 
-  let historyList: Array<any> = [],
-    bookmarkList: Map<any, any> = new Map(),
-    // filteredListSliced: Array<any> = [],
+  let bookmarkList: Map<string, HostGroup> = new Map(),
     bookmarkListSize: number = 0,
     loader: boolean = false,
-    titleVisible = false,
-    windowY: number = 0,
+    /** Активный dial-вид: в DOM только один (if/else if) */
+    viewMode: DialViewMode = loadDialViewMode(),
     hh: number = 0,
     ww: number = 0,
-    st: number = 0,
-    oldwindowY: number = 0,
-    visible = Math.ceil((hh * ww) / 50 / 50) || 200,
+    visible = 200,
     windowHeight: number = 0,
-    windowWidth: number = 0,
-    autoloader: any;
+    windowWidth: number = 0;
 
-  async function getNodes(searchTerm: string): Promise<any> {
+  // Совместимость: lined = старый titleVisible (CSS / HostItem context)
+  $: titleVisible = isLinedView(viewMode);
+
+  // VirtualScroll slot data — только value ряда
+  function chunkRowValue(data: unknown): HostGroup[] {
+    const row = data as { value?: HostGroup[] } | null;
+    return row?.value || [];
+  }
+
+  // Высота ряда ≈ max(anchorGroup с margin/border, крупные favicon) — без overflow:hidden
+  $: rowEstimate = titleVisible ? 48 : 220;
+
+  const titleVisibleStore = writable(false);
+  setContext("titleVisible", titleVisibleStore);
+  $: titleVisibleStore.set(titleVisible);
+  $: visible = Math.ceil((hh * ww) / 50 / 50) || 200;
+
+  async function getNodes(
+    term: string
+  ): Promise<[chrome.history.HistoryItem[], chrome.bookmarks.BookmarkTreeNode[]]> {
+    const { startTime, endTime } = historySearchBounds(historyRange);
     return Promise.all([
-      // получаем историю посещений
-      new Promise((resolve) => {
+      new Promise<chrome.history.HistoryItem[]>((resolve) => {
         chrome.history.search(
           {
-            text: searchTerm, // запрос для поиска
-            startTime:
-              new Date().getTime() -
-              1000 * 60 * 60 * 24 * Math.max(7, searchTerm.length + 1), // последние 7 дней или по количеству символов
-            maxResults: 1000, // максимальное количество результатов
+            text: term,
+            startTime,
+            endTime,
+            maxResults: 2500,
           },
           (results) => {
-            return resolve(results); // возвращаем результат
+            resolve(results || []);
           }
         );
       }),
-      chrome.bookmarks.search(searchTerm || "h"), // получаем массив закладок по запросу или по всем ссылкообразным закладкам если нет запроса
+      chrome.bookmarks.search(term || "h"),
     ]);
   }
 
+  function setHistoryPreset(preset: HistoryRangePreset) {
+    // Пресет + даты для date inputs (сегодня/вчера/недели)
+    const dates = datesForPreset(preset);
+    historyRange = { preset, fromDate: dates.fromDate, toDate: dates.toDate };
+    rangeDraftFrom = dates.fromDate;
+    rangeDraftTo = dates.toDate;
+    saveHistoryRangeToStorage(historyRange);
+    rangePopoverOpen = false;
+    getBookmarks();
+  }
+
+  function applyCustomRange() {
+    historyRange = {
+      preset: "custom",
+      fromDate: rangeDraftFrom,
+      toDate: rangeDraftTo,
+    };
+    saveHistoryRangeToStorage(historyRange);
+    rangePopoverOpen = false;
+    getBookmarks();
+  }
+
+  $: rangeStatusLabel = formatHistoryRangeLabel(historyRange);
+
   async function getBookmarks() {
     const startTime = performance.now();
-
-    //
-    console.log("get bookmark searchTerm", searchTerm);
     loader = true;
-    // @todo фильтровать по имеющимся анкорам
-    // @todo догружать по мере поиска по истории
 
-    const s = await getNodes(searchTerm); // получаем массив из двух объектов
-    // let a: any = s[0]; // первый объект истории
-    // let b: any = s[1]; // второй объект закладок
-    let arr1Length = s[0].length; // длина массива истории
-    let arr2Length = s[1].length; // длина массива закладок
-    bookmarkList = new Map(); // очищаем карту анкоров
-    let newNodesList = []; // очищаем карту нод
-    let maxVisits: number = 1; // максимальное количество посещений
-    // оптимизировать проход по массивам, совместить вычисления в один проход по длине массива
+    const s = await getNodes(searchTerm);
+    let built = buildBookmarkIndex(s[0] || [], s[1] || []);
 
-    // let chankList: Array<any> = []; // массив чанков для отображения
-    for (let i = 0; i < arr1Length + arr2Length; i++) {
-      // перебираем массив истории и закладок
-
-      let c: any;
-      if (i >= arr1Length) {
-        // если перебираем закладки
-        c = s[1][i - arr1Length]; // получаем элемент закладки
-        c.isBookmark = true; // добавляем поле обозначающее что это закладка
-      } else c = s[0][i]; // получаем элемент истории
-      if (!c.url) {
-        continue;
-      }
-      let host = "localhost"; // хост по умолчанию
-      // если url начинается на префикс из приведенных в списке ignoreUrl , то удаляем этот элемент из массива
+    // Открытые вкладки — сверху как session-группа (другой цвет)
+    const api = stashChrome();
+    if (api && !searchTerm.trim()) {
       try {
-        let ignore = false;
-        ignoreUrl.map((item) => {
-          if (c?.url?.startsWith(item)) {
-            ignore = true;
-          }
-        });
-        if (ignore) {
-          continue;
+        const session = await loadOpenTabsForSession(api);
+        if (session) {
+          const merged = mergeSessionIntoIndex({
+            bookmarkList: built.bookmarkList,
+            nodesList: built.nodesList,
+            session,
+          });
+          built = {
+            ...built,
+            bookmarkList: merged.bookmarkList,
+            nodesList: merged.nodesList,
+          };
         }
-      } catch (error) {
-        console.error(error);
-      }
-
-      try {
-        // попытка получить хост из адреса
-        host = new URL(c.url).host.split(":")[0]; // получаем хост
-        c.host = host; // добавляем поле хоста в объект
-        // c.img_data = online
-        //   ? // ? "https://s2.googleusercontent.com/s2/favicons?domain_url=" + encodeURIComponent(c.url)
-        //     "https://favicon.yandex.net/favicon/" + host
-        //   : localStorage.getItem("favicon_" + host);
-        if (bookmarkList.has(host)) {
-          // если хост уже есть в карте
-          let bmitems = bookmarkList.get(host); // получаем массив анкоров для хоста
-          bmitems.hostVisitCount = (bmitems.hostVisitCount ? bmitems.hostVisitCount * 1 : 1) + (c.visitCount || 1); // увеличиваем количество посещений хоста
-          maxVisits = Math.max(maxVisits, bmitems.hostVisitCount); // получаем максимальное количество посещений
-          c.weightVisits = Math.log10(
-            Math.max(c.visitCount || 1, c.hostVisitCount || 1)
-          ); // получаем вес посещений
-          // c.weightVisitsRadius = c.weightVisits * 10 + 10 + 50; // получаем примерный радиус анкора в зависимисти от веса посещений
-          bmitems.weightVisits = bmitems.weightVisits
-            ? bmitems.weightVisits * 1
-            : 1 + c.weightVisits; // увеличиваем вес посещений хоста
-          bmitems.weightVisitsRadius =
-            Math.ceil(bmitems.weightVisits * 10) + 10 + 50; // получаем примерный радиус анкора в зависимисти от веса посещений
-          // bmitems.push(c); // добавляем в массив анкоров для хоста
-          bmitems.nodes.push(newNodesList.length); // добавляем в массив анкоров для хоста
-          bookmarkList.set(host, bmitems); // добавляем в карту анкоров
-          // bookmarkList.set(host, [...bmitems, c]); // добавляем в карту анкоров
-        } else {
-          // если хоста нет в карте         
-          // console.log("c",c);
-          c.hostVisitCount = c.visitCount || 1; // присваиваем количество посещений
-          c.weightVisits = Math.log10(c.hostVisitCount); // получаем вес посещений
-          // console.log("c.weightVisits",c.weightVisits);
-          c.weightVisitsRadius = Math.ceil(c.weightVisits * 10) + 10 + 50; // получаем примерный радиус анкора в зависимисти от веса посещений
-          // bookmarkList.set(host, [c]); // добавляем в карту анкоров
-          bookmarkList.set(host, { nodes: [newNodesList.length] }); // добавляем в карту анкоров
-          storeFavicon(c.url); // сохраняем иконку хоста в локальное хранилище
-        }
-        newNodesList.push(c);
-      } catch (e) {
-        // если не удалось получить хост
-        console.error(e);
-        console.log("Link without host: ", c.url, c.title);
+      } catch (err) {
+        console.error(err);
       }
     }
-    nodesList.set(newNodesList); // присваиваем новый массив нод
-    // console.log("bookmarkList", bookmarkList);
-    // console.log("nodesList",$nodesList);
-    await makechanks();
-    loader = false; // закончили загрузку
-    bookmarkListSize = bookmarkList.size; // получаем длину карты анкоров
-    localStorage.maxVisits = maxVisits + ""; // сохраняем максимальное количество посещений
+
+    bookmarkList = built.bookmarkList;
+    nodesList.set(built.nodesList);
+    // Новая выдача — сбросить lined unfold LRU и asked-иконки
+    clearUnfoldedHosts();
+    resetIconEnsure();
+    // deps для ленивого ensure из BubbleDot / AnchoreItem
+    configureIconLoader({ faviconLocalhost: favicon_localhost });
+    localStorage.maxVisits = built.maxVisits + "";
+
+    // Иконки/cover — НЕ blast на все хосты: ensureIconsForAnchor у видимых
+
+    await rebuildChunks();
+    loader = false;
+    bookmarkListSize = bookmarkList.size;
+    initialLoadDone = true;
     console.log(`getBookmarks took ${performance.now() - startTime}ms`);
   }
 
-  // разбиваем на чанки
+  /** Ключ последней сборки — не дергать VirtualScroll без нужды */
+  let lastChunksKey = "";
 
-  async function makechanks(newNodesList) {
+  async function rebuildChunks() {
     const startTime = performance.now();
-    newNodesList = newNodesList || $nodesList;
-    loader = true; // начали рендер
-    // разбиваем bookmarkList на чанки по длине окна и радиусу анкоров
-    let chankList: Array<any> = [];
-    let ik = 1;
-    bookmarkList.forEach((value, key, map) => {
-      const last = chankList[chankList.length - 1];
-      let itemWidth =
-        value.weightVisitsRadius * 2 ||
-        newNodesList[value.nodes[0]].weightVisitsRadius * 2 ||
-        150;
-      // console.log("itemWidth",itemWidth);
-      if (
-        last &&
-        last.width + itemWidth <= windowWidth - 50
-        // last.width + 150 >= windowWidth - 100
-      ) {
-        last.value.push(value);
-        last.width = last.width + itemWidth;
-      } else {
-        let newItem = {
-          key: ik,
-          value: [],
-          width: itemWidth,
-        };
-        newItem.value.push(value);
-        chankList.push(newItem);
-      }
-      ik++;
-    });
-    filteredListSliced.set(chankList); // получаем массив анкоров из карты анкоров
-    loader = false; // закончили загрузку
-
+    // Без loader=true — иначе мигание и прыжок скролла при смене ширины/режима
+    const width = windowWidth || ww || 800;
+    lastChunksKey = `${titleVisible ? 1 : 0}:${width}:${bookmarkList.size}`;
+    const chankList = makeChunks(
+      bookmarkList,
+      $nodesList,
+      width,
+      titleVisible
+    );
+    filteredListSliced.set(chankList);
     console.log(`makechanks took ${performance.now() - startTime}ms`);
   }
 
-  async function storeFavicon(url: string) {
-    try {
-      let host = new URL(url).host.split(":")[0];
-      setTimeout(async () => {
-        let fav = localStorage.getItem("favicon_" + host);
-        if (!fav?.length) {
-          const promises = Promise.all([
-            toDataURL("http://www.google.com/s2/favicons?domain=" + host),
-            toDataURL("https://favicon.yandex.net/favicon/" + host),
-            //   toDataURL("chrome://favicon2/?size=16&scale_factor=1x&page_url=" +encodeURIComponent(hostAnchore.url)),
-            toDataURL(
-              "https://s2.googleusercontent.com/s2/favicons?domain_url=" + url
-            ),
-          ]);
-          let datas = await promises;
-          // перебираем все полученные иконки
-          datas.forEach((data: any) => {
-            if (data && data.length && data !== favicon_localhost) {
-              fav = data;
-            }
-          });
-          if (fav) localStorage.setItem("favicon_" + host, fav);
-        }
-      }, 10000);
-    } catch (e) {
-      console.log("No favicon for url: ", e);
+  function syncChunksIfNeeded() {
+    if (!bookmarkList.size) return;
+    const width = windowWidth || ww || 800;
+    // Lined: width почти не влияет на число рядов — всё равно ключ стабилен
+    if (!width && !titleVisible) return;
+    const key = `${titleVisible ? 1 : 0}:${width}:${bookmarkList.size}`;
+    if (key === lastChunksKey) return;
+    rebuildChunks();
+  }
+
+  /** Цикл dial-видов (bubble ↔ lined); без scrollTo — позицию страницы не трогаем */
+  function toggleViewMode() {
+    viewMode = nextDialViewMode(viewMode);
+    saveDialViewMode(viewMode);
+    lastChunksKey = "";
+    syncChunksIfNeeded();
+  }
+
+  let timer: ReturnType<typeof setTimeout>;
+  /** Идёт перенос вкладок в закладки */
+  let stashBusy = false;
+  /** Короткий статус после переноса */
+  let stashNote = "";
+  /** CSV import: скрытый file input */
+  let csvFileInput: HTMLInputElement;
+  let csvBusy = false;
+
+  $: newSearch(searchTerm);
+  // НЕ зависеть от ww/hh (clientWidth anchores) — VirtualScroll меняет высоту
+  // при скролле → иначе rebuild → прыжок
+  $: {
+    titleVisible;
+    windowWidth;
+    bookmarkList.size;
+    initialLoadDone;
+    if (initialLoadDone || bookmarkList.size) syncChunksIfNeeded();
+  }
+
+  async function newSearch(term: string) {
+    const timeout = initialLoadDone ? 150 : 300;
+    localStorage.searchTerm = term;
+    clearTimeout(timer);
+    loader = true;
+    timer = setTimeout(() => {
+      getBookmarks();
+    }, timeout);
+  }
+
+  function closeRangePopover() {
+    rangePopoverOpen = false;
+  }
+
+  function toggleRangePopover() {
+    rangePopoverOpen = !rangePopoverOpen;
+    if (rangePopoverOpen) {
+      // Всегда подставить актуальные даты в inputs
+      const draft = draftDatesFromRange(historyRange);
+      rangeDraftFrom = draft.fromDate;
+      rangeDraftTo = draft.toDate;
     }
   }
 
-  // let val='';
-  let timer: any;
-  $: newSearch(searchTerm);
-
-  async function newSearch(searchTerm: string) {
-    let timeout = 1050;
-    if (!persistloading) {
-      persistloading = false;
-      timeout = 3000;
+  /** Клик мимо — закрыть; нативный date calendar не в DOM — не трогаем, пока focus на date */
+  function onRangeDocPointerDown(e: PointerEvent) {
+    if (!rangePopoverOpen) return;
+    if (
+      !shouldDismissRangePopover({
+        root: rangeRootEl,
+        eventTarget: e.target,
+        activeElement: document.activeElement,
+      })
+    ) {
+      return;
     }
-    console.log("searchTerm", searchTerm);
-    localStorage.searchTerm = searchTerm; // сохраняем поисковый запрос в локальное хранилище
-    // filteredListSliced.set([]);
-    clearTimeout(timer); // очищаем таймер
-    timer = setTimeout(() => {
-      // запускаем таймер
-      getBookmarks(); // запускаем загрузку анкоров
-    }, timeout); // задержка в мс перед загрузкой анкоров
+    closeRangePopover();
+  }
+
+  /** Фокус ушёл из wrap (в т.ч. после закрытия native picker + клик мимо) */
+  function onRangeFocusOut() {
+    setTimeout(() => {
+      if (!rangePopoverOpen || !rangeRootEl) return;
+      if (rangeRootEl.contains(document.activeElement)) return;
+      closeRangePopover();
+    }, 0);
+  }
+
+  function clearSearch() {
+    // Escape: сначала свернуть date range, потом search
+    if (rangePopoverOpen) {
+      closeRangePopover();
+      return;
+    }
+    searchTerm = "";
+    searchInputEl?.blur();
+  }
+
+  function onSearchKeydown(e: KeyboardEvent) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      clearSearch();
+    }
+  }
+
+  function onGlobalKey(e: CustomEvent) {
+    // "/" focuses search when not typing in an input
+    if (e.detail === "/" || e.detail === "Slash") {
+      searchInputEl?.focus();
+    }
+  }
+
+  /** chrome.tabs + bookmarks — без permission `tabs`, URL даёт `<all_urls>`. */
+  function stashChrome(): StashChrome | null {
+    try {
+      if (
+        typeof chrome !== "undefined" &&
+        typeof chrome.tabs?.query === "function" &&
+        typeof chrome.bookmarks?.create === "function"
+      ) {
+        return chrome as unknown as StashChrome;
+      }
+    } catch {
+      // preview без mock tabs
+    }
+    return null;
+  }
+
+  async function onStashTabs(allWindows: boolean) {
+    if (stashBusy) return;
+    const api = stashChrome();
+    if (!api) {
+      stashNote = "Need Chrome extension";
+      return;
+    }
+    const scope = allWindows ? "all tabs" : "tabs in this window";
+    if (!confirm(`Save to bookmarks and close ${scope}?`)) return;
+    stashBusy = true;
+    stashNote = "";
+    try {
+      const result = await stashOpenTabs({ allWindows, chromeApi: api });
+      if (!result.bookmarked) {
+        stashNote = "No tabs to move";
+      } else {
+        stashNote = `Moved ${result.bookmarked}`;
+        await getBookmarks();
+      }
+    } catch (err) {
+      console.error(err);
+      stashNote = "Failed to move tabs";
+    } finally {
+      stashBusy = false;
+    }
+  }
+
+  /** chrome.bookmarks для CSV-импорта (в т.ч. preview mock). */
+  function importChrome(): ImportBookmarksChrome | null {
+    try {
+      if (
+        typeof chrome !== "undefined" &&
+        typeof chrome.bookmarks?.create === "function"
+      ) {
+        return chrome as unknown as ImportBookmarksChrome;
+      }
+    } catch {
+      // нет API
+    }
+    return null;
+  }
+
+  /** Export текущего dial (nodesList) в CSV-файл. */
+  function onExportCsv() {
+    const nodes = get(nodesList) || [];
+    const { rows } = downloadLinksCsv({ nodes });
+    stashNote = rows ? `CSV · ${rows} links` : "CSV · empty";
+  }
+
+  function onImportCsvClick() {
+    if (csvBusy) return;
+    if (!importChrome()) {
+      stashNote = "Need chrome.bookmarks";
+      return;
+    }
+    csvFileInput?.click();
+  }
+
+  async function onCsvFileChange(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    const api = importChrome();
+    if (!api) {
+      stashNote = "Need chrome.bookmarks";
+      return;
+    }
+    csvBusy = true;
+    stashNote = "CSV · import…";
+    try {
+      const text = await file.text();
+      const { imported, skipped } = await importLinksFromCsvText({
+        text,
+        chromeApi: api,
+      });
+      stashNote = skipped
+        ? `CSV · +${imported}, пропуск ${skipped}`
+        : `CSV · +${imported}`;
+      if (imported) await getBookmarks();
+    } catch (err) {
+      console.error(err);
+      stashNote = "CSV · import error";
+    } finally {
+      csvBusy = false;
+    }
   }
 
   onMount(() => {
-    // loadmore(true);
+    // focus search shortly after open for quicker filtering
+    setTimeout(() => searchInputEl?.focus(), 100);
+    // capture: закрыть range до других handlers
+    window.addEventListener("pointerdown", onRangeDocPointerDown, true);
   });
 
   onDestroy(() => {
-    // localStorage.setItem("maxVisits", "0");
-    filteredListSliced.set($filteredListSliced.slice(0, 200));
-    console.log("destroy anchores");
+    clearTimeout(timer);
+    window.removeEventListener("pointerdown", onRangeDocPointerDown, true);
   });
 </script>
 
-<!-- 
-  on:scroll={() => onScroll()}
-  on:keyup={handleKeyup}-->
 <svelte:window
-  bind:scrollY={windowY}
   bind:innerHeight={windowHeight}
   bind:innerWidth={windowWidth}
   bind:online
 />
-<!-- <p>showing items {start}-{end}:{visible}</p> -->
+
 <filterBar class="text-white">
-  <input
-    class="text-white"
-    type="search"
-    id="search"
-    bind:value={searchTerm}
-    title="Press Esc or Del to clear"
-  />
+  <div class="filterRow searchRow">
+    {#if previewMock}
+      <Tooltip.Root
+        content="No chrome.history — mock data"
+        side="bottom"
+        delayDuration={300}
+      >
+        <span class="previewBanner">Preview · mock data</span>
+      </Tooltip.Root>
+    {/if}
+      <input
+        class="text-white"
+        type="search"
+        id="search"
+        bind:this={searchInputEl}
+        bind:value={searchTerm}
+        on:keydown={onSearchKeydown}
+        placeholder="Search history & bookmarks"
+        autocomplete="off"
+      />
+  </div>
   <Keydown
     pauseOnInput
-    on:Backspace={() => {
-      if (searchTerm.length > 0) {
-        searchTerm = searchTerm.slice(0, -1);
-      }
-    }}
-    on:Delete={() => {
-      searchTerm = "";
-    }}
-    on:Escape={() => {
-      searchTerm = "";
-    }}
-    on:key={(e) => {
-      if (e.detail.length == 1) searchTerm = searchTerm + e.detail;
-    }}
+    on:Delete={clearSearch}
+    on:Escape={clearSearch}
+    on:key={onGlobalKey}
   />
-  <label id="changeView">
-    <input type="checkbox" bind:checked={titleVisible} />
-    <icon>
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        class="feather feather-stop-circle"
+  <div class="filterRow actionsRow">
+    <div class="stashBtns">
+      <Tooltip.Root
+        content="Save tabs in this window to bookmarks and close"
+        side="bottom"
+        delayDuration={350}
       >
-        {#if titleVisible}
-          <circle
-            cx="12"
-            cy="12"
-            r="10"
-            transition:draw={{
-              duration: 500,
-              delay: 0,
-              easing: cubicOut,
-            }}
-          />
-          <circle
-            cx="12"
-            cy="12"
-            r="2"
-            transition:draw={{
-              duration: 200,
-              delay: 200,
-              easing: cubicOut,
-            }}
-          />
-          <rect
-            x="6"
-            y="6"
-            width="12"
-            height="12"
-            transition:draw={{
-              duration: 100,
-              delay: 0,
-              easing: cubicOut,
-            }}
-          />
-        {:else}
-          <line
-            x1="8"
-            y1="6"
-            x2="21"
-            y2="6"
-            transition:draw={{
-              duration: 300,
-              delay: 100,
-              easing: cubicOut,
-            }}
-          />
-          <line
-            x1="8"
-            y1="12"
-            x2="21"
-            y2="12"
-            transition:draw={{
-              duration: 300,
-              delay: 200,
-              easing: quintOut,
-            }}
-          />
-          <line
-            x1="8"
-            y1="18"
-            x2="21"
-            y2="18"
-            transition:draw={{
-              duration: 400,
-              delay: 200,
-              easing: cubicOut,
-            }}
-          />
-          <line x1="3" y1="6" x2="3.01" y2="6" />
-          <line x1="3" y1="12" x2="3.01" y2="12" />
-          <line x1="3" y1="18" x2="3.01" y2="18" />
-        {/if}
-      </svg>
-    </icon>
-  </label>
-  <span>
-    {searchTerm}
-    showing items {visible}
-    of {bookmarkListSize}, last {searchTerm.length || 1} week{searchTerm.length >
-    1
-      ? "s"
-      : ""}
-  </span>
-</filterBar>
-<anchores bind:clientHeight={hh} bind:clientWidth={ww} class:titleVisible>
-  <!-- {#each $filteredListSliced as hostItem (hostItem)} -->
-  <!-- {#each hostItems as hostItem (hostItem)} -->
-  <!-- <HostItem {hostItem} /> -->
-  <!-- {/each} -->
-  <VirtualScroll
-    let:data
-    data={$filteredListSliced}
-    key="key"
-    pageMode={true}
-    topThreshold={5}
-    bottomThreshold={5}
-  >
-    <div class="itemWrapper">
-      <HostItems {...data} />
+        <button
+          type="button"
+          class="stashBtn"
+          disabled={stashBusy}
+          on:click={() => onStashTabs(false)}
+        >
+          Clear the window tabs
+        </button>
+      </Tooltip.Root>
+      <Tooltip.Root
+        content="Save tabs in all windows to bookmarks and close"
+        side="bottom"
+        delayDuration={350}
+      >
+        <button
+          type="button"
+          class="stashBtn"
+          disabled={stashBusy}
+          on:click={() => onStashTabs(true)}
+        >
+          Clear all tabs
+        </button>
+      </Tooltip.Root>
+      <Tooltip.Root
+        content="Download current dial links to CSV"
+        side="bottom"
+        delayDuration={350}
+      >
+        <button
+          type="button"
+          class="stashBtn"
+          disabled={csvBusy}
+          on:click={onExportCsv}
+        >
+          export csv
+        </button>
+      </Tooltip.Root>
+      <Tooltip.Root
+        content="Import links from CSV to bookmarks"
+        side="bottom"
+        delayDuration={350}
+      >
+        <button
+          type="button"
+          class="stashBtn"
+          disabled={csvBusy}
+          on:click={onImportCsvClick}
+        >
+          import csv
+        </button>
+      </Tooltip.Root>
+      <!-- Скрытый input: выбор .csv для импорта -->
+      <input
+        bind:this={csvFileInput}
+        type="file"
+        accept=".csv,text/csv"
+        class="csvFileInput"
+        on:change={onCsvFileChange}
+      />
     </div>
-  </VirtualScroll>
-  <!-- <InfiniteScroll window={true} threshold={1000} on:loadMore={() => page++} /> -->
+    <span class="status">
+      {#if searchTerm}“{searchTerm}” · {/if}
+      {bookmarkListSize} sites ·
+      <span
+        class="rangeWrap"
+        bind:this={rangeRootEl}
+        on:focusout={onRangeFocusOut}
+      >
+        <button
+          type="button"
+          class="rangeTrigger"
+          aria-expanded={rangePopoverOpen}
+          aria-haspopup="dialog"
+          on:click={toggleRangePopover}
+        >
+          {rangeStatusLabel}
+        </button>
+        {#if rangePopoverOpen}
+          <div
+            class="rangePopover"
+            role="dialog"
+            aria-label="History date range"
+          >
+            <div class="rangePresets">
+              <button type="button" on:click={() => setHistoryPreset("today")}>Today</button>
+              <button type="button" on:click={() => setHistoryPreset("yesterday")}>Yesterday</button>
+              <button type="button" on:click={() => setHistoryPreset("1w")}>1 week</button>
+              <button type="button" on:click={() => setHistoryPreset("4w")}>4 weeks</button>
+              <button type="button" on:click={() => setHistoryPreset("12w")}>12 weeks</button>
+              <button type="button" on:click={() => setHistoryPreset("all")}>All time</button>
+            </div>
+            <div class="rangeCustom">
+              <label>
+                From
+                <input type="date" bind:value={rangeDraftFrom} />
+              </label>
+              <label>
+                To
+                <input type="date" bind:value={rangeDraftTo} />
+              </label>
+              <button type="button" class="rangeApply" on:click={applyCustomRange}>Apply</button>
+            </div>
+          </div>
+        {/if}
+      </span>
+      {#if stashNote} · {stashNote}{/if}
+    </span>
+    <Tooltip.Root
+      content={viewMode === "lined" ? "Bubble view" : "Lined list view"}
+      side="bottom"
+      delayDuration={350}
+    >
+      <button
+        type="button"
+        id="changeView"
+        aria-pressed={viewMode === "lined"}
+        aria-label={viewMode === "lined" ? "Switch to bubble view" : "Switch to list view"}
+        data-view-mode={viewMode}
+        on:click|stopPropagation={toggleViewMode}
+      >
+        <icon>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="feather feather-stop-circle"
+          >
+            {#if titleVisible}
+              <circle
+                cx="12"
+                cy="12"
+                r="10"
+                transition:draw={{
+                  duration: 500,
+                  delay: 0,
+                  easing: cubicOut,
+                }}
+              />
+              <circle
+                cx="12"
+                cy="12"
+                r="2"
+                transition:draw={{
+                  duration: 200,
+                  delay: 200,
+                  easing: cubicOut,
+                }}
+              />
+              <rect
+                x="6"
+                y="6"
+                width="12"
+                height="12"
+                transition:draw={{
+                  duration: 100,
+                  delay: 0,
+                  easing: cubicOut,
+                }}
+              />
+            {:else}
+              <line
+                x1="8"
+                y1="6"
+                x2="21"
+                y2="6"
+                transition:draw={{
+                  duration: 300,
+                  delay: 100,
+                  easing: cubicOut,
+                }}
+              />
+              <line
+                x1="8"
+                y1="12"
+                x2="21"
+                y2="12"
+                transition:draw={{
+                  duration: 300,
+                  delay: 200,
+                  easing: quintOut,
+                }}
+              />
+              <line
+                x1="8"
+                y1="18"
+                x2="21"
+                y2="18"
+                transition:draw={{
+                  duration: 400,
+                  delay: 200,
+                  easing: quintOut,
+                }}
+              />
+              <line x1="3" y1="6" x2="3.01" y2="6" />
+              <line x1="3" y1="12" x2="3.01" y2="12" />
+              <line x1="3" y1="18" x2="3.01" y2="18" />
+            {/if}
+          </svg>
+        </icon>
+      </button>
+    </Tooltip.Root>
+  </div>
+</filterBar>
+<anchores bind:clientHeight={hh} bind:clientWidth={ww} class:titleVisible data-view-mode={viewMode}>
+  <!-- Взаимоисключающие виды: без {#key}+outro (fade на шарах держал BubbleField в DOM) -->
+  {#if viewMode === "lined"}
+    <VirtualScroll
+      let:data
+      data={$filteredListSliced}
+      key="key"
+      pageMode={true}
+      keeps={40}
+      estimateSize={rowEstimate}
+      topThreshold={2}
+      bottomThreshold={2}
+    >
+      <div class="itemWrapper lined" style:min-height="{rowEstimate}px">
+        <HostItems value={chunkRowValue(data)} />
+      </div>
+    </VirtualScroll>
+  {:else if viewMode === "bubble"}
+    {#if bookmarkList.size && $nodesList.length}
+      <!-- Bubble field: d3-force + viewport cull -->
+      <BubbleField
+        {bookmarkList}
+        nodesList={$nodesList}
+        width={windowWidth || ww || 800}
+      />
+    {/if}
+  {/if}
   {#if loader}<loader><div class="lds-circle"><div /></div></loader>{/if}
 </anchores>
 
-<!-- <autoloader bind:this={autoloader}>{hh}</autoloader> -->
 <style>
   loader {
     margin: 0 auto;
@@ -433,19 +733,46 @@
     background: rgb(20, 20, 20);
     border: 0px;
     border-bottom: 2px solid #b5b5b5;
-    height: 30px;
-    width: 98%;
+    box-sizing: border-box;
+    height: 40px;
+    width: 100%;
     text-align: center;
-    font-size: 30px;
-    padding: 10px 0px;
+    font-size: 22px;
+    line-height: 1.2;
+    padding: 4px 0 6px;
+  }
+  /* Поиск в своей строке — не width:98%, иначе кнопки уезжают под placeholder */
+  filterBar .searchRow :global(.tooltip-root.block) {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
   }
   #search:focus {
     border-bottom: 2px solid #395e9d;
     outline: none;
   }
-  #changeView input {
-    opacity: 0;
-    display: none;
+  #search::placeholder {
+    color: #666;
+    font-size: 18px;
+  }
+  #changeView {
+    margin-left: auto;
+    flex-shrink: 0;
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 4px;
+    color: inherit;
+    line-height: 0;
+    display: inline-flex;
+    align-items: center;
+  }
+  #changeView:hover {
+    opacity: 0.85;
+  }
+  #changeView:focus-visible {
+    outline: 1px solid #395e9d;
+    outline-offset: 2px;
   }
   .text-white {
     color: #fff;
@@ -454,94 +781,210 @@
     background: rgb(20, 20, 20);
     display: flex;
     position: relative;
-    height: 80px;
+    height: auto;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 8px;
+    padding: 10px 32px 12px;
+    opacity: 1;
+    z-index: 10;
+  }
+  filterBar .filterRow {
+    display: flex;
     flex-direction: row;
-    flex-wrap: wrap;
-    align-content: space-around;
-    justify-content: flex-start;
+    flex-wrap: nowrap;
     align-items: center;
     gap: 10px;
-    padding: 0 32px;
+    width: 100%;
+    min-width: 0;
   }
-  filterBar * {
-    opacity: 0;
-    transition: opacity 0.3s ease;
+  filterBar .actionsRow {
+    flex-wrap: wrap;
+    position: relative;
   }
-  main:hover filterBar * {
-    opacity: 1;
-    transition: opacity 0.3s ease 2s;
+  filterBar .previewBanner {
+    font-size: 11px;
+    color: #f0c040;
+    border: 1px solid #665522;
+    border-radius: 4px;
+    padding: 2px 8px;
+    white-space: nowrap;
   }
-  /* filterBar:before {
-      content: "";
-      background: linear-gradient(
-         180deg,
-         rgba(20, 20, 20, 0),
-         rgba(20, 20, 20, 1)
-      );
-      height: 100px;
-      width: 100%;
-      position: relative;
-      display: block;
-      left: 0;
-      top: -100px;
-   } */
+  filterBar .status {
+    font-size: 12px;
+    color: #999;
+    white-space: nowrap;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  filterBar .rangeTrigger {
+    background: none;
+    border: none;
+    color: #b5c4e0;
+    font-size: inherit;
+    padding: 0 2px;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+  }
+  filterBar .rangeTrigger:hover {
+    color: #fff;
+  }
+  /* Якорь для absolute popover; inline чтобы не ломать status-строку */
+  filterBar .rangeWrap {
+    position: relative;
+    display: inline;
+  }
+  filterBar .rangePopover {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 6px);
+    z-index: 20;
+    background: rgb(28, 28, 32);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    padding: 10px 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 280px;
+  }
+  filterBar .rangePresets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  filterBar .rangePresets button,
+  filterBar .rangeApply {
+    background: rgba(255, 255, 255, 0.06);
+    color: #ddd;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  filterBar .rangePresets button:hover,
+  filterBar .rangeApply:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+  }
+  filterBar .rangeCustom {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 8px;
+    font-size: 11px;
+    color: #aaa;
+  }
+  filterBar .rangeCustom label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  filterBar .rangeCustom input[type="date"] {
+    background: rgb(20, 20, 20);
+    border: 1px solid #444;
+    color: #eee;
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-size: 11px;
+  }
+  filterBar .stashBtns {
+    display: flex;
+    flex-shrink: 0;
+    gap: 6px;
+    position: relative;
+    z-index: 3;
+  }
+  filterBar .stashBtn {
+    background: rgba(255, 255, 255, 0.06);
+    color: #ddd;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+    line-height: 1.2;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  filterBar .stashBtn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.28);
+    color: #fff;
+  }
+  filterBar .stashBtn:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  filterBar .csvFileInput {
+    display: none;
+  }
   anchores {
     display: block;
     box-sizing: border-box;
-    /*  */
     position: relative;
     width: 100%;
-    /* margin: 20px; */
     padding: 20px;
     height: auto;
-    /* min-height: 500px; */
     padding-top: 20px;
     z-index: 1;
-    /* bottom: 0;
-      left: 0; */
-    /* margin-bottom: 40px; */
     background: rgb(20, 20, 20);
-    transform: translateZ(0px);
-    /* justify-content: flex-start; */
-
-    /* min-height: 700px; */
-    /* display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
-      gap: 5px; */
+    /* Смена высоты bubble↔lined — без авто-якоря скролла браузера */
+    overflow-anchor: none;
   }
-  /* anchores:after {
-    height: 100px;
-    display: block;
-    position: absolute;
-    left: 0;
-    content: "";
-    background: linear-gradient(0deg, rgba(20, 20, 20, 0), rgba(20, 20, 20, 1));
-
-  } */
+  /* Lined: без горизонтального скролла (VirtualScroll pageMode) */
+  anchores.titleVisible {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+  anchores.titleVisible :global(.virtual-scroll-item),
+  anchores.titleVisible :global([style*="overflow-y"]) {
+    overflow-x: hidden !important;
+    max-width: 100%;
+  }
   anchores .itemWrapper {
     display: flex;
     flex-wrap: wrap;
     flex-direction: row;
-    align-content: flex-end;
+    align-content: center;
     align-items: center;
     width: 100%;
-    height: 150px;
+    height: 220px;
     justify-content: center;
     box-sizing: border-box;
-    transform: translateZ(0px);
+    /* visible — иначе круги с margin/scale обрезаются по mid-line */
+    overflow: visible;
+  }
+  /* Обёртка virtual-scroll тоже не должна клипать */
+  anchores :global(.virtual-scroll-item) {
+    overflow: visible;
+  }
+  anchores .itemWrapper.lined {
+    height: auto;
+    min-height: 48px;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    align-content: stretch;
+    overflow: hidden;
+    overflow-x: hidden;
+    max-width: 100%;
+    gap: 2px;
+    padding: 2px 0;
+    box-sizing: border-box;
   }
 
   .lds-circle {
     display: inline-block;
-    transform: translateZ(1px);
   }
   .lds-circle > div {
     display: inline-block;
     width: 40px;
     height: 40px;
     margin: 8px;
-    /* border-radius: 50%; */
-    /* background: #fff; */
     background: center no-repeat url("../assets/icon32.png");
     background-size: contain;
     animation: lds-circle 2.4s cubic-bezier(0, 0.2, 0.8, 1) infinite;
@@ -560,36 +1003,6 @@
     }
     100% {
       transform: rotateY(3600deg);
-    }
-  }
-
-  .titleVisible {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-
-  .titleVisible :global(anchor) {
-    width: 100% !important;
-    padding: 10px !important;
-    margin: 10px !important;
-    border: 1px solid transparent !important;
-    transform: scale(1) !important;
-    /* display: block; */
-    animation: -global-width-grow-anchor 1s
-      cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
-  }
-  .titleVisible :global(anchor:nth-child(-n + 10)) {
-    transition: transform cubic-bezier(0.23, 1, 0.32, 1), width 0.5s ease;
-  }
-
-  @keyframes -global-width-grow-anchor {
-    0% {
-      width: 50px;
-      /* display: inline-block; */
-    }
-    100% {
-      width: auto;
-      /* display: block; */
     }
   }
 </style>

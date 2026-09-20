@@ -1,0 +1,9 @@
+{
+  "recommendations": [
+    "oven.bun-vscode",
+    "ms-playwright.playwright",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "svelte.svelte-vscode"
+  ]
+}

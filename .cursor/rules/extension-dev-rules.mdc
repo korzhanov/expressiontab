@@ -1,0 +1,38 @@
+---
+description: ExpressionTab — Svelte Chrome extension conventions
+alwaysApply: true
+---
+
+# ExpressionTab frontend rules
+
+Эксперт по Chrome MV3 extensions, Svelte 3, TypeScript, Vite.
+
+## Принципы
+
+- Пиши кратко; не ломай существующее поведение без нужды.
+- `bun` для install / test / scripts; тесты — `bun:test`.
+- Чистую логику (группировка, чанки, ignore URL) держи в `src/lib/*.ts`, не только в `.svelte`.
+- Не удаляй существующие комментарии и dev-логи без явной причины (план/баг может требовать убрать hot-path `console.log`).
+- UI: new-tab — один composition; не раздувай filter bar лишними карточками.
+
+## Структура
+
+```text
+src/
+  manifest.json
+  newtab/          # App entry
+  lib/             # components + bookmarks/utils/stores
+builds/expressiontab/  # load unpacked
+```
+
+## Chrome APIs
+
+- Используй typed `chrome.*` (`@types/chrome`).
+- Не запрашивай лишние permissions; host_permissions только для favicon/сети по необходимости.
+- Публичный репо + MV3: least privilege, без удалённого кода и без скрытой отправки history/bookmarks — см. `public-repo-security.mdc`.
+
+## Производительность
+
+- Виртуализация рядов через `svelte-virtual-scroll-list` (не сырой `{#each}` на тысячи нод).
+- Не подписывай каждый item на весь `$nodesList` — передавай `anchor` пропом.
+- Тяжёлые CSS (`blur`, постоянный `will-change`) — sparingly.

@@ -1,104 +1,141 @@
 <script lang="ts">
-  import { onMount, onDestroy, tick, getContext, hasContext } from "svelte";
-  import Icon, {
-    Star,
-    Trash,
-    Pencil,
-    Duplicate,
-    ClipboardCopy,
-    Globe,
-  } from "svelte-hero-icons";
+  import Icon, { Star, Trash, Duplicate } from "svelte-hero-icons";
   import globe from "../assets/Globe.svg";
-  import { fly, scale, slide } from "svelte/transition";
-  import { quintOut } from "svelte/easing";
-  import { filteredListSliced, nodesList } from "./stores";
+  import { fly, fade } from "svelte/transition";
+  import { onDestroy, onMount } from "svelte";
+  import { favicons } from "./stores";
+  import { resolveFaviconSrc } from "./bookmarks";
+  import { ensureIconsForAnchor } from "./icon-ensure";
+  import * as Tooltip from "./components/ui/tooltip";
+  import BubblePop from "./BubblePop.svelte";
+  import { buildAnchorTooltip, formatDateShort } from "./age-format";
+  import { deleteDialUrl } from "./delete-dial-url";
 
-  export let index: number = 0;
-  console.log("index", index);
-  // let index: number = anchor.index || 0;
-  export let anchor: any = $nodesList[index] || {};
-  // console.log("$nodesList", $nodesList);
-  // console.log("$nodesList[index]", $nodesList[index]);
-  // console.log("anchor", anchor);
-  let now = new Date();
-  // let dateAdded: number = anchor.dateAdded || now.getTime();
-  // let dateGroupModified: number = anchor.dateGroupModified || now.getTime();
-  // let lastVisitTime: number = anchor.lastVisitTime || now.getTime();
-  let id: number = anchor.id || 0;
+  export let anchor: any = {};
   export let unfold: boolean | null = null;
-  export let childrenInvisible: boolean | null = null;
-  let typedCount: number = anchor.typedCount || 0;
-  let parentId: number | null = anchor.parentId || null;
-  let isBookmark: boolean = anchor.isBookmark || false;
-  let title: string = anchor.title || "";
-  let url: string = anchor.url || "";
-  let visitCount: number = anchor.visitCount || 1;
-  let hostVisitCount: any = anchor.hostVisitCount || 0;
-  let multiButton: boolean = false;
-  let deleted: boolean = false;
-  let maxVisits: number = localStorage?.maxVisits * 1 || 500;
+  export let childrenInvisible: boolean | null = true;
+  export let titleVisible: boolean = false;
+  /** Вложенная ссылка группы в lined — отступ слева */
+  export let nested: boolean = false;
 
-  export let weightVisits: number =
-    // anchor.weightVisits ||
-    Math.log10(Math.max(unfold ? visitCount : hostVisitCount, visitCount) * 1);
-  let weightVisitsRadius: any = anchor.weightVisitsRadius || 50;
+  $: id = anchor?.id || 0;
+  $: isBookmark = anchor?.isBookmark || false;
+  $: title = anchor?.title || "";
+  $: url = anchor?.url || "";
+  $: visitCount = anchor?.visitCount || 1;
+  $: hostVisitCount = anchor?.hostVisitCount || 0;
+  $: host = anchor?.host || "localhost";
+  // Тултип: last visit / added / open duration
+  $: tipMeta = buildAnchorTooltip({
+    title: nested ? url : title || host,
+    visitCount: unfold ? visitCount : hostVisitCount || visitCount,
+    lastVisitTime: anchor?.lastVisitTime,
+    dateAdded: anchor?.dateAdded,
+    isBookmark,
+    isSession: !!anchor?.isSession,
+    openedAt: anchor?.openedAt ?? anchor?.lastVisitTime,
+  });
+  $: tipContent = tipMeta.text || title || host || url;
+  // Строка titleVisible: title | visits | last visit
+  $: lastVisitLabel = formatDateShort(anchor?.lastVisitTime || 0);
+  $: showTitleLine = [
+    title || host,
+    isBookmark ? "bookmark" : `${visitCount} visits`,
+    lastVisitLabel ? `last ${lastVisitLabel}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  // В lined кнопки чуть меньше ряда; в bubble — крупнее
+  $: actionIconSize = titleVisible ? "16" : "22";
+  $: weightVisits = Math.log10(
+    Math.max(unfold ? visitCount : hostVisitCount, visitCount) * 1 || 1
+  );
+  $: weightVisitsRadius = anchor?.weightVisitsRadius || 50;
 
-  let ping = "";
-  try {
-    let tmping: URL = new URL(url);
-    tmping.searchParams.append("utm_network", "ExpressionTab_ChromeExtension");
-    ping = tmping.href;
-  } catch (e) {
-    console.error(url);
-    console.error(e);
+  let multiButton = false;
+  let menuFlip = false;
+  let deleted = false;
+  /** Идёт анимация лопания перед удалением из DOM (bubble) */
+  let popping = false;
+  /** Lined: slide/fade вместо BubblePop */
+  let listRemoving = false;
+  let closeTimer: ReturnType<typeof setTimeout> | null = null;
+  let anchorEl: HTMLElement;
+
+  // miss/нет кэша → page → host → img_data/Globe
+  $: src = resolveFaviconSrc(host, $favicons, anchor?.img_data || globe, url);
+
+  // Лениво: ряд VirtualScroll виден → idle-очередь (cover только bubble)
+  $: if (url) {
+    ensureIconsForAnchor({
+      url,
+      radius: (weightVisitsRadius || 50) / 2,
+      isBookmark,
+      skipCover: titleVisible,
+    });
   }
-  export let host = "";
-  host = host || anchor.host || "localhost";
-  // try {
-  //     host = new URL(url).host.split(":")[0] || "localhost";
-  // } catch (e) {
-  //     console.log("No favicon for url: ", url);
-  // }
 
-  // @todo если нет сохраненного фавикона
-  // показать сначала по прямой ссылке
-  // в следующий раз можно показать и кэшированный
-  // let src: string = "https://s2.googleusercontent.com/s2/favicons?domain_url=" + host;
-  let src: string = globe;
-  let img_data: string =
-    // localStorage.getItem("favicon_" + host) ||
-    anchor.img_data || "https://favicon.yandex.net/favicon/" + host;
-  // @todo написать поиск фавикон по url.path
-
-  if (img_data.length > 0) {
-    src = img_data;
+  function closeMenu() {
+    if (closeTimer) {
+      clearTimeout(closeTimer);
+      closeTimer = null;
+    }
+    multiButton = false;
   }
 
-  // function remove(todo) {
-  // 	todos = todos.filter(t => t !== todo);
-  // }
+  /** Показать меню действий (hover / ПКМ); клик по ссылке не блокируем — pointer-events:none на оверлее */
+  function showMenu() {
+    if (closeTimer) {
+      clearTimeout(closeTimer);
+      closeTimer = null;
+    }
+    if (anchorEl) {
+      const rect = anchorEl.getBoundingClientRect();
+      // По умолчанию кнопки справа сверху; у правого края — зеркало влево
+      menuFlip =
+        typeof window !== "undefined" &&
+        rect.right > window.innerWidth - 140;
+    }
+    multiButton = true;
+  }
 
-  // Чтобы получить значок для домена, используйте:
-  // https://s2.googleusercontent.com/s2/favicons?domain=www.stackoverflow.com
-  // http://www.google.com/s2/favicons?domain=somedomain.com
+  function openMenu(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    showMenu();
+  }
 
-  // Чтобы получить значок для URL-адреса, используйте:
-  // https://s2.googleusercontent.com/s2/favicons?domain_url=https://www.stackoverflow.com
-  // chrome://favicon2/?size=16&scale_factor=1x&page_url=https%3A%2F%2Fdocs.google.com%2Fforms%2Fd%2Fe%2F1FAIpQLSckRt0pts60MaYbNv73y5tiIMjLsfpuEdHwrsFXr9v6Bi21fg%2Fviewform&allow_google_server_fallback=0
+  function scheduleCloseMenu() {
+    if (closeTimer) clearTimeout(closeTimer);
+    // Небольшая задержка — успеть доехать курсором до кнопок меню
+    closeTimer = setTimeout(() => {
+      multiButton = false;
+    }, 280);
+  }
+
+  /** Курсор на кнопках меню — не закрывать */
+  function keepMenuOpen() {
+    if (!multiButton) return;
+    if (closeTimer) {
+      clearTimeout(closeTimer);
+      closeTimer = null;
+    }
+  }
 
   async function copyToBuffer(e: Event, copyText: string) {
     e.preventDefault();
-    document.addEventListener(
-      "copy",
-      function(e) {
-        e.clipboardData?.setData("text/plain", copyText);
-        e.preventDefault();
-      },
-      true
-    );
-    document.execCommand("copy");
-    // console.log("copied text : ", copyText);
+    try {
+      await navigator.clipboard.writeText(copyText);
+    } catch (err) {
+      console.error(err);
+    }
   }
+
+  /** Обёртка без type-annot в разметке (Svelte 3 parser) */
+  function onCopyClick(e: Event) {
+    copyToBuffer(e, url);
+  }
+
   async function changeBookmark() {
     if (isBookmark) {
       chrome.bookmarks.remove(String(id));
@@ -111,133 +148,163 @@
       isBookmark = true;
     }
   }
+
   async function deleteAnchore() {
-    if (isBookmark) {
-      chrome.bookmarks.remove(String(id));
-      isBookmark = false;
-    }
+    if (popping || listRemoving || deleted) return;
+    // Bookmark + history (и дубли закладок по URL) — иначе снова в индексе
     try {
-      chrome.history.deleteUrl({ url: url });
-      deleted = true;
+      if (typeof chrome !== "undefined") {
+        await deleteDialUrl({
+          chromeApi: chrome,
+          url,
+          bookmarkId: isBookmark ? id : null,
+        });
+      }
     } catch (e) {
       console.log(e);
     }
+    isBookmark = false;
+    closeMenu();
+    if (titleVisible) {
+      // Список: уезд вправо + fade (не BubblePop)
+      listRemoving = true;
+      setTimeout(() => {
+        deleted = true;
+        listRemoving = false;
+      }, 280);
+      return;
+    }
+    // Bubble: лопание, потом убираем из DOM
+    popping = true;
+    setTimeout(() => {
+      deleted = true;
+      popping = false;
+    }, 680);
   }
+
+  onMount(() => {
+    // pageMode VirtualScroll: mouseleave при скролле часто не приходит
+    const onScroll = () => {
+      if (multiButton) closeMenu();
+    };
+    const opts: AddEventListenerOptions = { capture: true, passive: true };
+    window.addEventListener("scroll", onScroll, opts);
+    return () => window.removeEventListener("scroll", onScroll, opts);
+  });
+
+  onDestroy(() => {
+    closeMenu();
+  });
 </script>
 
-{#if !deleted}
-  <!-- {@debug url} -->
-  <!-- {@debug weightVisits}} -->
-  <!-- {#if !new RegExp("^" + ignoreUrl.join("|")).test(url)}
-        class:titleVisible -->
-  <!-- transition:scale="{{duration: 500, delay: 500, opacity: 0.5, start: 0.5, easing: quintOut}}" -->
-  <!-- 
-
-        width:{weightVisits * 100 + 50}px;
-        height:{weightVisits * 100 + 50}px;
-        z-index: -{Math.ceil(weightVisits * 1000)};  
-
-        on:contextmenu|stopPropagation|preventDefault="{() => {
-				adjusting = !adjusting;
-				if (adjusting) selected = circle;
-			}}"
-    class="rounded-full"
-    on:mouseover={() => (multiButton = true)}
-    on:mouseleave={() => (multiButton = false)}
-    in:slide={{ duration: 700, delay: 300 }}
-    out:slide={{ duration: 700, delay: 300 }}
-    out:scale={{duration: 330, delay: 20, opacity: 0.1, start: 0.5, easing: quintOut}}
-    in:fly={{ x: -90, y: -20, duration: 350 }}
-
-
-    in:scale={{ duration: 330, opacity: 0.5, start: 0.5 }}
-    out:fly={{ x: -70, y: -20, duration: 350 }}
-
-  -->
-  <!-- -->
-  <anchor
-    {title}
-    style:margin="{weightVisits * 10 + 10}px;"
-    class:isBookmark
-    class:invisible={!childrenInvisible}
-    on:contextmenu|stopPropagation|preventDefault={() => (multiButton = true)}
-    on:mouseleave|stopPropagation|preventDefault={() => (multiButton = false)}
+{#if !deleted && anchor && url && (url.startsWith("http://") || url.startsWith("https://"))}
+  <Tooltip.List
+    content={tipContent}
+    side="bottom"
+    delayDuration={450}
+    block={titleVisible}
+    disabled={titleVisible && !nested}
   >
-    <bgcircle
-      style="
-    transform: translateZ(0) scale({(weightVisits * 1 + 1).toFixed(2)});
+    <anchor
+      bind:this={anchorEl}
+      style:margin={titleVisible ? "0" : `${Math.min(weightVisits, 2) * 8 + 8}px`}
+      class:isBookmark
+      class:aged={tipMeta.aged}
+      class:invisible={!childrenInvisible}
+      class:titleVisible
+      class:nested={nested && titleVisible}
+      class:menuFlip
+      class:popping
+      class:listRemoving
+      on:contextmenu={openMenu}
+      on:mouseleave={scheduleCloseMenu}
+      on:mouseenter={showMenu}
+    >
+      {#if !titleVisible}
+        <div class="popLayer" aria-hidden="true">
+          <BubblePop active={popping} />
+        </div>
+        <bgcircle
+          style="
+    transform: translateZ(0) scale({(Math.min(weightVisits, 2) * 0.35 + 1).toFixed(2)});
     background-image: url('{src}');
 "
-    />
-    <!-- style="background-image: url('{src}');" -->
-    <slot />
-    <a {ping} href={url}>
-      <!-- 
-        transition:scale={{
-          duration: 500,
-          delay: 50,
-          opacity: 0.5,
-          start: 0.5,
-          easing: quintOut,
-        }} -->
-
-      <anchoricon style:background-image="url('{src}')" />
-      <!-- style="background-image: url('{src}');" -->
-      {#if unfold === false}
-        <anchoricon
-          class="subicon"
-          in:fly={{ x: 95, duration: 300 }}
-          out:fly={{ x: 70, duration: 350 }}
-          style:background-image="url('{src}')"
-        />
-        <anchoricon
-          class="subicon"
-          in:fly={{ x: 55, duration: 300 }}
-          out:fly={{ x: 50, duration: 350 }}
-          style:background-image="url('{src}')"
-          style="transform:  translateZ(0) scale(0.56) translate(51px, -18px);"
         />
       {/if}
-
-      <span>
-        <strong>{title}</strong> | {isBookmark ? "⭐" : visitCount + " visits"}
-      </span>
-    </a>
-    {#if multiButton}
-        <!-- in:fly={{ x: 5, duration: 300 }}
-        out:fly={{ x: 5, duration: 300 }} -->
-      <div
-        class:multiButton
-        on:mouseenter|stopPropagation|preventDefault={() => {}}
+      <slot />
+      <a
+        href={url}
+        rel="noopener noreferrer"
+        on:click|stopPropagation
       >
-        <button
-          class:isBookmark
-          title="Bookmark"
-          on:click={(e) => changeBookmark()}
-        >
-          <Icon src={Star} solid size="22" />
-        </button>
-        <!-- {#if isBookmark}
-      {:else}
+        <anchoricon style:background-image="url('{src}')" />
+        {#if unfold === false && !titleVisible}
+          <anchoricon
+            class="subicon"
+            in:fly={{ x: 95, duration: 300 }}
+            out:fly={{ x: 70, duration: 350 }}
+            style:background-image="url('{src}')"
+          />
+          <anchoricon
+            class="subicon"
+            in:fly={{ x: 55, duration: 300 }}
+            out:fly={{ x: 50, duration: 350 }}
+            style:background-image="url('{src}')"
+            style="transform:  translateZ(0) scale(0.56) translate(51px, -18px);"
+          />
         {/if}
-          {#if isBookmark}
-              <button class="fas fa-comment" title="Edit">
-                  <Icon src={Pencil} solid size="22" />
-              </button>
-          {/if} -->
-        <button
-          class="copyToBuffer"
-          title="Copy url"
-          on:click={(e) => copyToBuffer(e, url)}
+
+        <span class:showTitle={titleVisible}>
+          {#if titleVisible}
+            {showTitleLine}
+          {:else}
+            <strong>{title || host}</strong>
+            | {isBookmark ? "bookmark" : visitCount + " visits"}
+          {/if}
+        </span>
+      </a>
+      {#if multiButton}
+        <div
+          class="multiButton"
+          class:menuFlip
+          class:lined={titleVisible}
+          transition:fade={{ duration: 160 }}
+          on:mouseenter={keepMenuOpen}
+          on:mouseleave={scheduleCloseMenu}
         >
-          <Icon src={Duplicate} solid size="22" />
-        </button>
-        <button title="Delete" on:click={() => deleteAnchore()}>
-          <Icon src={Trash} solid size="22" />
-        </button>
-      </div>
-    {/if}
-  </anchor>
+          <Tooltip.List content="Bookmark" side="top" delayDuration={200}>
+            <button
+              class:isBookmark
+              type="button"
+              aria-label="Bookmark"
+              on:click={() => changeBookmark()}
+            >
+              <Icon src={Star} solid size={actionIconSize} />
+            </button>
+          </Tooltip.List>
+          <Tooltip.List content="Copy url" side="top" delayDuration={200}>
+            <button
+              class="copyToBuffer"
+              type="button"
+              aria-label="Copy url"
+              on:click={onCopyClick}
+            >
+              <Icon src={Duplicate} solid size={actionIconSize} />
+            </button>
+          </Tooltip.List>
+          <Tooltip.List content="Delete" side="top" delayDuration={200}>
+            <button
+              type="button"
+              aria-label="Delete"
+              on:click={() => deleteAnchore()}
+            >
+              <Icon src={Trash} solid size={actionIconSize} />
+            </button>
+          </Tooltip.List>
+        </div>
+      {/if}
+    </anchor>
+  </Tooltip.List>
 {/if}
 
 <style lang="scss">
@@ -245,26 +312,19 @@
     display: none;
   }
 
-  @keyframes width-grow {
-    0% {
-      width: 0px;
-    }
-    100% {
-      width: auto;
-    }
-  }
   anchoricon {
-    height: 18px;
-    width: 18px;
-    margin: 6px;
-    transform: translateZ(0) scale(1.2);
+    height: 24px;
+    width: 24px;
+    margin: 4px 8px 4px 4px;
+    transform: translateZ(0) scale(1);
     background-repeat: no-repeat;
     background-position: center;
-    border-radius: 2px;
+    border-radius: 4px;
     background-image: url("../assets/Globe.svg");
     background-size: contain;
     box-sizing: border-box;
-    filter: drop-shadow(3px 1px 4px rgba(20, 20, 20, 0.52));
+    filter: drop-shadow(2px 1px 3px rgba(20, 20, 20, 0.45));
+    flex-shrink: 0;
   }
   anchoricon.subicon {
     position: absolute;
@@ -277,6 +337,7 @@
   anchor {
     --background: #fff;
     --text: black;
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
     position: relative;
     width: 50px;
     height: 50px;
@@ -285,12 +346,65 @@
     border: 10px solid transparent;
     text-overflow: ellipsis;
     display: block;
-    position: relative;
     padding-right: 0px;
     box-sizing: border-box;
-    animation: -global-width-grow-anchor 1s
-      cubic-bezier(0.455, 0.03, 0.515, 0.955) both;
-    transition: all 0.6s ease;
+    transition: transform 0.35s var(--ease-out), border-color 0.35s var(--ease-out),
+      background-color 0.35s var(--ease-out), box-shadow 0.35s var(--ease-out),
+      opacity 0.35s var(--ease-out);
+  }
+  // Во время лопания прячем контент иконки — виден только BubblePop
+  anchor.popping {
+    pointer-events: none;
+    background-color: transparent !important;
+    border-color: transparent !important;
+  }
+  anchor.popping > :not(.popLayer) {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.12s ease;
+  }
+  /* Lined delete: сдвиг вправо + fade */
+  anchor.titleVisible.listRemoving {
+    opacity: 0;
+    transform: translateX(28px);
+    pointer-events: none;
+    transition: opacity 0.26s var(--ease-out), transform 0.26s var(--ease-out);
+  }
+  .popLayer {
+    position: absolute;
+    inset: -4px;
+    z-index: 3000;
+    pointer-events: none;
+  }
+  anchor.titleVisible {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    min-height: 36px;
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.07);
+    margin: 0;
+    /* Справа место под 3 кнопки — title ellipsis не залезает на меню */
+    padding: 6px 6.75rem 6px 8px;
+    background-color: rgba(255, 255, 255, 0.035);
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  // Вложенные URL группы — визуальная иерархия списка
+  anchor.titleVisible.nested {
+    background-color: transparent;
+    border-color: transparent;
+    padding: 4px 6.75rem 4px 4px;
+    min-height: 32px;
+    border-radius: 8px;
+  }
+  anchor.titleVisible:hover {
+    background-color: rgba(255, 255, 255, 0.075);
+    border-color: rgba(255, 255, 255, 0.14);
+  }
+  anchor.titleVisible.nested:hover {
+    background-color: rgba(255, 255, 255, 0.055);
   }
   anchor bgcircle {
     width: 30px;
@@ -304,24 +418,11 @@
     left: 0;
     top: 0;
     z-index: -1;
-    filter: brightness(1) contrast(1) saturate(1.3) blur(5px);
+    filter: brightness(1) contrast(1) saturate(1.3);
     transform: translateZ(0);
     box-shadow: 5px 5px 10px #222;
-    // animation: pulseEffect 3s both infinite;
-    // }
-
-    // $percent: 1%;
-    // @for $i from 1 through 20 {
-    // :global(* bgcircle:nth-of-type(#{$i}) ) {
-    // bgcircle {
-    will-change: transform, filter, opacity;
-    // animation: pulseEffect infinite;
-    // animation-duration: 10s;
-    // transition-delay: 10s;
-    // animation-delay: 10s;
+    transition: transform 0.45s var(--ease-out), opacity 0.35s var(--ease-out);
   }
-  // }
-
   anchor.isBookmark {
     background-color: #484848;
     border-width: 7px !important;
@@ -329,106 +430,134 @@
     border-style: solid;
     padding: 3px;
   }
+  /* Давно не заходили / старая закладка */
+  anchor.aged:not(.titleVisible) {
+    box-shadow: 0 0 0 2px hsla(35, 40%, 55%, 0.55);
+  }
+  anchor.aged.titleVisible {
+    outline: 1px dashed hsla(35, 45%, 50%, 0.7);
+    outline-offset: 1px;
+  }
+  anchor.titleVisible.isBookmark {
+    border-width: 1px !important;
+    border-color: rgba(240, 192, 64, 0.35);
+    background-color: rgba(240, 192, 64, 0.06);
+    padding: 6px 6.75rem 6px 8px;
+  }
   .multiButton {
-    z-index: -1000;
+    z-index: 1000;
     position: absolute;
-    top: 1.25rem;
+    // Центр над иконкой — дуга сверху (bubble view)
+    top: 0.15rem;
     left: 1.25rem;
     border-radius: 100%;
-    width: 0rem;
-    height: 0rem;
-    opacity: 0;
+    width: 6.5rem;
+    height: 6.5rem;
+    opacity: 1;
     transform: translate(-50%, -50%);
-    transition: 0.25s cubic-bezier(0.25, 0, 0, 1) 1.5s;
+    // Пустая зона не перехватывает клик — открывается <a> под меню
+    pointer-events: none;
   }
-  .multiButton:hover {
-    z-index: 1000;
+  .multiButton.menuFlip {
+    left: 1.25rem;
+    right: auto;
+    transform: translate(-50%, -50%);
+  }
+  // Lined: кнопки поверх ссылки справа, с градиентной подложкой
+  .multiButton.lined {
+    top: 0;
+    bottom: 0;
+    left: auto;
+    right: 0;
+    width: auto;
+    height: auto;
+    border-radius: 0 10px 10px 0;
+    transform: none;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    padding: 0 8px 0 20px;
+    z-index: 30;
+    background: linear-gradient(
+      90deg,
+      rgba(22, 22, 22, 0) 0%,
+      rgba(22, 22, 22, 0.92) 28%,
+      rgba(22, 22, 22, 0.98) 100%
+    );
+  }
+  .multiButton.lined.menuFlip {
+    right: 0;
+    left: auto;
+    transform: none;
   }
   .multiButton button {
-    display: grid;
-    place-items: center;
-    position: absolute;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: static;
     width: 2rem;
     height: 2rem;
+    padding: 0;
+    margin: 0;
     border: none;
     border-radius: 100%;
     background: var(--background);
     color: var(--text);
-    transform: translateZ(0) translate(-50%, -50%);
+    line-height: 0;
+    // Только кнопки ловят клик (контейнер pointer-events: none)
+    pointer-events: auto;
+    transform: none;
     cursor: pointer;
-    // transition: 0.25s cubic-bezier(0.25, 0, 0, 1) 1.5s;
-    transition: left, top 0.25s cubic-bezier(0.25, 0, 0, 1) 1.5s;
+    transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease,
+      transform 0.28s var(--ease-out);
     box-shadow: 0 0 0rem -0.25rem var(--background);
+    z-index: 1001;
     &:hover {
       background: var(--text);
       color: var(--background);
       box-shadow: 0 0 1rem -0.25rem var(--background);
-      z-index: 1000;
+      z-index: 1002;
     }
-    &:first-child:nth-last-child(1),
-    &:first-child:nth-last-child(1) ~ * {
-      //If there is 1 child
-      &:nth-child(1) {
-        left: 25%;
-        top: 25%;
-      }
-    }
-    &:first-child:nth-last-child(2),
-    &:first-child:nth-last-child(2) ~ * {
-      //If there are 2 children
-      &:nth-child(1) {
-        left: 37.5%;
-        top: 18.75%;
-      }
-      &:nth-child(2) {
-        left: 18.75%;
-        top: 37.5%;
-      }
-    }
-    &:first-child:nth-last-child(3),
-    &:first-child:nth-last-child(3) ~ * {
-      //If there are 3 children
-      &:nth-child(1) {
-        left: 50%;
-        top: 15.625%;
-      }
-      &:nth-child(2) {
-        left: 25%;
-        top: 25%;
-      }
-      &:nth-child(3) {
-        left: 15.625%;
-        top: 50%;
-      }
-    }
-    &:first-child:nth-last-child(4), //If there are 4 children, if first child is also 4th item from bottom get self, and
-                &:first-child:nth-last-child(4) ~ * {
-      //If there are 4 children, if first child is also 4th item from bottom get siblings
-      &:nth-child(1) {
-        left: 62.5%;
-        top: 18.75%;
-      }
-      &:nth-child(2) {
-        left: 37.5%;
-        top: 18.75%;
-      }
-      &:nth-child(3) {
-        left: 18.75%;
-        top: 37.5%;
-      }
-      &:nth-child(4) {
-        left: 18.75%;
-        top: 62.5%;
-      }
+    // Центр иконки внутри круга (svelte-hero-icons / svg)
+    :global(svg) {
+      display: block;
+      margin: 0;
+      flex-shrink: 0;
     }
   }
-
-  anchor:hover .multiButton,
-  .multiButton:focus-within {
-    z-index: 100;
-    width: 10rem;
-    height: 10rem;
-    opacity: 1;
+  // Дуга сверху: позиции на обёртках Tooltip (не на button)
+  .multiButton:not(.lined) :global(.tooltip-root) {
+    position: absolute;
+    pointer-events: auto;
+    transform: translate(-50%, -50%);
+  }
+  .multiButton:not(.lined) :global(.tooltip-root:nth-child(1)) {
+    left: 22%;
+    top: 28%;
+  }
+  .multiButton:not(.lined) :global(.tooltip-root:nth-child(2)) {
+    left: 50%;
+    top: 8%;
+  }
+  .multiButton:not(.lined) :global(.tooltip-root:nth-child(3)) {
+    left: 78%;
+    top: 28%;
+  }
+  .multiButton.lined button {
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+  }
+  .multiButton.lined :global(.tooltip-root) {
+    position: static;
+    transform: none;
+    pointer-events: auto;
+  }
+  // Hovered dial выше соседей — кнопки не «под» соседней иконкой
+  anchor:hover,
+  anchor.menuFlip {
+    z-index: 50;
   }
   anchor a {
     color: #ddd;
@@ -443,16 +572,24 @@
     align-items: center;
     flex-wrap: nowrap;
     align-content: flex-end;
+    position: relative;
+    z-index: 2;
+    pointer-events: auto;
+    cursor: pointer;
   }
-  anchor:hover a {
-    opacity: 1;
-  }
-  .titleVisible anchor a span {
-    display: block;
-    min-width: 100px;
-    width: auto;
-    opacity: 1;
-    transition: width 0.6s ease, opacity 1s linear;
+  anchor.titleVisible a {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    min-height: 28px;
+    padding-right: 0;
+    color: rgba(255, 255, 255, 0.9);
+    gap: 2px;
+    min-width: 0;
+    box-sizing: border-box;
+    /* Ссылка под кнопками — клик по тексту; кнопки выше по z-index */
+    position: relative;
+    z-index: 1;
   }
   anchor a span {
     display: block;
@@ -460,24 +597,23 @@
     overflow: hidden;
     opacity: 0;
   }
-
-  @keyframes -global-width-grow-anchor {
-    0% {
-      width: 50px;
-    }
-    100% {
-      width: auto;
-    }
+  anchor a span.showTitle {
+    display: block;
+    min-width: 0;
+    width: auto;
+    flex: 1 1 0%;
+    opacity: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+    margin-left: 4px;
+    font-size: 14px;
+    line-height: 1.35;
+    letter-spacing: 0.01em;
   }
-  @keyframes pulseEffect {
-    0% {
-      opacity: 1;
-    }
-    40% {
-      opacity: 0.7;
-    }
-    100% {
-      opacity: 1;
-    }
+  anchor a span.showTitle strong {
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.95);
   }
 </style>

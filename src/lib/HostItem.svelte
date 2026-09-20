@@ -1,126 +1,157 @@
 <script lang="ts">
-  import { setContext, getContext, hasContext, tick } from "svelte";
-  import { children } from "svelte/internal";
-  import { fly, scale, slide } from "svelte/transition";
-
+  import { getContext } from "svelte";
+  import Icon, { ChevronDown } from "svelte-hero-icons";
   import AnchoreItem from "./AnchoreItem.svelte";
-  import { longhover } from "./longhover";
-  import { toDataURL } from "./utils";
-  import { filteredListSliced, nodesList } from "./stores";
+  import { longhover, GROUP_LONGHOVER_MS } from "./longhover";
+  import { nodesList } from "./stores";
+  import { getUnfoldSlice, UNFOLD_PAGE_SIZE } from "./bookmarks";
+  import * as Tooltip from "./components/ui/tooltip";
 
-  export let key: any;
   export let hostItem: any;
-  let anchores = hostItem.nodes || [];
-  // console.log("anchores",anchores);
-  // console.log("hostitem $nodesList",$nodesList);
-  let hostAnchore = $nodesList[anchores[0]] || [];
-  //   let domain = new URL(anchores[0].url).host.split(":")[0]  ;
-  let otherAnchores = anchores[1] ? anchores.slice(1) : [];
-  // console.log("otherAnchores",otherAnchores);
-  let tweenOtherAnchores: Array<any> = [];
+
+  $: anchores = hostItem?.nodes || [];
+  $: hostAnchore = $nodesList[anchores[0]] || {};
+  $: otherAnchores = anchores[1] ? anchores.slice(1) : [];
+  $: isSessionGroup = !!(hostItem?.isSession || hostAnchore?.isSession);
+  $: groupHint = `${otherAnchores.length} more — arrow toggles, hover 3s or right-click`;
+  $: toggleLabel = unfold
+    ? `Hide ${otherAnchores.length} more links`
+    : `Show ${otherAnchores.length} more links`;
+
+  /**
+   * Локальный unfold — НЕ store.
+   * VirtualScroll recycle уничтожает компонент → unfold сбрасывается сам,
+   * без глобального store (иначе mid-scroll менялись высоты → прыжки).
+   */
   let unfold = false;
   let childrenInvisible = false;
+  let visibleChildCount = UNFOLD_PAGE_SIZE;
 
-  let favicon_localhost = localStorage.favicon_localhost;
+  $: unfoldSlice = getUnfoldSlice(otherAnchores, visibleChildCount);
 
-  async function tweenAnchores() {
-    unfold = !unfold;
-    childrenInvisible = !childrenInvisible;
-    // let changedHost = $filteredListSliced[key];
-    // filteredListSliced.update((value)=>{
-    //   value[key] = changedHost;
-    //   return value;
-    // });
-    // if (unfold == true) { // если выпадает
-    //   let minLenght: number = otherAnchores.length; // минимальная длина массива
-    //   if (otherAnchores.length > 50) { // если больше 50 элементов
-    //     minLenght = Math.min(Math.floor(otherAnchores.length / 2), 50); // минимальная длина массива
-    //   }
-    //   for (let i = 0; i < minLenght; i++) { // проходим по массиву и добавляем в массив твинов
-    //     let newItem = otherAnchores[i];
-    //     // setTimeout(async function() {
-    //       tweenOtherAnchores[i] = newItem;
-    //     // }, 150);
-    //     // tweenOtherAnchores[i] = newItem;
-    //   }
-    //   if (otherAnchores.length > 50) { // если больше 50 элементов
-    //     setTimeout(async function() {
-    //       await tick();
-    //       tweenOtherAnchores = otherAnchores;
-    //     }, 350);
-    //   }
-    //   console.log("minLengh = " + minLenght);
-    // } else {
-    //   console.log("unfold ", unfold);
-    //   tweenOtherAnchores = tweenOtherAnchores.slice(
-    //     0,
-    //     Math.min(Math.floor(tweenOtherAnchores.length / 3), 100)
-    //   );
-    //   for (let j = 0; j < tweenOtherAnchores.length; j++) {
-    //     setTimeout(async function(j: number) {
-    //       tweenOtherAnchores.pop();
-    //       // tweenOtherAnchores.slice(
-    //       //    tweenOtherAnchores.length - 2, 1
-    //       // );
-    //       tweenOtherAnchores = tweenOtherAnchores;
-    //     }, 300);
-    //   }
-    // }
-    hostAnchore = hostAnchore;
+  const titleVisibleStore = getContext("titleVisible");
+
+  function openGroup(e?: Event) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (!unfold) {
+      unfold = true;
+      childrenInvisible = true;
+      visibleChildCount = UNFOLD_PAGE_SIZE;
+    }
   }
 
-  // let maxVisits = hostAnchore.hostVisitCount;
-  // if (hasContext('maxVisits')) {
-  // 	maxVisits = Math.max(getContext('maxVisits'), maxVisits);
-  // }
-  // setContext('maxVisits', maxVisits);
+  function toggleGroup(e?: Event) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (unfold) {
+      unfold = false;
+      childrenInvisible = false;
+      visibleChildCount = UNFOLD_PAGE_SIZE;
+    } else {
+      openGroup();
+    }
+  }
 
+  /** Клик по группе: не трогаем <a>/кнопки — иначе ссылки не открываются */
+  function onGroupClick(e: MouseEvent) {
+    const el = e.target as HTMLElement | null;
+    if (el?.closest?.("a, button, .multiButton")) return;
+    toggleGroup(e);
+  }
 
+  function showMore(e: Event) {
+    e.preventDefault();
+    e.stopPropagation();
+    visibleChildCount = unfoldSlice.nextCount;
+  }
 </script>
 
 {#if hostItem}
   {#if anchores.length < 2}
     {#each anchores as item (item)}
-      <!-- <AnchoreItem anchor={$nodesList[item]} {host} childrenInvisible={false} /> -->
-      <AnchoreItem index={item}  childrenInvisible={false} />
+      {#if $nodesList[item]?.url}
+        <AnchoreItem
+          anchor={$nodesList[item]}
+          childrenInvisible={true}
+          titleVisible={$titleVisibleStore}
+        />
+      {/if}
     {/each}
   {:else}
-    <anchorGroup
-      class="hovicon effect-8"
-      use:longhover={3000}
-      on:longhover|stopPropagation|preventDefault={tweenAnchores}
-      on:contextmenu={() => (unfold = true)}
-      class:unfold
-      title={otherAnchores.length}
-    >
-      <!-- <AnchoreItem
-        anchor={hostAnchore}
-        {host}
-        {unfold}
-        childrenInvisible={true}
-      /> -->
-      <AnchoreItem
-        index={anchores[0]}
-        {unfold}
-        childrenInvisible={true}
-      />
-    </anchorGroup>
+    <!-- <Tooltip.List
+      content={groupHint}
+      side="bottom"
+      delayDuration={550}
+      block={!!$titleVisibleStore}
+    > -->
+      <anchorGroup
+        class="hovicon effect-8"
+        class:lined={$titleVisibleStore}
+        class:session={isSessionGroup}
+        use:longhover={GROUP_LONGHOVER_MS}
+        on:longhover|stopPropagation|preventDefault={openGroup}
+        on:contextmenu|stopPropagation|preventDefault={openGroup}
+        on:click|stopPropagation={onGroupClick}
+        class:unfold
+      >
+        <!-- Явная кнопка раскрытия группы (стандартный button + chevron) -->
+        <!-- <Tooltip.List content={toggleLabel} side="left" delayDuration={250}> -->
+          <button
+            type="button"
+            class="groupToggle"
+            class:lined={$titleVisibleStore}
+            aria-expanded={unfold}
+            aria-label={toggleLabel}
+            on:click|stopPropagation={toggleGroup}
+          >
+            <Icon src={ChevronDown} solid size={$titleVisibleStore ? "18" : "16"} />
+            {#if $titleVisibleStore}
+              <span class="groupToggleCount">{otherAnchores.length}</span>
+            {/if}
+          </button>
+        <!-- </Tooltip.List> -->
+        {#if hostAnchore?.url}
+          <AnchoreItem
+            anchor={hostAnchore}
+            {unfold}
+            childrenInvisible={true}
+            titleVisible={$titleVisibleStore}
+          />
+        {/if}
+      </anchorGroup>
+    <!-- </Tooltip.List> -->
     {#if unfold}
-      <!-- <div class="otherAnchores"> -->
-      {#each otherAnchores as item (item)}
-        <!-- <AnchoreItem anchor={$nodesList[item]} {host} {childrenInvisible} /> -->
-        <AnchoreItem index={item}  {childrenInvisible} />
-      {/each}
-      <!-- </div> -->
+      <div
+        class="groupChildren"
+        class:lined={$titleVisibleStore}
+      >
+        {#each unfoldSlice.visible as item (item)}
+          {#if $nodesList[item]?.url}
+            <AnchoreItem
+              anchor={$nodesList[item]}
+              childrenInvisible={childrenInvisible}
+              titleVisible={$titleVisibleStore}
+              nested={!!$titleVisibleStore}
+            />
+          {/if}
+        {/each}
+        {#if unfoldSlice.hasMore}
+          <button class="showMore" type="button" on:click={showMore}>
+            +{otherAnchores.length - unfoldSlice.visible.length} more
+          </button>
+        {/if}
+      </div>
     {/if}
-    <!-- {#each otherAnchores as item (item)}
-      <AnchoreItem anchor={item} {host} {childrenInvisible}/>
-    {/each} -->
   {/if}
 {/if}
-
 <style lang="scss">
   anchorGroup {
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
     width: 50px;
     height: 50px;
     display: flex;
@@ -129,29 +160,182 @@
     justify-content: center;
     align-items: baseline;
     flex-direction: row;
-    width: 50px;
-    height: 50px;
-    display: flex;
-    flex-wrap: wrap;
-    align-content: center;
-    justify-content: center;
-    align-items: baseline;
-    flex-direction: row;
-    border: 20px solid #1b1b1bcf !important;
+    border: 12px solid #1b1b1bcf !important;
     filter: saturate(1.12);
     background-color: #6c519433;
     border-radius: 50%;
-    margin: 30px;
-    transition: all 1s ease;
+    margin: 16px;
+    transition: border-color 0.35s var(--ease-out),
+      background-color 0.35s var(--ease-out);
+  }
+  anchorGroup.lined {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    min-height: 40px;
+    border-radius: 12px;
+    border-width: 1px !important;
+    border-color: rgba(255, 255, 255, 0.09) !important;
+    margin: 2px 0;
+    // Одна строка: заголовок хоста + кнопка «ещё N» (без переноса)
+    flex-wrap: nowrap;
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 2px 6px 2px 2px;
+    filter: none;
+    background-color: rgba(255, 255, 255, 0.04);
+    gap: 4px;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  // Заголовок занимает оставшуюся ширину; иначе .tooltip-root.block { width:100% } выталкивает кнопку вниз
+  anchorGroup.lined :global(.tooltip-root.block) {
+    flex: 1 1 0%;
+    min-width: 0;
+    width: auto;
+    max-width: none;
+    overflow: hidden; // ellipsis заголовка, не выталкивает кнопку
+  }
+  // Обёртка groupToggle: слева от заголовка, без сжатия и без переноса
+  anchorGroup.lined :global(.tooltip-root:not(.block)) {
+    flex: 0 0 auto;
+    order: -1;
+  }
+
+  .groupToggle {
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    flex-shrink: 0;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    margin: 0;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #eee;
+    line-height: 0;
+    cursor: pointer;
+    z-index: 5;
+    transition: background-color 0.25s var(--ease-out), border-color 0.25s var(--ease-out),
+      transform 0.25s var(--ease-out), color 0.25s ease;
+  }
+  .groupToggle:hover {
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.28);
+  }
+  .groupToggle :global(svg) {
+    display: block;
+    margin: 0;
+    transition: transform 0.3s var(--ease-out);
+  }
+  .groupToggle[aria-expanded="true"] :global(svg) {
+    transform: rotate(180deg);
+  }
+  // Bubble: компактный бейдж на группе
+  .groupToggle:not(.lined) {
+    position: absolute;
+    right: -2px;
+    bottom: -2px;
+    width: 1.5rem;
+    height: 1.5rem;
+    background: #1f1f1f;
+    border-color: rgba(255, 255, 255, 0.25);
+  }
+  .groupToggle.lined {
+    width: auto;
+    min-width: 1.5rem;
+    height: auto;
+    min-height: 1.5rem;
+    padding: 2px 4px;
+    border: none;
+    border-radius: 0;
+    margin-right: 2px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.75);
+  }
+  .groupToggle.lined:hover {
+    background: transparent;
+    border: none;
+    color: #fff;
+  }
+  .groupToggleCount {
+    font-size: 12px;
+    font-weight: 650;
+    line-height: 1;
+    color: rgba(255, 255, 255, 0.8);
+    font-variant-numeric: tabular-nums;
   }
   anchorGroup:hover {
-    transition: all 1s ease;
-    /* // border: 1px dashed rgb(58, 42, 42) !important; */
-    border: 20px solid #1d1d1df2 !important;
+    border: 12px solid #1d1d1df2 !important;
+  }
+  anchorGroup.lined:hover {
+    border-width: 1px !important;
+    border-color: rgba(255, 255, 255, 0.14) !important;
+  }
+  /* Session tabs — teal accent в lined */
+  anchorGroup.lined.session {
+    border-color: rgba(64, 200, 180, 0.35) !important;
+    background-color: rgba(40, 160, 140, 0.1);
+  }
+  anchorGroup.lined.session:hover {
+    border-color: rgba(64, 200, 180, 0.5) !important;
+    background-color: rgba(40, 160, 140, 0.16);
+  }
+
+  // Вложенные ссылки группы в lined — отступ + направляющая слева
+  .groupChildren.lined {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin: 4px 0 14px 18px;
+    padding: 6px 0 6px 16px;
+    border-left: 2px solid rgba(255, 255, 255, 0.14);
+    animation: groupReveal 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @keyframes groupReveal {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .showMore {
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 10px;
+    padding: 8px 14px;
+    margin: 6px 0 2px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 550;
+    letter-spacing: 0.02em;
+    align-self: flex-start;
+    transition: background-color 0.25s ease, color 0.25s ease,
+      border-color 0.25s ease;
+  }
+  .showMore:hover {
+    background: rgba(255, 255, 255, 0.09);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.28);
   }
 
   .hovicon {
     cursor: pointer;
+    position: relative;
+  }
+  .hovicon:hover {
+    // Меню/пульс поверх соседних dial в ряду
+    z-index: 40;
   }
   .hovicon:after {
     pointer-events: none;
@@ -160,22 +344,16 @@
     height: 50px;
     border-radius: 50%;
     content: "";
-    -webkit-box-sizing: content-box;
-    -moz-box-sizing: content-box;
     box-sizing: content-box;
   }
   .hovicon:before {
     display: block;
     -webkit-font-smoothing: antialiased;
   }
-  /* Effect 8 */
   .hovicon.effect-8 {
-    will-change: transform, opacity;
-    transition: transform ease-out 0.1s, background;
-    transition: all ease-out 0.7s;
+    transition: background 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   }
   .hovicon.effect-8:after {
-    will-change: transform, opacity;
     top: 0;
     left: 0;
     z-index: -1;
@@ -184,20 +362,21 @@
     transform: scale(0.9);
   }
   .hovicon.effect-8:hover {
-    will-change: transform;
-    transform: scale(0.93);
+    /* без scale на самом элементе — иначе дёрганье при скролле */
     background-color: #ffffffcf;
-    transition: all 0.3;
   }
+  /* Пульсация (sonar) при наведении — только bubble view */
   .hovicon.effect-8:hover:after {
-    will-change: transform;
-    animation: sonarEffect 2.77s cubic-bezier(0, 1.86, 0.93, -0.89) 0.33s;
-    animation-iteration-count: 3;
+    animation: sonarEffect 1.4s ease-out 0s infinite;
   }
+  /* Lined: без sonar и без белой вспышки — читаемый текст */
+  .hovicon.effect-8.lined:hover {
+    background-color: rgba(255, 255, 255, 0.07);
+  }
+  .hovicon.effect-8.lined:hover:after,
   .unfold.hovicon.effect-8:hover:after {
-    will-change: transform;
-    animation: sonarEffect 0.8s ease-in 1s reverse;
-    animation-iteration-count: 3;
+    animation: none;
+    opacity: 0;
   }
   @keyframes sonarEffect {
     0% {

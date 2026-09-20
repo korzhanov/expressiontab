@@ -1,0 +1,70 @@
+---
+description: Публичный репозиторий — секреты, PAT, Actions, permissions расширения
+alwaysApply: true
+---
+
+# Безопасность публичного репо (ExpressionTab)
+
+Репозиторий **публичный**: любой коммит, PR, issue и workflow-лог видны всем. Секреты и лишние права — недопустимы.
+
+## Секреты и токены
+
+1. **Никогда** не коммитить и не пушить: PAT, API keys, `.env` с секретами, cookies, приватные ключи, содержимое Actions secrets.
+2. `PROJECT_TOKEN` и любые токены — **только** в GitHub → Settings → Secrets and variables → Actions (Repository secrets). Не в коде, не в README, не в issue/PR, не в скринах, не в `docs/pr-evidence/`.
+3. Не печатать секреты в `console.log`, CI logs, `gh` output, agent chat transcript, который потом коммитят.
+4. Если секрет **уже утёк** (в git history / gist / чат):
+   - немедленно отозвать/ротировать токен;
+   - создать новый secret;
+   - не «чистить» историю force-push без явной просьбы владельца.
+5. В примерах документации — только плейсхолдеры (`ghp_***`, `${{ secrets.PROJECT_TOKEN }}`), никогда реальные значения.
+
+## PAT для Project #9 (публичный репо)
+
+| Scope | Нужен? |
+|-------|--------|
+| `project` | **Да** — доступ к user Projects v2 |
+| `repo` | **Нет** для публичного expressiontab (нужен только если репо private) |
+| `workflow`, `admin:*`, `delete_repo` | **Нет** |
+
+- Classic PAT, минимальный срок жизни, по возможности ограничить по необходимости.
+- Один secret name: `PROJECT_TOKEN`. Не дублировать токен в Environment secrets без нужды.
+- Локально агент для `gh project item-add` использует **свой** `gh auth` пользователя; не подставлять `PROJECT_TOKEN` в локальные команды и не писать его в файлы.
+
+## GitHub Actions
+
+1. Workflows не должны `echo` / `printenv` секретов.
+2. `pull_request_target` **не** checkout'ить и **не** выполнять код из PR-ветки (только GitHub API) — как в `project-auto-triage.yml`.
+3. Не добавлять `permissions: write-all`. Явно минимальные `permissions:` в workflow.
+4. Не передавать secrets в fork-PR через обычный `pull_request` без необходимости; для triage — `pull_request_target` + API-only.
+5. Dependabot / сторонние Actions — только pinned major (`@v2` / `@v7`) из доверенных org; новые Actions — с ревью.
+
+## Chrome extension (MV3)
+
+1. **Least privilege**: не расширять `permissions` / `host_permissions` без обоснования в issue/PR.
+2. Сейчас `<all_urls>` — чувствительно; любое сужение или замена на конкретные host — предпочтительнее; новые broad permissions — отдельный issue + явный риск в PR.
+3. Не внедрять удалённый код (`eval`, remote script injection, unchecked `innerHTML` с URL пользователя).
+4. Не отправлять history/bookmarks/URL на сторонние серверы без явного opt-in и описания в README/privacy.
+5. UTM / telemetry / analytics — только с согласия или выключено по умолчанию; не логировать полный URL пользователя в публичные сервисы.
+6. Clipboard / bookmarks mutate — только по действию пользователя (кнопка меню).
+
+## Коммиты, PR, скрины
+
+1. Перед `git add` / commit — проверить, что нет `.env`, `*.pem`, `credentials*`, скопированных токенов.
+2. В PR/issue не вставлять DevTools Network с Authorization headers.
+3. Скрины new-tab: размывать/не показывать чувствительные закладки пользователя, если это чужие данные; для своих — ок.
+4. Review checklist агента: «есть ли секреты / лишние permissions / утечка URL в сеть?»
+5. Не ссылаться на другие внутренние репозитории по имени в docs/issue/PR — проект самодостаточен.
+
+## ❌ / ✅
+
+```text
+❌ PROJECT_TOKEN=ghp_xxx в .env закоммичен
+❌ scope repo+workflow «на всякий случай» для публичного репо
+❌ checkout PR в pull_request_target и yarn install из fork
+❌ добавить host_permissions "<all_urls>" ещё раз «для удобства» без issue
+
+✅ Secret только в Settings → Actions
+✅ PAT: только project
+✅ triage workflow = API only
+✅ новое permission → issue + обоснование + least privilege
+```

@@ -1,0 +1,119 @@
+name: project auto triage
+
+on:
+  # pull_request_target: workflow берётся с base-ветки PR; secrets доступны и для fork'ов.
+  # Код из PR не выполняем — только GitHub API.
+  pull_request_target:
+    types: [opened, reopened, ready_for_review, converted_to_draft]
+  issues:
+    types: [opened, reopened]
+  # Ручной бэкфилл открытых PR/issues в проект
+  workflow_dispatch:
+    inputs:
+      backfill:
+        description: 'Add all open PRs and issues in this repo to the project'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+env:
+  PROJECT_URL: https://github.com/users/korzhanov/projects/9
+
+jobs:
+  add-to-project-and-assign:
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require PROJECT_TOKEN
+        env:
+          PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+        run: |
+          if [ -z "$PROJECT_TOKEN" ]; then
+            echo "::error::Secret PROJECT_TOKEN is not set. Create a classic PAT with scope 'project' only (public repo) and add it as repo secret PROJECT_TOKEN. Never commit the token."
+            exit 1
+          fi
+
+      - name: Add PR/issue to GitHub Project v2
+        uses: actions/add-to-project@v2
+        with:
+          project-url: ${{ env.PROJECT_URL }}
+          github-token: ${{ secrets.PROJECT_TOKEN }}
+
+      - name: Assign author to PR/issue
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const login =
+              context.payload.pull_request?.user?.login ??
+              context.payload.issue?.user?.login;
+
+            if (!login || /\[bot\]$/.test(login)) {
+              core.info(`Skip assigning: login=${login}`);
+              return;
+            }
+
+            const issue_number =
+              context.payload.pull_request?.number ??
+              context.payload.issue?.number;
+
+            if (!issue_number) {
+              core.info('Skip assigning: issue_number not found');
+              return;
+            }
+
+            await github.rest.issues.addAssignees({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number,
+              assignees: [login],
+            });
+
+  backfill-open-items:
+    if: github.event_name == 'workflow_dispatch' && inputs.backfill
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require PROJECT_TOKEN
+        env:
+          PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+        run: |
+          if [ -z "$PROJECT_TOKEN" ]; then
+            echo "::error::Secret PROJECT_TOKEN is not set."
+            exit 1
+          fi
+
+      - name: Backfill open PRs and issues into project
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          PROJECT_URL: ${{ env.PROJECT_URL }}
+        run: |
+          set -euo pipefail
+          OWNER="${GITHUB_REPOSITORY_OWNER}"
+          PROJECT_NUMBER="${PROJECT_URL##*/}"
+
+          echo "Resolving project $OWNER/$PROJECT_NUMBER …"
+          PROJECT_ID="$(gh project list --owner "$OWNER" --format json \
+            --jq ".projects[] | select(.number==$PROJECT_NUMBER) | .id")"
+          if [ -z "$PROJECT_ID" ]; then
+            echo "::error::Could not resolve project id for $PROJECT_URL (check PAT scopes: project)"
+            exit 1
+          fi
+          echo "PROJECT_ID=$PROJECT_ID"
+
+          add_url() {
+            local url="$1"
+            echo "→ $url"
+            gh project item-add "$PROJECT_NUMBER" --owner "$OWNER" --url "$url" || true
+          }
+
+          gh api "repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" --paginate \
+            --jq '.[].html_url' | while read -r url; do add_url "$url"; done
+
+          gh api "repos/${GITHUB_REPOSITORY}/issues?state=open&per_page=100" --paginate \
+            --jq '.[] | select(.pull_request == null) | .html_url' | while read -r url; do add_url "$url"; done
+
+          echo "Backfill done."

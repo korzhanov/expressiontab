@@ -35,27 +35,37 @@ Clear design, usefull functions, and more.
 [ ] make release 1.0
 
 #
+## Development & GitHub flow
+
+См. [docs/DEV_FLOW.md](docs/DEV_FLOW.md): issue → ветка → PR → Project #9. Агентские правила: `AGENTS.md`, `.cursor/rules/`.
+
+#
 # For local dev:
 
 0. Clone repo from github
 1. Install dependencies with 
 ```
-yarn
+bun install
 ```
-3. Run dev
+(или `yarn`)
+3. Run build / watch
 ```
-yarn dev
+bun run build
 ```
 4. Open [chrome://extensions/](chrome://extensions/)
-5. Click `Load unpacked extension` and select the folder `expressiontab\builds\expressiontab`
+5. Click `Load unpacked extension` and select the folder `expressiontab/builds/expressiontab`
 6. Open extension`s options page and click `Enable`
+
+```
+bun test
+```
 
 # For local production build:
 1. Open vite.config.js
 2. Change `mode: 'development'` to `mode: 'production'`
-3. Make buld with
+3. Make build with
 ```
-yarn build
+bun run build
 ```
 
 #

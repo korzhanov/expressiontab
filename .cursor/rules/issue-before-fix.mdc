@@ -1,0 +1,26 @@
+---
+description: Before committing a fix or feature, create a GitHub issue (gh), then resolve it
+alwaysApply: true
+---
+
+# Issue before fix
+
+For **every** user-submitted issue containing a bug or feature request:
+
+1. **First**, create a GitHub issue using `gh issue create` (brief title + body: problem / expected behaviour / context / project).
+2. **Project #9** (`korzhanov`, https://github.com/users/korzhanov/projects/9) — сразу после create:
+   ```bash
+   ITEM=$(gh project item-add 9 --owner korzhanov --url "$URL" --format json --jq .id)
+   # Status: 🌀 MVP Backlog | ▶️ Todo | 👾 Realization | 👀 In review | ✅ Done
+   gh project item-edit --id "$ITEM" --project-id PVT_kwHOACIdh84AEKzA \
+     --field-id PVTSSF_lAHOACIdh84AEKzAzgCZrYw \
+     --single-select-option-id e83e7f55   # MVP Backlog; Todo=47fc9ee4 Realization=68a253c3 Done=98236657
+   ```
+   Нужны scopes: `project` + `read:project` (`gh auth refresh -s read:project,project`).
+3. Take ownership (comment/assign) if needed.
+4. Only then implement the fix or feature.
+5. Upon completion: summary comment + `gh issue close`; Status → **✅ Done** (`98236657`).
+
+Progress / screenshots: **`issue-pr-progress-visual.mdc`**. PR checklist tree: **`pr-task-tree.mdc`**.
+
+Do not skip the issue step ‘just to fix it faster’. Exception: purely informational queries that do not involve code changes.
