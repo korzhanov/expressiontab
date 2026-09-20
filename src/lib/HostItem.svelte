@@ -170,21 +170,24 @@
   }
   anchorGroup.lined {
     width: 100%;
+    max-width: 100%;
     height: auto;
-    min-height: 48px;
+    min-height: 40px;
     border-radius: 12px;
     border-width: 1px !important;
     border-color: rgba(255, 255, 255, 0.09) !important;
-    margin: 4px 0;
+    margin: 2px 0;
     // Одна строка: заголовок хоста + кнопка «ещё N» (без переноса)
     flex-wrap: nowrap;
     flex-direction: row;
     justify-content: flex-start;
     align-items: center;
-    padding: 2px 10px 2px 2px;
+    padding: 2px 6px 2px 2px;
     filter: none;
     background-color: rgba(255, 255, 255, 0.04);
-    gap: 6px;
+    gap: 4px;
+    box-sizing: border-box;
+    overflow: hidden;
   }
   // Заголовок занимает оставшуюся ширину; иначе .tooltip-root.block { width:100% } выталкивает кнопку вниз
   anchorGroup.lined :global(.tooltip-root.block) {
@@ -245,11 +248,20 @@
   }
   .groupToggle.lined {
     width: auto;
-    min-width: 2.25rem;
-    height: 2rem;
-    padding: 0 8px;
-    border-radius: 8px;
-    margin-right: 4px;
+    min-width: 1.5rem;
+    height: auto;
+    min-height: 1.5rem;
+    padding: 2px 4px;
+    border: none;
+    border-radius: 0;
+    margin-right: 2px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.75);
+  }
+  .groupToggle.lined:hover {
+    background: transparent;
+    border: none;
+    color: #fff;
   }
   .groupToggleCount {
     font-size: 12px;

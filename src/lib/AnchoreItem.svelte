@@ -8,7 +8,8 @@
   import { ensureIconsForAnchor } from "./icon-ensure";
   import * as Tooltip from "./components/ui/tooltip";
   import BubblePop from "./BubblePop.svelte";
-  import { buildAnchorTooltip } from "./age-format";
+  import { buildAnchorTooltip, formatDateShort } from "./age-format";
+  import { deleteDialUrl } from "./delete-dial-url";
 
   export let anchor: any = {};
   export let unfold: boolean | null = null;
@@ -35,6 +36,15 @@
     openedAt: anchor?.openedAt ?? anchor?.lastVisitTime,
   });
   $: tipContent = tipMeta.text || title || host || url;
+  // Строка titleVisible: title | visits | last visit
+  $: lastVisitLabel = formatDateShort(anchor?.lastVisitTime || 0);
+  $: showTitleLine = [
+    title || host,
+    isBookmark ? "bookmark" : `${visitCount} visits`,
+    lastVisitLabel ? `last ${lastVisitLabel}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
   // В lined кнопки чуть меньше ряда; в bubble — крупнее
   $: actionIconSize = titleVisible ? "16" : "22";
   $: weightVisits = Math.log10(
@@ -139,15 +149,19 @@
 
   async function deleteAnchore() {
     if (popping || deleted) return;
-    if (isBookmark) {
-      chrome.bookmarks.remove(String(id));
-      isBookmark = false;
-    }
+    // Bookmark + history (и дубли закладок по URL) — иначе снова в индексе
     try {
-      chrome.history.deleteUrl({ url: url });
+      if (typeof chrome !== "undefined") {
+        await deleteDialUrl({
+          chromeApi: chrome,
+          url,
+          bookmarkId: isBookmark ? id : null,
+        });
+      }
     } catch (e) {
       console.log(e);
     }
+    isBookmark = false;
     // Сначала лопание пузырька (CodePen-мотив), потом убираем из списка
     popping = true;
     closeMenu();
@@ -182,7 +196,7 @@
   >
     <anchor
       bind:this={anchorEl}
-      style:margin={titleVisible ? "2px 0" : `${Math.min(weightVisits, 2) * 8 + 8}px`}
+      style:margin={titleVisible ? "0" : `${Math.min(weightVisits, 2) * 8 + 8}px`}
       class:isBookmark
       class:aged={tipMeta.aged}
       class:invisible={!childrenInvisible}
@@ -206,7 +220,12 @@
         />
       {/if}
       <slot />
-      <a href={url} rel="noopener noreferrer" on:click|stopPropagation>
+      <a
+        href={url}
+        rel="noopener noreferrer"
+        class:hasMenu={multiButton && titleVisible}
+        on:click|stopPropagation
+      >
         <anchoricon style:background-image="url('{src}')" />
         {#if unfold === false && !titleVisible}
           <anchoricon
@@ -225,8 +244,12 @@
         {/if}
 
         <span class:showTitle={titleVisible}>
-          <strong>{title || host}</strong>
-          | {isBookmark ? "bookmark" : visitCount + " visits"}
+          {#if titleVisible}
+            {showTitleLine}
+          {:else}
+            <strong>{title || host}</strong>
+            | {isBookmark ? "bookmark" : visitCount + " visits"}
+          {/if}
         </span>
       </a>
       {#if multiButton}
@@ -337,21 +360,24 @@
   }
   anchor.titleVisible {
     width: 100%;
+    max-width: 100%;
     height: auto;
-    min-height: 44px;
-    border-radius: 12px;
+    min-height: 36px;
+    border-radius: 10px;
     border-width: 1px;
     border-color: rgba(255, 255, 255, 0.07);
-    margin: 3px 0;
-    padding: 10px 14px;
+    margin: 0;
+    padding: 6px 8px;
     background-color: rgba(255, 255, 255, 0.035);
+    box-sizing: border-box;
+    overflow: hidden;
   }
   // Вложенные URL группы — визуальная иерархия списка
   anchor.titleVisible.nested {
     background-color: transparent;
     border-color: transparent;
-    padding: 7px 12px 7px 8px;
-    min-height: 36px;
+    padding: 4px 8px 4px 4px;
+    min-height: 32px;
     border-radius: 8px;
   }
   anchor.titleVisible:hover {
@@ -525,11 +551,18 @@
   }
   anchor.titleVisible a {
     width: 100%;
+    max-width: 100%;
     height: auto;
     min-height: 28px;
-    padding-right: 7rem; // место под ряд кнопок справа
+    padding-right: 0.5rem;
     color: rgba(255, 255, 255, 0.9);
     gap: 2px;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  /* Место под кнопки только когда меню открыто — иначе лишний гориз. скролл */
+  anchor.titleVisible a.hasMenu {
+    padding-right: 7rem;
   }
   anchor a span {
     display: block;
@@ -539,7 +572,7 @@
   }
   anchor a span.showTitle {
     display: block;
-    min-width: 100px;
+    min-width: 0;
     width: auto;
     flex: 1;
     opacity: 1;
@@ -547,7 +580,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     text-align: left;
-    margin-left: 10px;
+    margin-left: 4px;
     font-size: 14px;
     line-height: 1.35;
     letter-spacing: 0.01em;
