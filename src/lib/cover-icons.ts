@@ -1,7 +1,8 @@
 /**
  * Крупные иконки для фона больших / starred-пузырей.
  * Без Chrome _favicon / обычных favicon (пикселятся).
- * Порядок: speculative manifest → HTML rel=manifest → apple/og/twitter;
+ * Порядок: speculative manifest → HTML rel=manifest → apple/og;
+ * twitter:image — только для тултипа (не cover).
  * SVG допустимы даже без большого sizes.
  * Ошибки → catch / null (Chrome Network 404 всё равно может писать).
  */
@@ -19,16 +20,22 @@ export const MANIFEST_PATHS = [
   "/manifest.webmanifest",
 ] as const;
 
+/** Результат загрузки: cover для шара, tip — twitter (тултип) */
+export type CoverLoadResult = {
+  cover?: string;
+  tip?: string;
+};
+
 type CoverJob = {
   host: string;
   url: string;
-  resolve: (data: string | undefined) => void;
+  resolve: (data: CoverLoadResult) => void;
 };
 
 const queue: CoverJob[] = [];
 let active = 0;
 const CONCURRENCY = 2;
-const inflight = new Map<string, Promise<string | undefined>>();
+const inflight = new Map<string, Promise<CoverLoadResult>>();
 /** Session: URL уже 404 / пустой — не долбить снова */
 const probeMiss = new Set<string>();
 
@@ -186,7 +193,8 @@ export function parseManifestIcons(
 }
 
 /**
- * Достаёт кандидатов cover из HTML: apple-touch → large icon → og/twitter.
+ * Достаёт кандидатов cover из HTML: apple-touch → large icon → og.
+ * twitter:image сюда не входит — только parseTipImageUrls.
  */
 export function parseCoverIconUrls(html: string, pageUrl: string): string[] {
   const scored: Scored[] = [];
@@ -229,9 +237,8 @@ export function parseCoverIconUrls(html: string, pageUrl: string): string[] {
   while ((m = metaRe.exec(html))) {
     const key = m[1].toLowerCase();
     const content = m[2];
+    // og — cover; twitter — только tip
     if (key === "og:image" || key === "og:image:url") push(content, 80);
-    if (key === "twitter:image" || key === "twitter:image:src")
-      push(content, 70);
   }
   const metaRe2 =
     /<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["']([^"']+)["'][^>]*>/gi;
@@ -239,8 +246,36 @@ export function parseCoverIconUrls(html: string, pageUrl: string): string[] {
     const content = m[1];
     const key = m[2].toLowerCase();
     if (key === "og:image" || key === "og:image:url") push(content, 80);
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.map((s) => s.href);
+}
+
+/**
+ * twitter:image для тултипа (не для фона пузыря).
+ */
+export function parseTipImageUrls(html: string, pageUrl: string): string[] {
+  const scored: Scored[] = [];
+  const seen = new Set<string>();
+  const push = (href: string | null | undefined, score: number) => {
+    pushScored(scored, seen, href, pageUrl, score);
+  };
+
+  const metaRe =
+    /<meta[^>]+(?:property|name)=["']([^"']+)["'][^>]*content=["']([^"']+)["'][^>]*>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = metaRe.exec(html))) {
+    const key = m[1].toLowerCase();
     if (key === "twitter:image" || key === "twitter:image:src")
-      push(content, 70);
+      push(m[2], 100);
+  }
+  const metaRe2 =
+    /<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["']([^"']+)["'][^>]*>/gi;
+  while ((m = metaRe2.exec(html))) {
+    const key = m[2].toLowerCase();
+    if (key === "twitter:image" || key === "twitter:image:src")
+      push(m[1], 100);
   }
 
   scored.sort((a, b) => b.score - a.score);
@@ -260,6 +295,24 @@ export function resolveCoverSrc(
     if (cached && cached !== COVER_MISS) return cached;
   }
   return fallback;
+}
+
+/**
+ * Превью тултипа: tip (twitter) → иначе cover → fallback.
+ */
+export function resolveTipImageSrc(
+  host: string,
+  tipMap: Map<string, string> | undefined,
+  coverMap: Map<string, string> | undefined,
+  fallback: string
+): string {
+  const fromTip = tipMap?.get(host);
+  if (fromTip && fromTip !== COVER_MISS) return fromTip;
+  if (typeof localStorage !== "undefined") {
+    const cached = localStorage.getItem("tip_" + host);
+    if (cached && cached !== COVER_MISS) return cached;
+  }
+  return resolveCoverSrc(host, coverMap, fallback);
 }
 
 /**
@@ -342,16 +395,17 @@ async function runCoverJob(
   toDataURL: (url: string) => Promise<string | undefined>
 ): Promise<void> {
   try {
-    // Без Chrome _favicon / s2 favicon — только app icons / SVG / og
+    let cover: string | undefined;
+    let tip: string | undefined;
 
-    // 1) Speculative manifest host + parent
+    // 1) Speculative manifest host + parent → только cover
     for (const mUrl of manifestCandidateUrls(job.url)) {
       const icons = await fetchManifestIconUrls(mUrl);
       if (!icons.length) continue;
       const data = await tryIconUrls(icons, toDataURL);
       if (data) {
-        job.resolve(data);
-        return;
+        cover = data;
+        break;
       }
     }
 
@@ -363,34 +417,42 @@ async function runCoverJob(
       }
     })();
     if (!origin) {
-      job.resolve(undefined);
+      job.resolve({ cover, tip });
       return;
     }
 
-    // 2) HTML → link rel=manifest + apple/og (не favicon.ico)
+    // 2) HTML → tip (twitter) + cover (manifest link / apple / og)
     const html = await xhrText(origin, 120_000);
     if (!html) {
-      job.resolve(undefined);
+      job.resolve({ cover, tip });
       return;
     }
 
-    const linked = parseManifestLink(html, origin);
-    if (linked) {
-      const icons = await fetchManifestIconUrls(linked);
-      if (icons.length) {
-        const data = await tryIconUrls(icons, toDataURL);
-        if (data) {
-          job.resolve(data);
-          return;
+    // twitter:image — только tip, даже если cover уже из manifest
+    const tipUrls = parseTipImageUrls(html, origin);
+    if (tipUrls.length) {
+      tip = await tryIconUrls(tipUrls, toDataURL, 2);
+    }
+
+    if (!cover) {
+      const linked = parseManifestLink(html, origin);
+      if (linked) {
+        const icons = await fetchManifestIconUrls(linked);
+        if (icons.length) {
+          cover = await tryIconUrls(icons, toDataURL);
         }
       }
     }
 
-    const candidates = parseCoverIconUrls(html, origin);
-    job.resolve(await tryIconUrls(candidates, toDataURL));
+    if (!cover) {
+      const candidates = parseCoverIconUrls(html, origin);
+      cover = await tryIconUrls(candidates, toDataURL);
+    }
+
+    job.resolve({ cover, tip });
   } catch {
-    // Любая неожиданная ошибка — просто без cover
-    job.resolve(undefined);
+    // Любая неожиданная ошибка — просто без cover/tip
+    job.resolve({});
   }
 }
 
@@ -406,54 +468,88 @@ function pump(toDataURL: (url: string) => Promise<string | undefined>) {
   }
 }
 
-/** Фоновая очередь cover для крупных / starred хостов. */
+/** Фоновая очередь cover (+ twitter tip) для крупных / starred хостов. */
 export function enqueueCover(
   url: string,
   toDataURL: (url: string) => Promise<string | undefined>
-): Promise<string | undefined> {
+): Promise<CoverLoadResult> {
   let host: string;
   try {
     host = getHostFromUrl(url);
   } catch {
-    return Promise.resolve(undefined);
+    return Promise.resolve({});
   }
   try {
     if (
       typeof localStorage !== "undefined" &&
       localStorage.getItem("favicon_" + host) === FAVICON_MISS
     ) {
-      return Promise.resolve(undefined);
+      return Promise.resolve({});
     }
   } catch {
     /* */
   }
 
-  const cached =
+  const cachedCover =
     typeof localStorage !== "undefined"
       ? localStorage.getItem("cover_" + host)
       : null;
-  if (cached === COVER_MISS) return Promise.resolve(undefined);
-  if (cached?.length) return Promise.resolve(cached);
+  const cachedTip =
+    typeof localStorage !== "undefined"
+      ? localStorage.getItem("tip_" + host)
+      : null;
+
+  // Оба уже в кэше (в т.ч. miss) — без сети
+  if (
+    cachedCover != null &&
+    cachedCover.length > 0 &&
+    cachedTip != null &&
+    cachedTip.length > 0
+  ) {
+    return Promise.resolve({
+      cover:
+        cachedCover !== COVER_MISS && cachedCover.length
+          ? cachedCover
+          : undefined,
+      tip:
+        cachedTip !== COVER_MISS && cachedTip.length ? cachedTip : undefined,
+    });
+  }
 
   const pending = inflight.get(host);
   if (pending) return pending;
 
-  const promise = new Promise<string | undefined>((resolve) => {
+  const promise = new Promise<CoverLoadResult>((resolve) => {
     queue.push({ host, url, resolve });
     pump(toDataURL);
   }).then((data) => {
     inflight.delete(host);
     if (typeof localStorage !== "undefined") {
       try {
-        localStorage.setItem(
-          "cover_" + host,
-          data && data.length ? data : COVER_MISS
-        );
+        // Не затирать хороший кэш пустым miss, если уже был cover
+        if (data.cover?.length) {
+          localStorage.setItem("cover_" + host, data.cover);
+        } else if (cachedCover == null) {
+          localStorage.setItem("cover_" + host, COVER_MISS);
+        }
+        if (data.tip?.length) {
+          localStorage.setItem("tip_" + host, data.tip);
+        } else if (cachedTip == null) {
+          localStorage.setItem("tip_" + host, COVER_MISS);
+        }
       } catch {
         /* quota */
       }
     }
-    return data;
+    // Подмешать уже закэшированное, если job вернул только одну сторону
+    return {
+      cover:
+        data.cover ||
+        (cachedCover && cachedCover !== COVER_MISS ? cachedCover : undefined),
+      tip:
+        data.tip ||
+        (cachedTip && cachedTip !== COVER_MISS ? cachedTip : undefined),
+    };
   });
   inflight.set(host, promise);
   return promise;

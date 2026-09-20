@@ -56,6 +56,8 @@ describe("BubblePop", () => {
     expect(src).toContain("transition:fade");
     // Cover только при реальной крупной иконке — не подставляем favicon
     expect(src).toContain("coverBgUrl = coverSrc");
+    expect(src).toContain("image={tipImageSrc}");
+    expect(src).toContain("resolveTipImageSrc");
     expect(src).not.toContain("localBookmark ? faviconSrc");
     expect(src).not.toContain("bubbleDot__star");
     expect(src).not.toContain("starred={localBookmark}");

@@ -19,8 +19,9 @@
   import {
     COVER_MIN_SIZE,
     resolveCoverSrc,
+    resolveTipImageSrc,
   } from "./cover-icons";
-  import { covers, favicons } from "./stores";
+  import { covers, favicons, tipImages } from "./stores";
   import type { BubbleEnterAnim, BubbleNode } from "./bubble-physics";
 
   export let bubble: BubbleNode;
@@ -77,8 +78,10 @@
   $: localBookmark = !!bubble.isBookmark;
   // miss → Globe; page → host → globe (Docs/Notion свой favicon)
   $: faviconSrc = resolveFaviconSrc(host, $favicons, globe, bubble.url);
-  // Cover только из meta/apple-touch — без fallback на мелкий favicon
+  // Cover только из meta/apple-touch — без twitter и без мелкого favicon
   $: coverSrc = resolveCoverSrc(host, $covers, "");
+  // Tip: twitter предпочтительнее, иначе cover
+  $: tipImageSrc = resolveTipImageSrc(host, $tipImages, $covers, "");
   $: showCoverBg = !!coverSrc && (size >= COVER_MIN_SIZE || localBookmark);
   $: coverBgUrl = coverSrc;
 
@@ -167,7 +170,7 @@
   <!-- Bubble tip: cover/og в tip если уже подгружен -->
   <Tooltip.Bubble
     content={tooltipText}
-    image={coverSrc}
+    image={tipImageSrc}
     side="bottom"
     delayDuration={400}
     disabled={dragging || popping || multiButton}

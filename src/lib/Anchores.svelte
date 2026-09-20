@@ -6,7 +6,7 @@
   import { draw } from "svelte/transition";
   import VirtualScroll from "svelte-virtual-scroll-list";
   import HostItems from "./HostItems.svelte";
-  import { filteredListSliced, nodesList, favicons, covers } from "./stores";
+  import { filteredListSliced, nodesList, favicons, covers, tipImages } from "./stores";
   import { toDataURL } from "./utils";
   import {
     buildBookmarkIndex,
@@ -208,10 +208,17 @@
             isBookmark: !!node.isBookmark,
           })
         ) {
-          enqueueCover(node.url, toDataURL).then((data) => {
-            if (data) {
+          enqueueCover(node.url, toDataURL).then((result) => {
+            if (result.cover) {
               covers.update((map) => {
-                map.set(host, data);
+                map.set(host, result.cover!);
+                return map;
+              });
+            }
+            // twitter:image — только tip, не фон шара
+            if (result.tip) {
+              tipImages.update((map) => {
+                map.set(host, result.tip!);
                 return map;
               });
             }

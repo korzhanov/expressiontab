@@ -7,8 +7,10 @@ import {
   isCoverWorthyUrl,
   manifestCandidateUrls,
   parseCoverIconUrls,
+  parseTipImageUrls,
   parseManifestIcons,
   parseManifestLink,
+  resolveTipImageSrc,
   shouldLoadCover,
 } from "./cover-icons";
 
@@ -25,14 +27,16 @@ describe("parseCoverIconUrls", () => {
     expect(urls.some((u) => u.includes("small.ico"))).toBe(false);
   });
 
-  it("reads twitter:image and large rel=icon", () => {
+  it("reads large rel=icon; twitter:image is tip-only not cover", () => {
     const html = `
       <meta name="twitter:image" content="https://cdn.ex.com/tw.jpg" />
       <link rel="icon" sizes="192x192" href="/pwa.png" />
     `;
-    const urls = parseCoverIconUrls(html, "https://ex.com/");
-    expect(urls).toContain("https://cdn.ex.com/tw.jpg");
-    expect(urls).toContain("https://ex.com/pwa.png");
+    const covers = parseCoverIconUrls(html, "https://ex.com/");
+    expect(covers).not.toContain("https://cdn.ex.com/tw.jpg");
+    expect(covers).toContain("https://ex.com/pwa.png");
+    const tips = parseTipImageUrls(html, "https://ex.com/");
+    expect(tips).toContain("https://cdn.ex.com/tw.jpg");
   });
 
   it("absolutizeUrl resolves relative paths", () => {
@@ -110,5 +114,16 @@ describe("shouldLoadCover", () => {
       shouldLoadCover({ radius: COVER_MIN_SIZE / 2, isBookmark: false })
     ).toBe(true);
     expect(shouldLoadCover({ radius: 20, isBookmark: false })).toBe(false);
+  });
+});
+
+describe("resolveTipImageSrc", () => {
+  it("prefers tip (twitter) over cover", () => {
+    const tips = new Map([["ex.com", "data:tip"]]);
+    const covers = new Map([["ex.com", "data:cover"]]);
+    expect(resolveTipImageSrc("ex.com", tips, covers, "")).toBe("data:tip");
+    expect(resolveTipImageSrc("ex.com", new Map(), covers, "")).toBe(
+      "data:cover"
+    );
   });
 });

@@ -2,7 +2,7 @@
   /**
    * Tooltip для bubble-поля: не закрывается на scroll страницы
    * (поле высокое — иначе tip мгновенно умирает). Leave / ПКМ-меню — да.
-   * image — cover/og/twitter, если уже в store.
+   * image — twitter tip или cover, если уже в store.
    */
   import Tooltip from "./Tooltip.svelte";
   import type { TooltipSide } from "./portal";
