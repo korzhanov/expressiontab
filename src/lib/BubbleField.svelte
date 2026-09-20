@@ -56,7 +56,15 @@
     type BubbleWorld,
   } from "./bubble-physics";
   import { bubbleRadiusFromVisits } from "./bubble-radius";
+  import {
+    bubbleNavHue,
+    navBurstPortal,
+    shouldSkipNavTransition,
+    viewportCoverRadius,
+  } from "./bubble-nav-transition";
   import BubbleDot from "./BubbleDot.svelte";
+  import { tweened } from "svelte/motion";
+  import { cubicOut } from "svelte/easing";
 
   export let bookmarkList: Map<string, HostGroup> = new Map();
   export let nodesList: BookmarkNode[] = [];
@@ -1085,12 +1093,91 @@
     attachDragListeners();
   }
 
-  function onBubbleClick(e: MouseEvent) {
+  /** Overlay перехода: круг из шарика на весь экран */
+  let navBurst: {
+    cx: number;
+    cy: number;
+    hue: number;
+    url: string;
+  } | null = null;
+  const navBurstR = tweened(0, { duration: 520, easing: cubicOut });
+  let navBusy = false;
+
+  function prefersReducedMotion(): boolean {
+    try {
+      return (
+        typeof matchMedia !== "undefined" &&
+        matchMedia("(prefers-reduced-motion: reduce)").matches
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  function goToUrl(url: string) {
+    try {
+      window.location.href = url;
+    } catch {
+      /* */
+    }
+  }
+
+  function onBubbleClick(e: MouseEvent, b: BubbleNode) {
     if (dragMoved) {
       e.preventDefault();
       e.stopPropagation();
       dragMoved = false;
+      return;
     }
+    // Новая вкладка / модификаторы — нативный переход без анимации
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) {
+      return;
+    }
+    if (navBusy) {
+      e.preventDefault();
+      return;
+    }
+    const url = b.url;
+    if (
+      shouldSkipNavTransition({
+        reducedMotion: prefersReducedMotion(),
+        url,
+      })
+    ) {
+      return; // обычный <a href>
+    }
+    e.preventDefault();
+    e.stopPropagation();
+
+    const el = e.currentTarget as HTMLElement | null;
+    const rect = el?.getBoundingClientRect?.();
+    const cx = rect
+      ? rect.left + rect.width / 2
+      : e.clientX;
+    const cy = rect
+      ? rect.top + rect.height / 2
+      : e.clientY;
+    const r0 = rect ? Math.max(rect.width, rect.height) / 2 : b.r || 40;
+    const hue = bubbleNavHue({
+      kind: b.kind,
+      isBookmark: b.isBookmark,
+      isSession: b.isSession,
+      isOverflowGroup: b.isOverflowGroup,
+      groupable: isGroupableBubble(b),
+    });
+
+    navBusy = true;
+    navBurst = { cx, cy, hue, url };
+    navBurstR.set(r0, { duration: 0 }).then(() => {
+      const vw = window.innerWidth || 800;
+      const vh = window.innerHeight || 600;
+      const target = viewportCoverRadius(cx, cy, vw, vh);
+      return navBurstR.set(target);
+    }).then(() => {
+      goToUrl(url);
+    }).catch(() => {
+      goToUrl(url);
+    });
   }
 
   /** Star: создать / снять закладку в chrome.bookmarks. */
@@ -1246,12 +1333,30 @@
       onExpandCommit={() => onExpandCommit(b)}
       onExpandRequest={() => onExpandRequest(b)}
       onPointerDown={(e) => onBubblePointerDown(b, e)}
-      onLinkClick={onBubbleClick}
+      onLinkClick={(e) => onBubbleClick(e, b)}
       onDelete={() => onBubbleDelete(b)}
       onToggleBookmark={() => onBubbleToggleBookmark(b)}
     />
   {/each}
 </section>
+
+{#if navBurst}
+  <!-- На body-слое: иначе overflow/z-index поля режет круг под filterBar -->
+  <div
+    class="navBurst"
+    aria-hidden="true"
+    use:navBurstPortal
+    style="
+      left: {navBurst.cx}px;
+      top: {navBurst.cy}px;
+      width: {$navBurstR * 2}px;
+      height: {$navBurstR * 2}px;
+      margin-left: {-($navBurstR)}px;
+      margin-top: {-($navBurstR)}px;
+      --hue: {navBurst.hue};
+    "
+  ></div>
+{/if}
 
 <style>
   .bubbleField {
@@ -1261,5 +1366,20 @@
     overflow: hidden; /* не пускаем шары на часы / filter bar */
     /* Без цветного radial — только нейтральный слой поверх anchores; hero-картинка цветная */
     background: transparent;
+  }
+  /* Переход: круг из клика → весь экран; стили :global — нода на body-слое */
+  :global(.navBurst) {
+    position: fixed;
+    z-index: 300001;
+    border-radius: 50%;
+    pointer-events: none;
+    background: radial-gradient(
+      circle at 35% 30%,
+      hsl(var(--hue), 72%, 58%),
+      hsl(var(--hue), 70%, 32%) 55%,
+      #222 100%
+    );
+    box-shadow: inset 0 -0.2em 0.5em hsla(0, 0%, 0%, 0.25);
+    will-change: width, height, margin;
   }
 </style>

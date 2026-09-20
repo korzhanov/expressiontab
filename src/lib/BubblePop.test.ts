@@ -60,6 +60,15 @@ describe("BubblePop", () => {
     expect(src).not.toContain("starred={localBookmark}");
   });
 
+  it("BubbleField runs circle expand nav transition before open", () => {
+    const src = readFileSync(join(import.meta.dir, "BubbleField.svelte"), "utf8");
+    expect(src).toContain("navBurst");
+    expect(src).toContain("navBurstPortal");
+    expect(src).toContain("viewportCoverRadius");
+    expect(src).toContain("bubbleNavHue");
+    expect(src).toContain("window.location.href");
+  });
+
   it("BubbleField spawns children before pop, then shrinks to linkR; fold pops kids", () => {
     const src = readFileSync(join(import.meta.dir, "BubbleField.svelte"), "utf8");
     const fnAt = src.indexOf("function commitExpandPop");
