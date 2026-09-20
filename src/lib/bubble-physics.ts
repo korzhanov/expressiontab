@@ -6,7 +6,6 @@ import {
   forceSimulation,
   forceCollide,
   forceX,
-  forceY,
   forceLink,
   type Simulation,
   type SimulationNodeDatum,
@@ -59,13 +58,22 @@ export type BubbleNode = SimulationNodeDatum & {
 
 /** Зазор между ячейками сетки (разграничение ≈ gap/2). */
 export const PACK_GAP = 12;
+/** Шаг ряда hex/шахмат: плотнее прямой сетки (√3/2). */
+export const HEX_ROW = Math.sqrt(3) / 2;
 
 /** Временно: выключить «гравитацию» (стягивание по X/Y). */
 export const BUBBLE_GRAVITY = true;
+/** Сила стягивания к центру по X (слабее — не схлопывать ряд у потолка). */
+export const BUBBLE_GRAVITY_X = 0.008;
+/**
+ * Постоянное ускорение вверх (потолок стакана).
+ * Не forceY(точка): иначе blob вокруг якоря, а не пена у верхней кромки.
+ */
+export const BUBBLE_GRAVITY_UP = 1.8;
 /** Сила связей родитель↔дети (слабее — меньше пружинит по полю). */
 export const BUBBLE_LINK_STRENGTH = 0.35;
 /** Базовое трение: выше — быстрее успокаиваются после толчка. */
-export const BUBBLE_VELOCITY_DECAY = 0.38;
+export const BUBBLE_VELOCITY_DECAY = 0.26;
 
 export type BubbleLink = SimulationLinkDatum<BubbleNode> & {
   id: string;
@@ -95,8 +103,8 @@ function childId(host: string, nodeIndex: number): string {
 }
 
 /**
- * Позиция в сетке сверху вниз — единый cell на всех (не per-node r),
- * иначе крупные/мелкие шары попадают в разные cols и наезжают.
+ * Hex/шахмат spawn сверху вниз: нечётный ряд +½ cell, шаг ряда √3/2.
+ * Единый cell — иначе разные cols и наезды.
  */
 export function gridSpawnXY({
   index,
@@ -115,17 +123,25 @@ export function gridSpawnXY({
   cell?: number;
 }): { x: number; y: number } {
   const cell = cellOpt ?? 2 * r + PACK_GAP;
+  const rowH = cell * HEX_ROW;
   const pad = PACK_GAP + 8;
-  const cols = Math.max(1, Math.floor((Math.max(width, 320) - pad * 2) / cell));
+  // Запас под сдвиг нечётного ряда (иначе крайний шар уезжает за правый pad)
+  const cols = Math.max(
+    1,
+    Math.floor((Math.max(width, 320) - pad * 2 - cell * 0.5) / cell)
+  );
   const col = index % cols;
   const row = (index / cols) | 0;
-  // Небольшой jitter, чтобы не стояли идеальной решёткой
-  const jitterX = ((index * 53) % 11) - 5;
-  const jitterY = ((index * 71) % 11) - 5;
-  const x = pad + col * cell + cell * 0.5 + jitterX;
-  const y = pad + row * cell + cell * 0.5 + jitterY;
-  // Не вылезать за низ мира (высота уже посчитана под сетку)
+  // Шахматный сдвиг нечётных рядов на полъячейки
+  const stagger = row % 2 === 1 ? cell * 0.5 : 0;
+  // Лёгкий jitter — не идеальная решётка до первого tick
+  const jitterX = ((index * 53) % 7) - 3;
+  const jitterY = ((index * 71) % 7) - 3;
+  const xRaw = pad + col * cell + cell * 0.5 + stagger + jitterX;
+  const y = pad + row * rowH + cell * 0.5 + jitterY;
+  // Не вылезать за края мира
   const maxY = Math.max(pad + r, height - pad - r);
+  const x = Math.min(Math.max(pad + r, xRaw), Math.max(width - pad - r, pad + r));
   return { x, y: Math.min(y, maxY) };
 }
 
@@ -170,9 +186,12 @@ export function buildHostBubbles({
     });
   }
   const cap = drafts.length;
-  // Единая ячейка по max r — без наложений на старте
+  // Ячейка по packR (среднее+хвост max) — плотнее maxR; collide разведёт крупные
   const maxR = drafts.reduce((m, d) => Math.max(m, d.groupR), 40);
-  const cell = 2 * maxR + PACK_GAP;
+  const meanR =
+    drafts.reduce((s, d) => s + d.groupR, 0) / Math.max(drafts.length, 1) || 52;
+  const packR = Math.max(meanR * 0.85 + maxR * 0.15, 36);
+  const cell = 2 * packR + PACK_GAP;
   const nodes: BubbleNode[] = [];
   drafts.forEach((d, i) => {
     const { x, y } = gridSpawnXY({
@@ -216,42 +235,72 @@ export function buildHostBubbles({
 }
 
 /**
- * Якорь по Y: верх блока с шариками (`.bubbleField`), не верх страницы/viewport.
- * В координатах поля — центр первого ряда сетки (как gridSpawnXY).
+ * Якорь/потолок «стакана»: центр первого hex-ряда (для spawn-толчка).
  */
 export function focusYForWorld(height: number, avgR = 52): number {
   const pad = PACK_GAP + 8;
   const cell = 2 * avgR + PACK_GAP;
-  // Верх dial-блока = середина первого ряда шариков
   const topOfBlock = pad + cell * 0.5;
-  // На очень низком поле не тянуть ниже середины высоты
-  return Math.min(topOfBlock, Math.max(pad + 20, height * 0.45));
+  // На очень низком поле — не ниже ~трети высоты
+  return Math.min(topOfBlock, Math.max(pad + avgR, height * 0.35));
 }
 
 /**
- * Высота мира сеточной упаковкой (не площадью кругов — иначе в 2× короче нужному).
- * minHeight — остаток viewport под filter bar (preview не «полоска»).
+ * Высота мира по hex-рядам (тот же cell/cols, что gridSpawnXY).
+ * minHeight — только нижний пол, не viewport.
  */
 export function worldHeightForCount(
   count: number,
   width: number,
   {
     avgR = 52,
-    minHeight = 560,
+    minHeight = 240,
   }: { avgR?: number; minHeight?: number } = {}
 ): number {
   const simCount = Math.min(Math.max(count, 1), BUBBLE_SIM_CAP);
   const cell = 2 * avgR + PACK_GAP;
+  const rowH = cell * HEX_ROW;
   const pad = PACK_GAP + 8;
-  // Те же cols, что gridSpawnXY (с pad) — иначе высота короче рядов
+  // Те же cols, что gridSpawnXY (запас под stagger)
   const cols = Math.max(
     1,
-    Math.floor((Math.max(width, 320) - pad * 2) / cell)
+    Math.floor((Math.max(width, 320) - pad * 2 - cell * 0.5) / cell)
   );
   const rows = Math.ceil(simCount / cols);
-  // pad сверху/снизу — без лишней «пустоты после последнего ряда»
-  const packed = rows * cell + pad * 2;
+  // pad + полъячейки сверху/снизу + (rows-1) hex-шагов
+  const packed = pad * 2 + cell + Math.max(0, rows - 1) * rowH;
   return Math.max(packed, minHeight);
+}
+
+/**
+ * Нижняя кромка контента (max y+r) — обрезать пустоту после укладки к потолку.
+ */
+export function contentBottomY(
+  nodes: BubbleNode[],
+  { pad = 16 }: { pad?: number } = {}
+): number {
+  let bottom = 0;
+  for (const n of nodes) {
+    bottom = Math.max(bottom, (n.y ?? 0) + (n.r || 40) + pad);
+  }
+  return bottom;
+}
+
+/** Постоянное ускорение вверх — пена к верхней кромке стакана. */
+function forceUpTowardCeiling(strength: number): Force<BubbleNode, undefined> {
+  let nodes: BubbleNode[] = [];
+  const force = ((alpha: number) => {
+    // Не гасить полностью с alpha — иначе «замирают» на полпути к потолку
+    const k = strength * (0.35 + 0.65 * alpha);
+    for (const n of nodes) {
+      if (n.fy != null) continue;
+      n.vy = (n.vy ?? 0) - k;
+    }
+  }) as Force<BubbleNode, undefined>;
+  force.initialize = (initNodes: BubbleNode[]) => {
+    nodes = initNodes;
+  };
+  return force;
 }
 
 export function createBubbleWorld({
@@ -274,11 +323,15 @@ export function createBubbleWorld({
     })
     .strength(BUBBLE_LINK_STRENGTH);
 
-  // Якорь Y — верх блока с шариками (не страница/часы)
   const topY = focusYForWorld(height);
-  // Сила «гравитации» (0 = временно выкл.)
-  const gX = BUBBLE_GRAVITY ? 0.003 : 0;
-  const gY = BUBBLE_GRAVITY ? 0.006 : 0;
+  const gX = BUBBLE_GRAVITY ? BUBBLE_GRAVITY_X : 0;
+  const gUp = BUBBLE_GRAVITY ? BUBBLE_GRAVITY_UP : 0;
+  // Стартовый толчок вверх — сразу к потолку, не ждать накопления force
+  for (const n of nodes) {
+    if ((n.y ?? 0) > topY + 8) {
+      n.vy = (n.vy ?? 0) - 18;
+    }
+  }
   const simulation = forceSimulation<BubbleNode>(nodes)
     .force(
       "collide",
@@ -288,16 +341,15 @@ export function createBubbleWorld({
         .iterations(6)
     )
     // Без many-body: в drag-collisions его нет — иначе давит на overlap
-    // Стягивание к середине по горизонтали
     .force("x", forceX(width / 2).strength(gX))
-    // Стягивание к верху блока с шариками
-    .force("y", forceY(topY).strength(gY))
+    // Постоянная «антигравитация» к потолку (не якорь-точка)
+    .force("up", forceUpTowardCeiling(gUp))
     // Связи родитель↔дети: держат раскрытую группу рядом
     .force("link", linkForce)
-    // Как быстро «остывает» движение после толчка (выше — раньше останавливается)
-    .alphaDecay(0.022)
-    // Трение: гасит скорость шаров (выше — меньше скольжения / пружины)
-    .velocityDecay(BUBBLE_VELOCITY_DECAY);
+    // Дольше живой после spawn — успеть улечься у верхней кромки
+    .alphaDecay(0.014)
+    .velocityDecay(BUBBLE_VELOCITY_DECAY)
+    .alpha(1);
 
   return { width, height, nodes, links, simulation, linkForce };
 }
@@ -351,11 +403,12 @@ export function endDragCollisions(world: BubbleWorld): void {
 export function resizeWorld(world: BubbleWorld, width: number, height: number): void {
   world.width = width;
   world.height = height;
-  const topY = focusYForWorld(height);
-  const gX = BUBBLE_GRAVITY ? 0.003 : 0;
-  const gY = BUBBLE_GRAVITY ? 0.006 : 0;
+  const gX = BUBBLE_GRAVITY ? BUBBLE_GRAVITY_X : 0;
+  const gUp = BUBBLE_GRAVITY ? BUBBLE_GRAVITY_UP : 0;
   world.simulation.force("x", forceX(width / 2).strength(gX));
-  world.simulation.force("y", forceY(topY).strength(gY));
+  // Тот же потолочный up-force (не forceY-якорь)
+  world.simulation.force("y", null);
+  world.simulation.force("up", forceUpTowardCeiling(gUp));
   // Обновить разграничение на случай смены состава радиусов
   world.simulation.force(
     "collide",
