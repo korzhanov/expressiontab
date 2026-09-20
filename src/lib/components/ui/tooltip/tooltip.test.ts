@@ -45,6 +45,17 @@ describe("tooltip ui module", () => {
       "utf8"
     );
     expect(bubble).toContain("closeOnScroll={false}");
+    expect(bubble).toContain("{image}");
     expect(list).toContain("closeOnScroll={true}");
+  });
+
+  it("Tooltip supports optional preview image", () => {
+    const src = readFileSync(
+      join(import.meta.dir, "Tooltip.svelte"),
+      "utf8"
+    );
+    expect(src).toContain("export let image");
+    expect(src).toContain("tooltip-image");
+    expect(src).toContain("has-image");
   });
 });

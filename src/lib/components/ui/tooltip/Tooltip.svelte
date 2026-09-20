@@ -14,6 +14,8 @@
 
   /** Текст подсказки */
   export let content: string = "";
+  /** Опционально: превью (og/twitter/cover data URL) над текстом */
+  export let image: string = "";
   /** Сторона относительно триггера */
   export let side: TooltipSide = "top";
   /** Задержка перед показом (как delayDuration у shadcn) */
@@ -138,6 +140,7 @@
     bind:this={popupEl}
     use:tooltipPortal={onPopupPlaced}
     class="tooltip-content"
+    class:has-image={!!image}
     class:top={side === "top"}
     class:bottom={side === "bottom"}
     class:left={side === "left"}
@@ -146,7 +149,18 @@
     style="top: {pos.top}px; left: {pos.left}px;"
     transition:fade={{ duration: 80 }}
   >
-    {content}
+    {#if image}
+      <!-- og/twitter/cover: после load пересчитываем clamp -->
+      <img
+        class="tooltip-image"
+        src={image}
+        alt=""
+        loading="lazy"
+        draggable="false"
+        on:load={() => syncPos(popupEl)}
+      />
+    {/if}
+    <span class="tooltip-text">{content}</span>
   </span>
 {/if}
 
@@ -182,6 +196,26 @@
     word-break: normal;
     pointer-events: none;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  }
+  .tooltip-content.has-image {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.35rem;
+    min-width: 10rem;
+    max-width: min(280px, 72vw);
+  }
+  .tooltip-image {
+    display: block;
+    width: 100%;
+    max-height: 140px;
+    object-fit: cover;
+    border-radius: 0.25rem;
+    background: #e8e8e8;
+  }
+  .tooltip-text {
+    display: block;
+    padding: 0.15rem 0.4rem 0.35rem;
   }
   .tooltip-content.top {
     transform: translate(-50%, -100%);

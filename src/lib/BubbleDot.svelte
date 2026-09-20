@@ -164,9 +164,10 @@
   role="group"
   style="transform: translate({tx}px, {ty}px); width: {size}px; height: {size}px;"
 >
-  <!-- Bubble tip: closeOnScroll=false — scroll поля не убивает подсказку -->
+  <!-- Bubble tip: cover/og в tip если уже подгружен -->
   <Tooltip.Bubble
     content={tooltipText}
+    image={coverSrc}
     side="bottom"
     delayDuration={400}
     disabled={dragging || popping || multiButton}
@@ -438,6 +439,30 @@
     //   hsla(42, 80%, 48%, 0.5) 55%,
     //   hsla(42, 75%, 32%, 0.62)
     // );
+    // https://docs.google.com/a/examle.com/forms/d/xxxxxx/viewform?edit_requested=true
+    // https://docs.google.com/document/d/xxxx/edit#
+    // https://docs.google.com/spreadsheets/d/xxxx/edit#gid=xxxx
+    // https://docs.google.com/presentation/d/xxxx/edit#slide=id.g1234567890
+    // https://docs.google.com/drawings/d/xxxx/edit
+    // https://docs.google.com/maps/d/xxxx/edit
+    // https://docs.google.com/forms/d/xxxx/viewform?edit_requested=true
+    // https://docs.google.com/document/d/xxxx/edit#
+    // https://docs.google.com/spreadsheets/d/xxxx/edit#gid=xxxx
+    // https://docs.google.com/presentation/d/xxxx/edit#slide=id.g1234567890
+    // https://docs.google.com/drawings/d/xxxx/edit
+    // https://docs.google.com/maps/d/xxxx/edit
+    // https://docs.google.com/forms/d/xxxx/viewform?edit_requested=true
+    // https://docs.google.com/document/d/xxxx/edit#
+    // https://docs.google.com/spreadsheets/d/xxxx/edit#gid=xxxx
+    // https://docs.google.com/presentation/d/xxxx/edit#slide=id.g1234567890
+    // https://docs.google.com/drawings/d/xxxx/edit
+    // https://docs.google.com/maps/d/xxxx/edit
+    // https://docs.google.com/forms/d/xxxx/viewform?edit_requested=true
+    // https://docs.google.com/document/d/xxxx/edit#
+    // https://docs.google.com/spreadsheets/d/xxxx/edit#gid=xxxx
+    // https://docs.google.com/presentation/d/xxxx/edit#slide=id.g1234567890
+    // https://docs.google.com/drawings/d/xxxx/edit
+    // https://docs.google.com/maps/d/xxxx/edit
   }
   .bubbleDot.expanded {
     box-shadow:

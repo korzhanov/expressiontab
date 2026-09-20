@@ -38,6 +38,7 @@ describe("BubblePop", () => {
     expect(src).not.toContain("showMenu()");
     // Tip: Bubble-политика (не close-on-scroll); не гасим на inflate
     expect(src).toContain("Tooltip.Bubble");
+    expect(src).toContain("image={coverSrc}");
     expect(src).toContain("disabled={dragging || popping || multiButton}");
     expect(src).not.toContain("inflating || popping");
   });
