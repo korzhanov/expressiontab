@@ -132,4 +132,14 @@ describe("BubblePop", () => {
     expect(foldBody).toContain("const r1 = groupR");
     expect(foldBody).not.toContain("clusterRadiusFromChildRadii");
   });
+
+  it("BubbleField caps concurrent unfolds at MAX_UNFOLDED_HOSTS", () => {
+    const src = readFileSync(
+      join(import.meta.dir, "BubbleField.svelte"),
+      "utf8"
+    );
+    expect(src).toContain("MAX_UNFOLDED_HOSTS");
+    expect(src).toContain("registerExpanded");
+    expect(src).toContain("noteUnfoldedHost");
+  });
 });

@@ -62,6 +62,11 @@
     shouldSkipNavTransition,
     viewportCoverRadius,
   } from "./bubble-nav-transition";
+  import {
+    MAX_UNFOLDED_HOSTS,
+    noteFoldedHost,
+    noteUnfoldedHost,
+  } from "./unfold-limit";
   import BubbleDot from "./BubbleDot.svelte";
   import { tweened } from "svelte/motion";
   import { cubicOut } from "svelte/easing";
@@ -81,6 +86,8 @@
   let dragTick = 0;
   let visible: BubbleNode[] = [];
   let expandedHosts: Record<string, boolean> = {};
+  /** LRU unfolded host'ов — не больше MAX_UNFOLDED_HOSTS */
+  let expandedOrder: string[] = [];
   let builtKey = "";
   /** Предыдущий scrollY поля — направление rise/fall */
   let lastFieldScrollY = 0;
@@ -181,6 +188,7 @@
     });
     world = createBubbleWorld({ nodes, width: w, height: worldH });
     expandedHosts = {};
+    expandedOrder = [];
     // Сброс enter-анимаций при новой симуляции
     prevVisibleIds = new Set();
     enterAnimById = {};
@@ -397,6 +405,37 @@
   }
 
   /**
+   * Запомнить unfold; сверх лимита — мгновенно свернуть самых старых
+   * (без очереди absorb-анимаций — иначе лагает).
+   */
+  function registerExpanded(host: string) {
+    if (!host || !world) return;
+    const { order, toCollapse } = noteUnfoldedHost({
+      order: expandedOrder,
+      host,
+      max: MAX_UNFOLDED_HOSTS,
+    });
+    expandedOrder = order;
+    for (const h of toCollapse) {
+      if (isHostExpanded(world, h)) collapseHost(world, h);
+      expandedHosts[h] = false;
+    }
+    expandedHosts[host] = true;
+    expandedHosts = { ...expandedHosts };
+  }
+
+  /** Снять host из LRU при fold */
+  function registerCollapsed(host: string) {
+    if (!host) return;
+    expandedOrder = noteFoldedHost({
+      order: expandedOrder,
+      host,
+    }).order;
+    expandedHosts[host] = false;
+    expandedHosts = { ...expandedHosts };
+  }
+
+  /**
    * Unfold: родитель сжимается groupR → linkR (вес своей ссылки),
    * дети появляются рядом (longhover / contextmenu / «+»).
    */
@@ -566,8 +605,7 @@
           maxChildren: GROUP_MAX_CHILDREN,
         });
         childSpawnSeq += 1;
-        expandedHosts[b.host] = true;
-        expandedHosts = { ...expandedHosts };
+        registerExpanded(b.host);
         nudgeSim(world, 0.12);
         refreshVisible();
       };
@@ -594,8 +632,7 @@
       spawnIndexBase: base,
       maxChildren: GROUP_MAX_CHILDREN,
     });
-    expandedHosts[b.host] = true;
-    expandedHosts = { ...expandedHosts };
+    registerExpanded(b.host);
     nudgeSim(world, 0.18);
     refreshVisible();
   }
@@ -843,8 +880,7 @@
         nodesList,
         maxChildren: GROUP_MAX_CHILDREN,
       });
-      expandedHosts[b.host] = true;
-      expandedHosts = { ...expandedHosts };
+      registerExpanded(b.host);
       refreshVisible();
     } else if (skipSpawn && group && !isHostExpanded(world, b.host)) {
       // 3с без детей (leave не было, но stagger ещё не стартовал) — все сразу
@@ -856,8 +892,7 @@
         maxChildren: GROUP_MAX_CHILDREN,
         keepParentR: true,
       });
-      expandedHosts[b.host] = true;
-      expandedHosts = { ...expandedHosts };
+      registerExpanded(b.host);
       refreshVisible();
     }
     if (expandTimer) clearTimeout(expandTimer);
@@ -928,8 +963,7 @@
     const children = listHostChildren(world, b.host);
     if (!children.length) {
       collapseHost(world, b.host);
-      expandedHosts[b.host] = false;
-      expandedHosts = { ...expandedHosts };
+      registerCollapsed(b.host);
       refreshVisible();
       return;
     }
@@ -990,8 +1024,7 @@
         unpinBubble(b);
         poppingChildIds = {};
         collapsingId = null;
-        expandedHosts[b.host] = false;
-        expandedHosts = { ...expandedHosts };
+        registerCollapsed(b.host);
         endSoftRadiusAdjust(world);
         nudgeSim(world, 0.15);
         inflateTick += 1;
@@ -1001,8 +1034,7 @@
     if (typeof requestAnimationFrame === "undefined") {
       collapseHost(world, b.host);
       collapsingId = null;
-      expandedHosts[b.host] = false;
-      expandedHosts = { ...expandedHosts };
+      registerCollapsed(b.host);
       refreshVisible();
       return;
     }

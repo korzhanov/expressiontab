@@ -19,6 +19,7 @@
     type ChunkRow,
   } from "./bookmarks";
   import { enqueueCover, shouldLoadCover } from "./cover-icons";
+  import { clearUnfoldedHosts } from "./unfold-limit";
   import { isMockChrome } from "./chrome-mock";
   import { stashOpenTabs, loadOpenTabsForSession, mergeSessionIntoIndex, type StashChrome } from "./stash-tabs";
   import {
@@ -166,6 +167,8 @@
 
     bookmarkList = built.bookmarkList;
     nodesList.set(built.nodesList);
+    // Новая выдача — сбросить lined unfold LRU
+    clearUnfoldedHosts();
     localStorage.maxVisits = built.maxVisits + "";
 
     // Favicon + cover (крупные/starred) только в расширении

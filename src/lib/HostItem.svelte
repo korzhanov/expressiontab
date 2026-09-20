@@ -5,6 +5,11 @@
   import { longhover, GROUP_LONGHOVER_MS } from "./longhover";
   import { nodesList } from "./stores";
   import { getUnfoldSlice, UNFOLD_PAGE_SIZE } from "./bookmarks";
+  import {
+    foldHost,
+    unfoldHost,
+    unfoldedHostOrder,
+  } from "./unfold-limit";
   import * as Tooltip from "./components/ui/tooltip";
 
   export let hostItem: any;
@@ -13,12 +18,16 @@
   $: hostAnchore = $nodesList[anchores[0]] || {};
   $: otherAnchores = anchores[1] ? anchores.slice(1) : [];
   $: isSessionGroup = !!(hostItem?.isSession || hostAnchore?.isSession);
+  // Стабильный ключ группы для LRU unfold
+  $: hostKey =
+    hostItem?.host || hostAnchore?.host || String(anchores[0] ?? "");
+  // Общий лимит 3 — подписка на store, не локальный флаг
+  $: unfold = !!hostKey && $unfoldedHostOrder.includes(hostKey);
   $: groupHint = `${otherAnchores.length} more — arrow toggles, hover 3s or right-click`;
   $: toggleLabel = unfold
     ? `Hide ${otherAnchores.length} more links`
     : `Show ${otherAnchores.length} more links`;
 
-  let unfold = false;
   let childrenInvisible = false;
   let visibleChildCount = UNFOLD_PAGE_SIZE;
 
@@ -31,8 +40,9 @@
       e.preventDefault();
       e.stopPropagation();
     }
+    if (!hostKey) return;
     if (!unfold) {
-      unfold = true;
+      unfoldHost(hostKey);
       childrenInvisible = true;
       visibleChildCount = UNFOLD_PAGE_SIZE;
     }
@@ -43,8 +53,9 @@
       e.preventDefault();
       e.stopPropagation();
     }
+    if (!hostKey) return;
     if (unfold) {
-      unfold = false;
+      foldHost(hostKey);
       childrenInvisible = false;
       visibleChildCount = UNFOLD_PAGE_SIZE;
     } else {

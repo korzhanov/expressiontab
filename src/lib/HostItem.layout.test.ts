@@ -21,4 +21,10 @@ describe("HostItem lined group row", () => {
     expect(src).toContain("groupToggleCount");
     expect(src).toContain("aria-expanded={unfold}");
   });
+
+  it("shares unfold via unfold-limit store (max 3)", () => {
+    expect(src).toContain("unfoldedHostOrder");
+    expect(src).toContain("unfoldHost(hostKey)");
+    expect(src).toContain("foldHost(hostKey)");
+  });
 });
