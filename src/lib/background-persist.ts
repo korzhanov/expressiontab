@@ -27,6 +27,11 @@ export type BackgroundMeta = {
   source: string;
   /** Пользователь поставил через drop — не перезаписывать daily */
   userLocked?: boolean;
+  /** Копирайт / автор (Bing, Peapix, Picsum) */
+  copyright?: string;
+  /** Ссылка на источник / автора */
+  creditUrl?: string;
+  title?: string;
 };
 
 function storageGet(

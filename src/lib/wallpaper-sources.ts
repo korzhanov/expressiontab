@@ -16,7 +16,24 @@ export type WallpaperPick = {
   /** Прямой https (или picsum redirect) на файл */
   imageUrl: string;
   title?: string;
+  /** Текст копирайта / автор (обязателен для Bing/Peapix/Picsum) */
+  copyright?: string;
+  /** Ссылка на автора / страницу (Picsum, Bing copyrightlink) */
+  creditUrl?: string;
 };
+
+/** Собрать короткую подпись для UI */
+export function formatWallpaperCredit(pick: {
+  copyright?: string;
+  title?: string;
+  source?: string;
+}): string {
+  const c = (pick.copyright || "").trim();
+  if (c) return c;
+  const t = (pick.title || "").trim();
+  if (t && pick.source && pick.source !== "user") return t;
+  return "";
+}
 
 /** Календарный день UTC YYYY-MM-DD */
 export function wallpaperDayKey(d = new Date()): string {
@@ -66,6 +83,8 @@ export async function resolvePeapixBing(
     source: "peapix-bing",
     imageUrl,
     title: String(row?.title || ""),
+    copyright: String(row?.copyright || row?.title || ""),
+    creditUrl: String(row?.pageUrl || ""),
   };
 }
 
@@ -81,6 +100,8 @@ export async function resolvePeapixSpotlight(): Promise<WallpaperPick> {
     source: "peapix-spotlight",
     imageUrl,
     title: String(row?.title || ""),
+    copyright: String(row?.copyright || row?.title || ""),
+    creditUrl: String(row?.pageUrl || ""),
   };
 }
 
@@ -88,7 +109,14 @@ export async function resolvePeapixSpotlight(): Promise<WallpaperPick> {
 export async function resolveBingArchive(mkt = "en-US"): Promise<WallpaperPick> {
   const data = (await fetchJson(
     `https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=${encodeURIComponent(mkt)}`
-  )) as { images?: { url?: string; title?: string; copyright?: string }[] };
+  )) as {
+    images?: {
+      url?: string;
+      title?: string;
+      copyright?: string;
+      copyrightlink?: string;
+    }[];
+  };
   const img = data?.images?.[0];
   const path = img?.url || "";
   if (!path) throw new Error("bing-archive: empty");
@@ -98,7 +126,9 @@ export async function resolveBingArchive(mkt = "en-US"): Promise<WallpaperPick> 
   return {
     source: "bing-archive",
     imageUrl,
-    title: String(img?.title || img?.copyright || ""),
+    title: String(img?.title || ""),
+    copyright: String(img?.copyright || img?.title || ""),
+    creditUrl: String(img?.copyrightlink || ""),
   };
 }
 
@@ -106,22 +136,40 @@ export async function resolveBingArchive(mkt = "en-US"): Promise<WallpaperPick> 
 export async function resolveBiturl(mkt = "en-US"): Promise<WallpaperPick> {
   const data = (await fetchJson(
     `https://bing.biturl.top/?resolution=1920&format=json&index=0&mkt=${encodeURIComponent(mkt)}`
-  )) as { url?: string; copyright?: string };
+  )) as { url?: string; copyright?: string; copyright_link?: string };
   const imageUrl = String(data?.url || "");
   if (!imageUrl) throw new Error("biturl: empty");
   return {
     source: "biturl",
     imageUrl,
     title: String(data?.copyright || ""),
+    copyright: String(data?.copyright || ""),
+    creditUrl: String(data?.copyright_link || ""),
   };
 }
 
-/** Picsum: стабильный seed = dayKey */
+/** Picsum: seed + /info для автора (Unsplash via Lorem Picsum) */
 export async function resolvePicsum(dayKey: string): Promise<WallpaperPick> {
+  const imageUrl = `https://picsum.photos/seed/${encodeURIComponent(dayKey)}/1920/1080.jpg`;
+  let copyright = "Photo via Lorem Picsum";
+  let creditUrl = "https://picsum.photos";
+  try {
+    const info = (await fetchJson(
+      `https://picsum.photos/seed/${encodeURIComponent(dayKey)}/info`
+    )) as { author?: string; url?: string; id?: number };
+    if (info?.author) {
+      copyright = `Photo by ${info.author} / Lorem Picsum`;
+    }
+    if (info?.url) creditUrl = String(info.url);
+  } catch {
+    /* info опционален — картинка всё равно ок */
+  }
   return {
     source: "picsum",
-    imageUrl: `https://picsum.photos/seed/${encodeURIComponent(dayKey)}/1920/1080.jpg`,
+    imageUrl,
     title: `Picsum ${dayKey}`,
+    copyright,
+    creditUrl,
   };
 }
 
@@ -154,7 +202,13 @@ export async function fetchDailyWallpaperDataUrl(
     prefer,
     maxChars = BACKGROUND_MAX_CHARS,
   }: { prefer?: WallpaperSourceId; maxChars?: number } = {}
-): Promise<{ dataUrl: string; source: WallpaperSourceId; title?: string }> {
+): Promise<{
+  dataUrl: string;
+  source: WallpaperSourceId;
+  title?: string;
+  copyright?: string;
+  creditUrl?: string;
+}> {
   const order: WallpaperSourceId[] = [
     prefer || pickSourceForDay(dayKey),
     "peapix-bing",
@@ -174,7 +228,13 @@ export async function fetchDailyWallpaperDataUrl(
     try {
       const pick = await resolveWallpaperPick(source, dayKey);
       const dataUrl = await remoteImageToJpegDataUrl(pick.imageUrl, maxChars);
-      return { dataUrl, source: pick.source, title: pick.title };
+      return {
+        dataUrl,
+        source: pick.source,
+        title: pick.title,
+        copyright: pick.copyright || formatWallpaperCredit(pick),
+        creditUrl: pick.creditUrl,
+      };
     } catch (e) {
       lastErr = e;
     }

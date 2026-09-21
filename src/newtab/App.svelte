@@ -21,6 +21,7 @@
   } from "../lib/image-drop";
   import {
     fetchDailyWallpaperDataUrl,
+    formatWallpaperCredit,
     remoteImageToJpegDataUrl,
     wallpaperDayKey,
   } from "../lib/wallpaper-sources";
@@ -35,12 +36,18 @@
   let pendingDrop: DropImageSource | null = null;
   let dropBusy = false;
   let dropError = "";
+  /** Подпись копирайта обоев (если API отдал) */
+  let bgCredit = "";
+  let bgCreditUrl = "";
 
   // Не persist(localStorage) — data URL фона не влезает в ~5MB квоту
   const background = createBackgroundStore(firstbg);
   /** Короткий URL для CSS (blob:), иначе огромный data: в style не рисуется */
   let bgCss = cssUrlValue(firstbg);
   let blobToRevoke: string | null = null;
+
+  /** Дефолтный ассет в репо — в имени файла copyright */
+  const DEFAULT_CREDIT = "Expression Drops · xfactorial.com";
 
   function applyBgDisplay(stored: string) {
     if (blobToRevoke) {
@@ -53,12 +60,33 @@
     background.set(stored);
   }
 
+  function applyCredit(meta: {
+    copyright?: string;
+    creditUrl?: string;
+    title?: string;
+    source?: string;
+    userLocked?: boolean;
+  } | null) {
+    if (!meta || meta.userLocked || meta.source === "user") {
+      bgCredit = "";
+      bgCreditUrl = "";
+      return;
+    }
+    bgCredit = formatWallpaperCredit(meta);
+    bgCreditUrl = (meta.creditUrl || "").trim();
+  }
+
   onMount(() => {
     void (async () => {
       const today = wallpaperDayKey();
       const stored = await loadBackgroundUrl(firstbg);
       const meta = await loadBackgroundMeta();
       applyBgDisplay(stored);
+      if (meta) applyCredit(meta);
+      else if (stored === firstbg || !stored) {
+        bgCredit = DEFAULT_CREDIT;
+        bgCreditUrl = "";
+      }
 
       // User drop — не трогаем
       if (meta?.userLocked) return;
@@ -68,12 +96,17 @@
       try {
         const daily = await fetchDailyWallpaperDataUrl(today);
         await saveBackgroundUrl(daily.dataUrl);
-        await saveBackgroundMeta({
+        const nextMeta = {
           dayKey: today,
           source: daily.source,
           userLocked: false,
-        });
+          copyright: daily.copyright,
+          creditUrl: daily.creditUrl,
+          title: daily.title,
+        };
+        await saveBackgroundMeta(nextMeta);
         applyBgDisplay(daily.dataUrl);
+        applyCredit(nextMeta);
       } catch (e) {
         console.warn("[wallpaper] daily fetch failed", e);
       }
@@ -152,8 +185,11 @@
         dayKey: wallpaperDayKey(),
         source: "user",
         userLocked: true,
+        copyright: "",
+        creditUrl: "",
       });
       applyBgDisplay(dataUrl);
+      applyCredit({ userLocked: true, source: "user" });
       cancelDrop();
     } catch (err) {
       console.error(err);
@@ -185,6 +221,23 @@
   </spacer>
 
   <Anchores />
+
+  {#if bgCredit}
+    <!-- Требование Bing/Peapix/Picsum: показывать копирайт, если есть -->
+    <div class="bgCredit" style="opacity: {Math.max(bgOpacity, 0.35)};">
+      {#if bgCreditUrl}
+        <a
+          class="bgCreditLink"
+          href={bgCreditUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={bgCredit}
+        >{bgCredit}</a>
+      {:else}
+        <span title={bgCredit}>{bgCredit}</span>
+      {/if}
+    </div>
+  {/if}
 
   {#if dropActive}
     <div class="dropHint" aria-hidden="true">Drop image — open or set background</div>
@@ -363,5 +416,32 @@
   }
   .dropBtn.ghost {
     background: transparent;
+  }
+
+  .bgCredit {
+    position: fixed;
+    left: 12px;
+    bottom: 10px;
+    z-index: 5;
+    max-width: min(420px, calc(100vw - 24px));
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: rgba(20, 20, 20, 0.55);
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 11px;
+    line-height: 1.35;
+    text-align: left;
+    pointer-events: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .bgCreditLink {
+    color: inherit;
+    text-decoration: none;
+  }
+  .bgCreditLink:hover {
+    color: #fff;
+    text-decoration: underline;
   }
 </style>

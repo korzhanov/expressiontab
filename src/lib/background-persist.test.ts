@@ -44,11 +44,22 @@ describe("background-persist", () => {
       },
     };
     await saveBackgroundMeta(
-      { dayKey: "2026-09-21", source: "picsum", userLocked: false },
+      {
+        dayKey: "2026-09-21",
+        source: "picsum",
+        userLocked: false,
+        copyright: "Photo by Jane / Lorem Picsum",
+        creditUrl: "https://unsplash.com/@jane",
+        title: "Picsum 2026-09-21",
+      },
       api
     );
     const m = await loadBackgroundMeta(api);
     expect(m?.dayKey).toBe("2026-09-21");
     expect(m?.source).toBe("picsum");
+    // Копирайт и ссылка переживают round-trip storage
+    expect(m?.copyright).toBe("Photo by Jane / Lorem Picsum");
+    expect(m?.creditUrl).toBe("https://unsplash.com/@jane");
+    expect(m?.title).toBe("Picsum 2026-09-21");
   });
 });
