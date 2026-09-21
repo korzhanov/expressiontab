@@ -7,6 +7,7 @@ import {
   gridSpawnXY,
   visibleBubbles,
   worldHeightForCount,
+  HEX_ROW,
 } from "./bubble-physics";
 import type { HostGroup, BookmarkNode } from "./bookmarks";
 import { SESSION_HOST_KEY } from "./bookmarks";
@@ -67,7 +68,7 @@ describe("bubble-physics", () => {
     expect(bubbles[0].tabCount).toBe(3);
   });
 
-  it("buildHostBubbles uses uniform grid cell so hosts do not spawn overlapped", () => {
+  it("buildHostBubbles uses packR hex grid; collide-tolerant spawn gaps", () => {
     const nodesList: BookmarkNode[] = [];
     const map = new Map<string, HostGroup>();
     for (let i = 0; i < 20; i++) {
@@ -89,15 +90,18 @@ describe("bubble-physics", () => {
       height: 2000,
     });
     expect(bubbles.length).toBe(20);
-    // Пара с разным r не ближе суммы радиусов (сетка + jitter ≤5)
+    // packR допускает лёгкий overlap крупных; после collide разъедутся
+    let minDist = Infinity;
     for (let i = 0; i < bubbles.length; i++) {
       for (let j = i + 1; j < bubbles.length; j++) {
         const a = bubbles[i];
         const b = bubbles[j];
         const dist = Math.hypot((a.x ?? 0) - (b.x ?? 0), (a.y ?? 0) - (b.y ?? 0));
-        expect(dist + 0.01).toBeGreaterThanOrEqual(a.r + b.r - 12);
+        minDist = Math.min(minDist, dist);
+        expect(dist + 0.01).toBeGreaterThanOrEqual(Math.min(a.r, b.r));
       }
     }
+    expect(minDist).toBeGreaterThan(20);
   });
 
   it("visibleBubbles culls by scroll window", () => {
@@ -161,20 +165,26 @@ describe("bubble-physics", () => {
     expect(nodes[1].y).toBe(200);
   });
 
-  it("worldHeightForCount uses grid packing not circle area", () => {
-    // 400×800: rows*cell — не меньше сетки; не «короткая полоска»
+  it("worldHeightForCount uses hex grid packing not circle area", () => {
+    // Hex: pad*2 + cell + (rows-1)*rowH — плотнее rows*cell
     const h = worldHeightForCount(400, 800);
     const cell = 2 * 52 + 12;
-    const cols = Math.floor(800 / cell);
+    const pad = 12 + 8;
+    const cols = Math.max(1, Math.floor((800 - pad * 2 - cell * 0.5) / cell));
     const rows = Math.ceil(400 / cols);
-    expect(h).toBeGreaterThanOrEqual(rows * cell);
+    const packed = pad * 2 + cell + Math.max(0, rows - 1) * cell * HEX_ROW;
+    expect(h).toBe(Math.max(packed, 240));
     expect(worldHeightForCount(200, 800)).toBeGreaterThan(
       worldHeightForCount(20, 800)
     );
     // 2000 hosts capped — высота как для 400, не раздувается
     expect(worldHeightForCount(2000, 800)).toBe(worldHeightForCount(400, 800));
-    // minHeight поднимает низкие миры (preview)
+    // minHeight поднимает низкие миры (явный floor)
     expect(worldHeightForCount(5, 800, { minHeight: 700 })).toBe(700);
+    // По умолчанию не раздуваем до viewport (~560) — плотнее к контенту
+    expect(worldHeightForCount(5, 800)).toBeLessThan(560);
+    // Hex короче прямой сетки rows*cell
+    expect(h).toBeLessThan(rows * cell + pad * 2);
   });
 
   it("clientToFieldPoint maps viewport to field without scroll double-count", async () => {
@@ -550,7 +560,9 @@ describe("bubble-physics", () => {
   });
 
   it("collide keeps nodes from overlapping after ticks", async () => {
-    const { createBubbleWorld, stopWorld } = await import("./bubble-physics");
+    const { createBubbleWorld, stopWorld, BUBBLE_EDGE_GAP } = await import(
+      "./bubble-physics"
+    );
     const nodes = [
       {
         id: "a",
@@ -584,8 +596,8 @@ describe("bubble-physics", () => {
     const a = world.nodes[0];
     const b = world.nodes[1];
     const dist = Math.hypot((a.x ?? 0) - (b.x ?? 0), (a.y ?? 0) - (b.y ?? 0));
-    // drag-collisions: radius = r+1 → минимум ≈ r_i+r_j+2
-    expect(dist).toBeGreaterThanOrEqual(a.r + b.r);
+    // collide pad = BUBBLE_EDGE_GAP/2 → минимум ≈ r_i+r_j+5
+    expect(dist).toBeGreaterThanOrEqual(a.r + b.r + BUBBLE_EDGE_GAP - 0.5);
     stopWorld(world);
   });
 
@@ -631,7 +643,7 @@ describe("bubble-physics", () => {
     expect(world.simulation.alphaTarget()).toBe(0.05);
     expect(world.simulation.velocityDecay()).toBe(0.55);
     endSoftRadiusAdjust(world);
-    expect(world.simulation.velocityDecay()).toBe(0.38);
+    expect(world.simulation.velocityDecay()).toBeCloseTo(0.26, 5);
     expect(world.simulation.alphaTarget()).toBe(0);
     world.simulation.alpha(0.01);
     nudgeSim(world, 0.1);
@@ -674,12 +686,22 @@ describe("bubble-physics", () => {
     expect(free.vx).toBeGreaterThan(0);
   });
 
-  it("gridSpawnXY fills top-down with fixed cell", () => {
-    const a = gridSpawnXY({ index: 0, count: 40, width: 800, height: 2400, r: 40 });
-    const b = gridSpawnXY({ index: 20, count: 40, width: 800, height: 2400, r: 40 });
+  it("gridSpawnXY fills top-down with checkerboard stagger", () => {
+    const cell = 2 * 40 + 12;
+    const a = gridSpawnXY({ index: 0, count: 40, width: 800, height: 2400, r: 40, cell });
+    const b = gridSpawnXY({ index: 20, count: 40, width: 800, height: 2400, r: 40, cell });
     expect(b.y).toBeGreaterThan(a.y);
     // Первый ряд ближе к верху, не к центру мира
     expect(a.y).toBeLessThan(200);
+    // Нечётный ряд сдвинут по X относительно чётного (шахмат)
+    const cols = Math.max(1, Math.floor((800 - 40 - cell * 0.5) / cell));
+    const i0 = 0;
+    const iOdd = cols; // первый элемент второго ряда
+    const p0 = gridSpawnXY({ index: i0, count: 40, width: 800, height: 2400, r: 40, cell });
+    const p1 = gridSpawnXY({ index: iOdd, count: 40, width: 800, height: 2400, r: 40, cell });
+    expect(Math.abs((p1.x ?? 0) - (p0.x ?? 0))).toBeGreaterThan(cell * 0.2);
+    // Hex: шаг ряда < cell (плотнее прямой сетки)
+    expect((p1.y ?? 0) - (p0.y ?? 0)).toBeLessThan(cell * 0.95);
   });
 
   it("craterPullStep moves node toward target", async () => {
@@ -741,8 +763,8 @@ describe("bubble-physics", () => {
     stopWorld(world);
   });
 
-  it("createBubbleWorld uses forceY toward top of bubble block", async () => {
-    const { createBubbleWorld, focusYForWorld, stopWorld, PACK_GAP, BUBBLE_GRAVITY } =
+  it("createBubbleWorld uses upward ceiling gravity not forceY anchor", async () => {
+    const { createBubbleWorld, focusYForWorld, stopWorld, PACK_GAP, BUBBLE_GRAVITY, bounceBubblesAtWorldEdges } =
       await import("./bubble-physics");
     const nodes = [
       {
@@ -764,18 +786,36 @@ describe("bubble-physics", () => {
       width: 800,
       height: 900,
     });
-    expect(world.simulation.force("y")).toBeTruthy();
+    // Потолочный up-force вместо якоря forceY(topY)
+    expect(world.simulation.force("up")).toBeTruthy();
+    expect(world.simulation.force("y")).toBeFalsy();
     const topY = focusYForWorld(900);
     expect(topY).toBeGreaterThan(PACK_GAP);
     expect(topY).toBeLessThan(200);
-    // Пока гравитация выкл. — узел не обязан ехать вверх
     if (BUBBLE_GRAVITY) {
+      // Стоп авто-таймера — только ручные tick (как в BubbleField onTick)
+      world.simulation.stop();
       world.simulation.alpha(1);
       const y0 = world.nodes[0].y ?? 500;
-      for (let i = 0; i < 120; i++) world.simulation.tick();
+      for (let i = 0; i < 200; i++) {
+        world.simulation.tick();
+        bounceBubblesAtWorldEdges(world.nodes, world.width, world.height);
+      }
       expect(world.nodes[0].y ?? 0).toBeLessThan(y0);
+      // У верхней кромки стакана (не в середине поля)
+      expect(world.nodes[0].y ?? 0).toBeLessThan(100);
     }
     stopWorld(world);
+  });
+
+  it("contentBottomY tracks lowest bubble edge", async () => {
+    const { contentBottomY } = await import("./bubble-physics");
+    expect(
+      contentBottomY([
+        { y: 100, r: 40 },
+        { y: 200, r: 50 },
+      ] as any)
+    ).toBe(200 + 50 + 16);
   });
 
   it("focusYForWorld anchors to top of bubble block not page", async () => {
