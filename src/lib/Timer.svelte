@@ -10,6 +10,7 @@
     TIMER_MODE_COUNTDOWN,
     type TimerMode,
   } from "./timer-mode";
+  import * as Tooltip from "./components/ui/tooltip";
 
   // Режим: 0 countdown / 1 clock / 2 hidden — клик по кругу
   let timerType: TimerMode = TIMER_MODE_COUNTDOWN;
@@ -75,7 +76,8 @@
       title="Click: countdown → clock → hide"
       on:click={onClockClick}
       on:keydown={(e) =>
-        (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onClockClick())}
+        (e.key === "Enter" || e.key === " ") &&
+        (e.preventDefault(), onClockClick())}
     >
       <p>
         {#key hour}<span in:fly={{ y: -20 }}>{hour}</span>{/key}:
@@ -85,13 +87,15 @@
     </time-display>
   {:else}
     <!-- Зона возврата после «выкл» на третьем клике -->
-    <button
-      type="button"
-      class="clockRestore"
-      title="Show clock"
-      aria-label="Show clock"
-      on:click={onClockClick}
-    ></button>
+    <Tooltip.Bubble content="Show clock" side="top" delayDuration={200}>
+      <button
+        type="button"
+        class="clockRestore"
+        title="Show clock"
+        aria-label="Show clock"
+        on:click={onClockClick}
+      ></button>
+    </Tooltip.Bubble>
   {/if}
 
   <!-- @todo Pomodoro timer -->
@@ -148,16 +152,18 @@
     transition: transition 0.3s ease;
   }
   .clockRestore {
-    width: 40px;
+    width: 100%;
+    min-width: 40px;
     height: 40px;
     border: none;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.12);
+    background: transparent;
     cursor: pointer;
     padding: 0;
+    display: flex;
   }
   .clockRestore:hover {
-    background: rgba(255, 255, 255, 0.22);
+    background: transparent;
   }
   /* // .toggle-pomodoro {
     //     display: flex;
