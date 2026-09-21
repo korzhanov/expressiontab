@@ -6,6 +6,7 @@
     loadTimerMode,
     nextTimerMode,
     saveTimerMode,
+    TIMER_MODE_CLOCK,
     TIMER_MODE_COUNTDOWN,
     type TimerMode,
   } from "./timer-mode";
