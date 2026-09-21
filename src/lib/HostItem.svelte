@@ -4,14 +4,15 @@
   import AnchoreItem from "./AnchoreItem.svelte";
   import { longhover, GROUP_LONGHOVER_MS } from "./longhover";
   import { nodesList } from "./stores";
-  import { getUnfoldSlice, UNFOLD_PAGE_SIZE } from "./bookmarks";
+  import { getUnfoldSlice, UNFOLD_PAGE_SIZE, liveNodeIndexes } from "./bookmarks";
   import * as Tooltip from "./components/ui/tooltip";
 
   export let hostItem: any;
 
-  $: anchores = hostItem?.nodes || [];
+  // Живые индексы: после Delete url гасится в nodesList — счётчик «ещё N» актуален
+  $: anchores = liveNodeIndexes(hostItem?.nodes || [], $nodesList);
   $: hostAnchore = $nodesList[anchores[0]] || {};
-  $: otherAnchores = anchores[1] ? anchores.slice(1) : [];
+  $: otherAnchores = anchores.slice(1);
   $: isSessionGroup = !!(hostItem?.isSession || hostAnchore?.isSession);
   $: groupHint = `${otherAnchores.length} more — arrow toggles, hover 3s or right-click`;
   $: toggleLabel = unfold
@@ -71,7 +72,7 @@
   }
 </script>
 
-{#if hostItem}
+{#if hostItem && anchores.length}
   {#if anchores.length < 2}
     {#each anchores as item (item)}
       {#if $nodesList[item]?.url}

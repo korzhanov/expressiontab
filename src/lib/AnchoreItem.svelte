@@ -3,8 +3,8 @@
   import globe from "../assets/Globe.svg";
   import { fly, fade } from "svelte/transition";
   import { onDestroy, onMount } from "svelte";
-  import { favicons } from "./stores";
-  import { resolveFaviconSrc } from "./bookmarks";
+  import { favicons, nodesList } from "./stores";
+  import { resolveFaviconSrc, clearUrlsInNodesList } from "./bookmarks";
   import { ensureIconsForAnchor } from "./icon-ensure";
   import * as Tooltip from "./components/ui/tooltip";
   import BubblePop from "./BubblePop.svelte";
@@ -165,6 +165,8 @@
     }
     isBookmark = false;
     closeMenu();
+    // Гасим url в индексе — HostItem.liveNodeIndexes обновит groupToggleCount
+    nodesList.update((list) => clearUrlsInNodesList(list, url));
     if (titleVisible) {
       // Список: уезд вправо + fade (не BubblePop)
       listRemoving = true;

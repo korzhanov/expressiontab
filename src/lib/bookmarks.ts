@@ -219,6 +219,38 @@ export function getUnfoldSlice(
   };
 }
 
+/**
+ * Индексы с живым http(s) URL.
+ * После Delete AnchoreItem гасит url в nodesList — hostItem.nodes сам не чистится.
+ */
+export function liveNodeIndexes(
+  indexes: number[],
+  nodes: BookmarkNode[]
+): number[] {
+  return indexes.filter((i) => isValidHttpUrl(nodes[i]?.url));
+}
+
+/**
+ * Погасить URL в копии nodesList (иммутабельно для store.update).
+ * Все дубли того же URL — как deleteDialUrl.
+ */
+export function clearUrlsInNodesList(
+  nodes: BookmarkNode[],
+  url: string
+): BookmarkNode[] {
+  if (!url) return nodes;
+  let changed = false;
+  const next = nodes.map((n) => {
+    if (n?.url === url) {
+      changed = true;
+      // Пустой url → liveNodeIndexes отфильтрует
+      return { ...n, url: "" };
+    }
+    return n;
+  });
+  return changed ? next : nodes;
+}
+
 export { UNFOLD_PAGE_SIZE };
 
 type FaviconJob = {

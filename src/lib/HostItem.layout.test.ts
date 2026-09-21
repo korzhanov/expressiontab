@@ -20,6 +20,9 @@ describe("HostItem lined group row", () => {
     expect(src).toContain('class="groupToggle"');
     expect(src).toContain("groupToggleCount");
     expect(src).toContain("aria-expanded={unfold}");
+    // Счётчик от живых URL после Delete
+    expect(src).toContain("liveNodeIndexes");
+    expect(src).toContain("otherAnchores.length");
   });
 
   it("uses local unfold (not global store) to avoid VirtualScroll jumps", () => {
