@@ -560,7 +560,9 @@ describe("bubble-physics", () => {
   });
 
   it("collide keeps nodes from overlapping after ticks", async () => {
-    const { createBubbleWorld, stopWorld } = await import("./bubble-physics");
+    const { createBubbleWorld, stopWorld, BUBBLE_EDGE_GAP } = await import(
+      "./bubble-physics"
+    );
     const nodes = [
       {
         id: "a",
@@ -594,8 +596,8 @@ describe("bubble-physics", () => {
     const a = world.nodes[0];
     const b = world.nodes[1];
     const dist = Math.hypot((a.x ?? 0) - (b.x ?? 0), (a.y ?? 0) - (b.y ?? 0));
-    // drag-collisions: radius = r+1 → минимум ≈ r_i+r_j+2
-    expect(dist).toBeGreaterThanOrEqual(a.r + b.r);
+    // collide pad = BUBBLE_EDGE_GAP/2 → минимум ≈ r_i+r_j+5
+    expect(dist).toBeGreaterThanOrEqual(a.r + b.r + BUBBLE_EDGE_GAP - 0.5);
     stopWorld(world);
   });
 

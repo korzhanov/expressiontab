@@ -58,6 +58,10 @@ export type BubbleNode = SimulationNodeDatum & {
 
 /** Зазор между ячейками сетки (разграничение ≈ gap/2). */
 export const PACK_GAP = 12;
+/** Отступ между краями соседних шаров (px) — collide padding ×2. */
+export const BUBBLE_EDGE_GAP = 5;
+/** Половина BUBBLE_EDGE_GAP: добавляется к r в forceCollide. */
+export const BUBBLE_COLLIDE_PAD = BUBBLE_EDGE_GAP / 2;
 /** Шаг ряда hex/шахмат: плотнее прямой сетки (√3/2). */
 export const HEX_ROW = Math.sqrt(3) / 2;
 
@@ -336,7 +340,7 @@ export function createBubbleWorld({
     .force(
       "collide",
       forceCollide<BubbleNode>()
-        .radius((d: BubbleNode) => (d.r || 40) + 1)
+        .radius((d: BubbleNode) => (d.r || 40) + BUBBLE_COLLIDE_PAD)
         .strength(1)
         .iterations(6)
     )
@@ -413,7 +417,7 @@ export function resizeWorld(world: BubbleWorld, width: number, height: number): 
   world.simulation.force(
     "collide",
     forceCollide<BubbleNode>()
-      .radius((d: BubbleNode) => (d.r || 40) + 1)
+      .radius((d: BubbleNode) => (d.r || 40) + BUBBLE_COLLIDE_PAD)
       .strength(1)
       .iterations(6)
   );
@@ -1038,7 +1042,8 @@ export function separateBubbles(
     width,
     height,
     iterations = 18,
-    gap = 3,
+    // Тот же визуальный зазор, что у forceCollide
+    gap = BUBBLE_EDGE_GAP,
   }: {
     width: number;
     height: number;
