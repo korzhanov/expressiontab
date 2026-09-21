@@ -13,6 +13,7 @@
     BUBBLE_SIM_CAP,
     clientToFieldPoint,
     collapseHost,
+    contentBottomY,
     createBubbleWorld,
     ENTER_FALL_MS,
     ENTER_RISE_MS,
@@ -97,6 +98,8 @@
   /** Полёты из-за экрана → разведённые конечные точки */
   let flights = new Map<string, BubbleEnterFlight>();
   let flightRaf = 0;
+  /** Уже обрезали пустоту снизу после укладки к потолку */
+  let heightTrimmed = false;
   /** Inflate / hover-grow для groupable host */
   let inflate: {
     id: string;
@@ -162,9 +165,7 @@
     const w = fieldWidth();
     measuredW = w;
     const count = simHostCount();
-    // minHeight ≈ viewport под filter bar — preview не короткая «полоска»
-    const minH = Math.max((viewH || 800) - 100, 480);
-    // Сначала maxR → высота → spawn (не provisional с clamp-pile)
+    // Высота ≈ упаковка рядов, НЕ весь viewport (иначе пустота снизу)
     const radii: number[] = [];
     for (const [, group] of bookmarkList) {
       if (radii.length >= BUBBLE_SIM_CAP) break;
@@ -177,9 +178,14 @@
       );
     }
     const maxR = radii.length ? Math.max(...radii, 40) : 52;
+    // Средний r — та же метрика, что buildHostBubbles (hex-высота ≈ spawn)
+    const meanR = radii.length
+      ? radii.reduce((a, b) => a + b, 0) / radii.length
+      : 52;
+    const packR = Math.max(meanR * 0.85 + maxR * 0.15, 36);
     worldH = worldHeightForCount(radii.length || count, w, {
-      avgR: maxR,
-      minHeight: minH,
+      avgR: packR,
+      minHeight: 240,
     });
     const nodes = buildHostBubbles({
       bookmarkList,
@@ -190,6 +196,7 @@
     world = createBubbleWorld({ nodes, width: w, height: worldH });
     expandedHosts = {};
     expandedOrder = [];
+    heightTrimmed = false;
     // Сброс enter-анимаций при новой симуляции
     prevVisibleIds = new Set();
     enterAnimById = {};
@@ -306,6 +313,20 @@
     if (world) {
       // И при drag: соседи от collide не улетают за край блока
       bounceBubblesAtWorldEdges(world.nodes, world.width, world.height);
+      // После укладки к потолку — срезать пустой хвост высоты
+      if (
+        !heightTrimmed &&
+        !dragBubble &&
+        world.simulation.alpha() < 0.08
+      ) {
+        const next = Math.max(240, Math.ceil(contentBottomY(world.nodes)));
+        if (next < worldH - 48) {
+          worldH = next;
+          world.height = next;
+          bounceBubblesAtWorldEdges(world.nodes, world.width, worldH);
+        }
+        heightTrimmed = true;
+      }
     }
     // Drag: обновляем позиции соседей, без refreshVisible (cull не трогаем)
     if (dragMoved && dragBubble) {
@@ -363,13 +384,13 @@
     measuredW = w;
     const hosts = world.nodes.filter((n) => n.kind === "host");
     // Только «спокойный» радиус (groupR) — не live r после inflate/unfold
-    const maxR = hosts.reduce(
-      (m, n) => Math.max(m, n.groupR ?? n.baseR ?? 40),
-      40
-    );
+    const rs = hosts.map((n) => n.groupR ?? n.baseR ?? 40);
+    const maxR = rs.reduce((m, r) => Math.max(m, r), 40);
+    const meanR = rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : 52;
+    const packR = Math.max(meanR * 0.85 + maxR * 0.15, 36);
     const nextH = worldHeightForCount(hosts.length || simHostCount(), w, {
-      avgR: maxR,
-      minHeight: Math.max((viewH || 800) - 100, 480),
+      avgR: packR,
+      minHeight: 240,
     });
     // Не расширять уже построенный мир (drag / scrollbar / inflate)
     if (nextH > worldH && Math.abs(w - world.width) < 2) {
@@ -1397,7 +1418,7 @@
   .bubbleField {
     position: relative;
     width: 100%;
-    min-height: 560px;
+    min-height: 240px;
     overflow: hidden; /* не пускаем шары на часы / filter bar */
     /* Без цветного radial — только нейтральный слой поверх anchores; hero-картинка цветная */
     background: transparent;
