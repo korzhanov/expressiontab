@@ -1,14 +1,15 @@
 import { describe, expect, it } from "bun:test";
 import {
-  BACKGROUND_MAX_CHARS,
-  loadBackgroundUrl,
+  loadBackgroundMeta,
+  saveBackgroundMeta,
   saveBackgroundUrl,
+  loadBackgroundUrl,
   type BackgroundStorage,
 } from "./background-persist";
 
 describe("background-persist", () => {
   it("saveBackgroundUrl prefers chrome.storage.local", async () => {
-    const store: Record<string, string> = {};
+    const store: Record<string, unknown> = {};
     const api: BackgroundStorage = {
       local: {
         get: (keys, cb) => {
@@ -16,7 +17,7 @@ describe("background-persist", () => {
           cb({ [k]: store[k] });
         },
         set: (items, cb) => {
-          Object.assign(store, items as Record<string, string>);
+          Object.assign(store, items);
           cb?.();
         },
       },
@@ -28,7 +29,26 @@ describe("background-persist", () => {
     );
   });
 
-  it("exposes size budget constant", () => {
-    expect(BACKGROUND_MAX_CHARS).toBeGreaterThan(1_000_000);
+  it("saves and loads backgroundMeta", async () => {
+    const store: Record<string, unknown> = {};
+    const api: BackgroundStorage = {
+      local: {
+        get: (keys, cb) => {
+          const k = typeof keys === "string" ? keys : Object.keys(keys || {})[0];
+          cb({ [k]: store[k] });
+        },
+        set: (items, cb) => {
+          Object.assign(store, items);
+          cb?.();
+        },
+      },
+    };
+    await saveBackgroundMeta(
+      { dayKey: "2026-09-21", source: "picsum", userLocked: false },
+      api
+    );
+    const m = await loadBackgroundMeta(api);
+    expect(m?.dayKey).toBe("2026-09-21");
+    expect(m?.source).toBe("picsum");
   });
 });

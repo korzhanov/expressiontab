@@ -6,6 +6,7 @@ import { writable, type Writable } from "svelte/store";
 
 const LS_KEY = "background";
 const CHROME_KEY = "background";
+const META_KEY = "backgroundMeta";
 
 /** Целевой размер data URL (символы) — запас под другие ключи LS */
 export const BACKGROUND_MAX_CHARS = 2_800_000;
@@ -13,11 +14,19 @@ export const BACKGROUND_MAX_CHARS = 2_800_000;
 export type BackgroundStorage = {
   local?: {
     get: (
-      keys: string | string[] | null,
+      keys: string | string[] | Record<string, unknown> | null,
       cb: (items: Record<string, unknown>) => void
     ) => void;
     set: (items: Record<string, unknown>, cb?: () => void) => void;
   };
+};
+
+/** Мета фона: дневная ротация + lock после user drop */
+export type BackgroundMeta = {
+  dayKey: string;
+  source: string;
+  /** Пользователь поставил через drop — не перезаписывать daily */
+  userLocked?: boolean;
 };
 
 function storageGet(
@@ -40,10 +49,26 @@ function storageGet(
   });
 }
 
+function storageGetRaw(
+  api: BackgroundStorage | undefined,
+  key: string
+): Promise<unknown> {
+  return new Promise((resolve) => {
+    try {
+      if (!api?.local?.get) {
+        resolve(null);
+        return;
+      }
+      api.local.get(key, (items) => resolve(items?.[key] ?? null));
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
 function storageSet(
   api: BackgroundStorage | undefined,
-  key: string,
-  value: string
+  items: Record<string, unknown>
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     try {
@@ -51,7 +76,7 @@ function storageSet(
         reject(new Error("no chrome.storage.local"));
         return;
       }
-      api.local.set({ [key]: value }, () => {
+      api.local.set(items, () => {
         const err =
           typeof chrome !== "undefined"
             ? chrome.runtime?.lastError
@@ -65,14 +90,23 @@ function storageSet(
   });
 }
 
+function defaultApi(
+  chromeApi?: BackgroundStorage
+): BackgroundStorage | undefined {
+  return (
+    chromeApi ??
+    (typeof chrome !== "undefined"
+      ? (chrome.storage as BackgroundStorage)
+      : undefined)
+  );
+}
+
 /** Прочитать фон: chrome.storage → localStorage (legacy persist) */
 export async function loadBackgroundUrl(
   fallback: string,
   chromeApi?: BackgroundStorage
 ): Promise<string> {
-  const api =
-    chromeApi ??
-    (typeof chrome !== "undefined" ? (chrome.storage as BackgroundStorage) : undefined);
+  const api = defaultApi(chromeApi);
   const fromChrome = await storageGet(api, CHROME_KEY);
   if (fromChrome) return fromChrome;
   try {
@@ -92,12 +126,9 @@ export async function saveBackgroundUrl(
   chromeApi?: BackgroundStorage
 ): Promise<void> {
   if (!dataUrl) throw new Error("empty background");
-  const api =
-    chromeApi ??
-    (typeof chrome !== "undefined" ? (chrome.storage as BackgroundStorage) : undefined);
+  const api = defaultApi(chromeApi);
   try {
-    await storageSet(api, CHROME_KEY, dataUrl);
-    // Убрать старый persist из LS — освободить квоту
+    await storageSet(api, { [CHROME_KEY]: dataUrl });
     try {
       localStorage.removeItem(LS_KEY);
     } catch {
@@ -112,8 +143,31 @@ export async function saveBackgroundUrl(
   }
   try {
     localStorage.setItem(LS_KEY, JSON.stringify(dataUrl));
-  } catch (e) {
+  } catch {
     throw new Error("Could not save background (storage full)");
+  }
+}
+
+export async function loadBackgroundMeta(
+  chromeApi?: BackgroundStorage
+): Promise<BackgroundMeta | null> {
+  const api = defaultApi(chromeApi);
+  const raw = await storageGetRaw(api, META_KEY);
+  if (!raw || typeof raw !== "object") return null;
+  const m = raw as BackgroundMeta;
+  if (!m.dayKey || !m.source) return null;
+  return m;
+}
+
+export async function saveBackgroundMeta(
+  meta: BackgroundMeta,
+  chromeApi?: BackgroundStorage
+): Promise<void> {
+  const api = defaultApi(chromeApi);
+  try {
+    await storageSet(api, { [META_KEY]: meta });
+  } catch {
+    /* meta необязательна при LS-only fallback */
   }
 }
 

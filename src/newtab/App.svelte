@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import { fade } from "svelte/transition";
   import firstbg from "../assets/expression-drops-xfactorial-com-copyright.jpg";
   import Anchores from "../lib/Anchores.svelte";
@@ -7,15 +7,23 @@
   import { bgOpacityFromScroll } from "../lib/utils";
   import {
     createBackgroundStore,
+    loadBackgroundMeta,
     loadBackgroundUrl,
+    saveBackgroundMeta,
     saveBackgroundUrl,
   } from "../lib/background-persist";
+  import { cssUrlValue, toCssBackgroundUrl } from "../lib/background-display";
   import {
     fileToBackgroundDataUrl,
     openUrlForSource,
     parseImageDrop,
     type DropImageSource,
   } from "../lib/image-drop";
+  import {
+    fetchDailyWallpaperDataUrl,
+    remoteImageToJpegDataUrl,
+    wallpaperDayKey,
+  } from "../lib/wallpaper-sources";
 
   let windowHeight = 600;
   let bgOpacity = 1;
@@ -30,9 +38,50 @@
 
   // Не persist(localStorage) — data URL фона не влезает в ~5MB квоту
   const background = createBackgroundStore(firstbg);
+  /** Короткий URL для CSS (blob:), иначе огромный data: в style не рисуется */
+  let bgCss = cssUrlValue(firstbg);
+  let blobToRevoke: string | null = null;
+
+  function applyBgDisplay(stored: string) {
+    if (blobToRevoke) {
+      URL.revokeObjectURL(blobToRevoke);
+      blobToRevoke = null;
+    }
+    const { cssUrl, revoke } = toCssBackgroundUrl(stored);
+    blobToRevoke = revoke;
+    bgCss = cssUrlValue(cssUrl || firstbg);
+    background.set(stored);
+  }
 
   onMount(() => {
-    void loadBackgroundUrl(firstbg).then((url) => background.set(url));
+    void (async () => {
+      const today = wallpaperDayKey();
+      const stored = await loadBackgroundUrl(firstbg);
+      const meta = await loadBackgroundMeta();
+      applyBgDisplay(stored);
+
+      // User drop — не трогаем
+      if (meta?.userLocked) return;
+      // Уже есть обои на сегодня
+      if (meta?.dayKey === today && stored && stored !== firstbg) return;
+
+      try {
+        const daily = await fetchDailyWallpaperDataUrl(today);
+        await saveBackgroundUrl(daily.dataUrl);
+        await saveBackgroundMeta({
+          dayKey: today,
+          source: daily.source,
+          userLocked: false,
+        });
+        applyBgDisplay(daily.dataUrl);
+      } catch (e) {
+        console.warn("[wallpaper] daily fetch failed", e);
+      }
+    })();
+  });
+
+  onDestroy(() => {
+    if (blobToRevoke) URL.revokeObjectURL(blobToRevoke);
   });
 
   // Пассивный scroll без bind:scrollY — меньше реактивных проходов Svelte на кадр
@@ -41,7 +90,6 @@
     rafId = requestAnimationFrame(() => {
       const y = window.scrollY || 0;
       const next = bgOpacityFromScroll(y, windowHeight);
-      // Обновляем DOM только при заметном изменении — без transition-борьбы
       if (Math.abs(next - lastOpacity) > 0.02) {
         lastOpacity = next;
         bgOpacity = next;
@@ -51,14 +99,12 @@
   }
 
   function onDragOver(e: DragEvent) {
-    // Нужен preventDefault — иначе drop не сработает
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
     dropActive = true;
   }
 
   function onDragLeave(e: DragEvent) {
-    // Уход за пределы main
     const t = e.relatedTarget as Node | null;
     if (t && (e.currentTarget as Node).contains(t)) return;
     dropActive = false;
@@ -96,14 +142,18 @@
     try {
       let dataUrl: string;
       if (pendingDrop.kind === "url") {
-        // Внешний / data URL — как есть (маленький https ок)
-        dataUrl = pendingDrop.url;
+        // https → data JPEG (иначе CSS/offline и длинные URL ломают показ)
+        dataUrl = await remoteImageToJpegDataUrl(pendingDrop.url);
       } else {
-        // Сжать file → JPEG; крупные — chrome.storage.local
         dataUrl = await fileToBackgroundDataUrl(pendingDrop.file);
       }
       await saveBackgroundUrl(dataUrl);
-      background.set(dataUrl);
+      await saveBackgroundMeta({
+        dayKey: wallpaperDayKey(),
+        source: "user",
+        userLocked: true,
+      });
+      applyBgDisplay(dataUrl);
       cancelDrop();
     } catch (err) {
       console.error(err);
@@ -128,7 +178,7 @@
   <bg
     in:fade
     out:fade
-    style="background-image: url('{$background}'); opacity: {bgOpacity};"
+    style="background-image: {bgCss}; opacity: {bgOpacity};"
   ></bg>
   <spacer>
     <Timer />
@@ -230,7 +280,6 @@
     width: 100%;
     min-height: 100vh;
     z-index: -2;
-    /* без transition на opacity — иначе фон «догоняет» скролл и интерфейс дёргается */
     will-change: opacity;
     pointer-events: none;
   }
