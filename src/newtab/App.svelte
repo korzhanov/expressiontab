@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import { fade } from "svelte/transition";
   import firstbg from "../assets/expression-drops-xfactorial-com-copyright.jpg";
   import Anchores from "../lib/Anchores.svelte";
@@ -7,15 +7,24 @@
   import { bgOpacityFromScroll } from "../lib/utils";
   import {
     createBackgroundStore,
+    loadBackgroundMeta,
     loadBackgroundUrl,
+    saveBackgroundMeta,
     saveBackgroundUrl,
   } from "../lib/background-persist";
+  import { cssUrlValue, toCssBackgroundUrl } from "../lib/background-display";
   import {
     fileToBackgroundDataUrl,
     openUrlForSource,
     parseImageDrop,
     type DropImageSource,
   } from "../lib/image-drop";
+  import {
+    fetchDailyWallpaperDataUrl,
+    formatWallpaperCredit,
+    remoteImageToJpegDataUrl,
+    wallpaperDayKey,
+  } from "../lib/wallpaper-sources";
 
   let windowHeight = 600;
   let bgOpacity = 1;
@@ -27,12 +36,85 @@
   let pendingDrop: DropImageSource | null = null;
   let dropBusy = false;
   let dropError = "";
+  /** Подпись копирайта обоев (если API отдал) */
+  let bgCredit = "";
+  let bgCreditUrl = "";
 
   // Не persist(localStorage) — data URL фона не влезает в ~5MB квоту
   const background = createBackgroundStore(firstbg);
+  /** Короткий URL для CSS (blob:), иначе огромный data: в style не рисуется */
+  let bgCss = cssUrlValue(firstbg);
+  let blobToRevoke: string | null = null;
+
+  /** Дефолтный ассет в репо — в имени файла copyright */
+  const DEFAULT_CREDIT = "Expression Drops · xfactorial.com";
+
+  function applyBgDisplay(stored: string) {
+    if (blobToRevoke) {
+      URL.revokeObjectURL(blobToRevoke);
+      blobToRevoke = null;
+    }
+    const { cssUrl, revoke } = toCssBackgroundUrl(stored);
+    blobToRevoke = revoke;
+    bgCss = cssUrlValue(cssUrl || firstbg);
+    background.set(stored);
+  }
+
+  function applyCredit(meta: {
+    copyright?: string;
+    creditUrl?: string;
+    title?: string;
+    source?: string;
+    userLocked?: boolean;
+  } | null) {
+    if (!meta || meta.userLocked || meta.source === "user") {
+      bgCredit = "";
+      bgCreditUrl = "";
+      return;
+    }
+    bgCredit = formatWallpaperCredit(meta);
+    bgCreditUrl = (meta.creditUrl || "").trim();
+  }
 
   onMount(() => {
-    void loadBackgroundUrl(firstbg).then((url) => background.set(url));
+    void (async () => {
+      const today = wallpaperDayKey();
+      const stored = await loadBackgroundUrl(firstbg);
+      const meta = await loadBackgroundMeta();
+      applyBgDisplay(stored);
+      if (meta) applyCredit(meta);
+      else if (stored === firstbg || !stored) {
+        bgCredit = DEFAULT_CREDIT;
+        bgCreditUrl = "";
+      }
+
+      // User drop — не трогаем
+      if (meta?.userLocked) return;
+      // Уже есть обои на сегодня
+      if (meta?.dayKey === today && stored && stored !== firstbg) return;
+
+      try {
+        const daily = await fetchDailyWallpaperDataUrl(today);
+        await saveBackgroundUrl(daily.dataUrl);
+        const nextMeta = {
+          dayKey: today,
+          source: daily.source,
+          userLocked: false,
+          copyright: daily.copyright,
+          creditUrl: daily.creditUrl,
+          title: daily.title,
+        };
+        await saveBackgroundMeta(nextMeta);
+        applyBgDisplay(daily.dataUrl);
+        applyCredit(nextMeta);
+      } catch (e) {
+        console.warn("[wallpaper] daily fetch failed", e);
+      }
+    })();
+  });
+
+  onDestroy(() => {
+    if (blobToRevoke) URL.revokeObjectURL(blobToRevoke);
   });
 
   // Пассивный scroll без bind:scrollY — меньше реактивных проходов Svelte на кадр
@@ -41,7 +123,6 @@
     rafId = requestAnimationFrame(() => {
       const y = window.scrollY || 0;
       const next = bgOpacityFromScroll(y, windowHeight);
-      // Обновляем DOM только при заметном изменении — без transition-борьбы
       if (Math.abs(next - lastOpacity) > 0.02) {
         lastOpacity = next;
         bgOpacity = next;
@@ -51,14 +132,12 @@
   }
 
   function onDragOver(e: DragEvent) {
-    // Нужен preventDefault — иначе drop не сработает
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
     dropActive = true;
   }
 
   function onDragLeave(e: DragEvent) {
-    // Уход за пределы main
     const t = e.relatedTarget as Node | null;
     if (t && (e.currentTarget as Node).contains(t)) return;
     dropActive = false;
@@ -96,14 +175,21 @@
     try {
       let dataUrl: string;
       if (pendingDrop.kind === "url") {
-        // Внешний / data URL — как есть (маленький https ок)
-        dataUrl = pendingDrop.url;
+        // https → data JPEG (иначе CSS/offline и длинные URL ломают показ)
+        dataUrl = await remoteImageToJpegDataUrl(pendingDrop.url);
       } else {
-        // Сжать file → JPEG; крупные — chrome.storage.local
         dataUrl = await fileToBackgroundDataUrl(pendingDrop.file);
       }
       await saveBackgroundUrl(dataUrl);
-      background.set(dataUrl);
+      await saveBackgroundMeta({
+        dayKey: wallpaperDayKey(),
+        source: "user",
+        userLocked: true,
+        copyright: "",
+        creditUrl: "",
+      });
+      applyBgDisplay(dataUrl);
+      applyCredit({ userLocked: true, source: "user" });
       cancelDrop();
     } catch (err) {
       console.error(err);
@@ -128,13 +214,30 @@
   <bg
     in:fade
     out:fade
-    style="background-image: url('{$background}'); opacity: {bgOpacity};"
+    style="background-image: {bgCss}; opacity: {bgOpacity};"
   ></bg>
   <spacer>
     <Timer />
   </spacer>
 
   <Anchores />
+
+  {#if bgCredit}
+    <!-- Требование Bing/Peapix/Picsum: показывать копирайт, если есть -->
+    <div class="bgCredit" style="opacity: {Math.max(bgOpacity, 0.35)};">
+      {#if bgCreditUrl}
+        <a
+          class="bgCreditLink"
+          href={bgCreditUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={bgCredit}
+        >{bgCredit}</a>
+      {:else}
+        <span title={bgCredit}>{bgCredit}</span>
+      {/if}
+    </div>
+  {/if}
 
   {#if dropActive}
     <div class="dropHint" aria-hidden="true">Drop image — open or set background</div>
@@ -230,7 +333,6 @@
     width: 100%;
     min-height: 100vh;
     z-index: -2;
-    /* без transition на opacity — иначе фон «догоняет» скролл и интерфейс дёргается */
     will-change: opacity;
     pointer-events: none;
   }
@@ -314,5 +416,32 @@
   }
   .dropBtn.ghost {
     background: transparent;
+  }
+
+  .bgCredit {
+    position: fixed;
+    left: 12px;
+    bottom: 10px;
+    z-index: 5;
+    max-width: min(420px, calc(100vw - 24px));
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: rgba(20, 20, 20, 0.55);
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 11px;
+    line-height: 1.35;
+    text-align: left;
+    pointer-events: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .bgCreditLink {
+    color: inherit;
+    text-decoration: none;
+  }
+  .bgCreditLink:hover {
+    color: #fff;
+    text-decoration: underline;
   }
 </style>

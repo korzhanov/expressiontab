@@ -12,5 +12,15 @@ describe("App image drop wiring", () => {
     expect(src).toContain("Set as background");
     expect(src).toContain("on:drop={onDrop}");
     expect(src).not.toContain("persist(writable");
+    // Drop → JPEG data + blob CSS; daily keyless wallpaper
+    expect(src).toContain("remoteImageToJpegDataUrl");
+    expect(src).toContain("applyBgDisplay");
+    expect(src).toContain("fetchDailyWallpaperDataUrl");
+    expect(src).toContain("userLocked: true");
+    expect(src).toContain("toCssBackgroundUrl");
+    // #100: копирайт обоев, если API отдал
+    expect(src).toContain("formatWallpaperCredit");
+    expect(src).toContain("bgCredit");
+    expect(src).toContain("applyCredit");
   });
 });
