@@ -1,7 +1,7 @@
 <script lang="ts">
-  // Tooltip в духе shadcn: delay → fade popup на портале (слой над overflow:hidden)
+  // Tooltip в духе shadcn: delay → popup на портале (слой над overflow:hidden)
   // Только один активный: claimActiveTooltip закрывает предыдущий
-  import { fade } from "svelte/transition";
+  // Без fade-outro: иначе destroy меню (Delete) оставляет сироту на layer
   import { onDestroy, onMount } from "svelte";
   import {
     claimActiveTooltip,
@@ -66,12 +66,15 @@
     syncPos(node);
   }
 
-  /** Закрыть сразу (без delay) — вызывается и из claim другого tooltip. */
+  /** Закрыть сразу — claim / scroll / leave / destroy меню. */
   function forceClose() {
     clearTimers();
-    if (!open) return;
     open = false;
-    releaseActiveTooltip(claimToken);
+    // Всегда release: иначе open уже false, а singleton держит нас
+    if (claimToken) {
+      releaseActiveTooltip(claimToken);
+      claimToken = 0;
+    }
   }
 
   function showNow() {
@@ -89,7 +92,7 @@
 
   function onLeave() {
     clearTimers();
-    // Короткая задержка — меньше мерцания при переходе на контент
+    // Короткая задержка — меньше мерцания при переходе между кнопками меню
     hideTimer = setTimeout(() => {
       forceClose();
     }, 80);
@@ -103,6 +106,7 @@
   }
 
   onMount(() => {
+    // capture: scroll не баблится, но ловится на window при capture
     const opts: AddEventListenerOptions = { capture: true, passive: true };
     window.addEventListener("scroll", onScrollOrResize, opts);
     window.addEventListener("resize", onScrollOrResize);
@@ -113,7 +117,7 @@
   });
 
   onDestroy(() => {
-    // Unmount ряда VirtualScroll без mouseleave — сразу снять portal
+    // Unmount ряда / меню без mouseleave — сразу снять portal
     forceClose();
   });
 
@@ -147,7 +151,6 @@
     class:right={side === "right"}
     role="tooltip"
     style="top: {pos.top}px; left: {pos.left}px;"
-    transition:fade={{ duration: 80 }}
   >
     {#if image}
       <!-- og/twitter/cover: после load пересчитываем clamp -->

@@ -28,4 +28,11 @@ describe("AnchoreItem lined title + delete", () => {
     // BubblePop только вне lined
     expect(src).toMatch(/\{#if !titleVisible\}[\s\S]*BubblePop/);
   });
+
+  it("closeMenu clears active tooltip so Delete pill does not stick", () => {
+    expect(src).toContain("closeActiveTooltip");
+    expect(src).toMatch(/function closeMenu[\s\S]*closeActiveTooltip/);
+    // scheduleClose идёт через closeMenu, не только multiButton=false
+    expect(src).toMatch(/scheduleCloseMenu[\s\S]*closeMenu\(\)/);
+  });
 });

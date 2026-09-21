@@ -17,7 +17,7 @@ describe("tooltip ui module", () => {
     expect(index).toContain("List");
   });
 
-  it("Tooltip.svelte uses role=tooltip and closeOnScroll policy", () => {
+  it("Tooltip.svelte forceClose always releases claim; no fade outro", () => {
     const src = readFileSync(
       join(import.meta.dir, "Tooltip.svelte"),
       "utf8"
@@ -33,6 +33,9 @@ describe("tooltip ui module", () => {
     expect(src).toContain("forceClose");
     expect(src).toContain("onScrollOrResize");
     expect(src).toContain('addEventListener("scroll"');
+    // Без fade — иначе сирота на layer при destroy меню
+    expect(src).not.toContain("transition:fade");
+    expect(src).toContain("claimToken = 0");
   });
 
   it("BubbleTooltip keeps tip on scroll; ListTooltip closes", () => {
