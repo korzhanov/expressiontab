@@ -45,11 +45,16 @@ describe("lazy icon load wiring", () => {
     expect(cov).toContain("CONCURRENCY = 1");
     expect(ens).toContain("ensureIconsForAnchor");
     expect(ens).toContain("skipCover");
+    expect(ens).toContain("wantTip");
     const item = readFileSync(
       join(import.meta.dir, "AnchoreItem.svelte"),
       "utf8"
     );
+    // Lined: tip для tooltip, cover-фон шара не нужен
+    expect(item).toContain("wantTip: titleVisible");
     expect(item).toContain("skipCover: titleVisible");
+    expect(item).toContain("image={tipImageSrc}");
+    expect(item).toContain("resolveTipImageSrc");
   });
 
   it("Anchores debounces chunk rebuild for VirtualScroll stability", () => {

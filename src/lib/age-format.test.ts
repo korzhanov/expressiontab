@@ -44,6 +44,7 @@ describe("age-format", () => {
     const now = Date.UTC(2025, 6, 1);
     const tip = buildAnchorTooltip({
       title: "Docs",
+      url: "https://docs.example/x",
       visitCount: 2,
       lastVisitTime: now - 10 * day,
       dateAdded: now - (OLD_BOOKMARK_DAYS + 1) * day,
@@ -51,12 +52,22 @@ describe("age-format", () => {
       now,
     });
     expect(tip.text).toContain("Docs");
+    expect(tip.text).toContain("https://docs.example/x");
     expect(tip.text).toContain("2 visits");
     expect(tip.text).toContain("Last visit:");
     expect(tip.text).toContain("Added:");
     expect(tip.text).toContain("(old)");
     expect(tip.oldBookmark).toBe(true);
     expect(tip.aged).toBe(true);
+  });
+
+  it("buildAnchorTooltip omits url when it equals title", () => {
+    const tip = buildAnchorTooltip({
+      title: "https://a.test/",
+      url: "https://a.test/",
+      visitCount: 1,
+    });
+    expect(tip.text).toBe("https://a.test/ · 1 visit");
   });
 
   it("buildAnchorTooltip session uses open duration not visit count", () => {

@@ -28,4 +28,13 @@ describe("AnchoreItem lined title + delete", () => {
     // BubblePop только вне lined
     expect(src).toMatch(/\{#if !titleVisible\}[\s\S]*BubblePop/);
   });
+
+  it("lined row tooltip matches bubble: url + tip image, not disabled by titleVisible", () => {
+    expect(src).toContain("image={tipImageSrc}");
+    expect(src).toContain("wantTip: titleVisible");
+    expect(src).toContain("buildAnchorTooltip");
+    // Раньше tip был выкл. на titleVisible — теперь только меню/анимация
+    expect(src).not.toContain("disabled={titleVisible && !nested}");
+    expect(src).toContain("disabled={multiButton || popping || listRemoving}");
+  });
 });

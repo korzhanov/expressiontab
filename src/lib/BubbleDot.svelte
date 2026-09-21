@@ -107,6 +107,7 @@
   /** Текст tooltip: title · visits · last visit / added / open duration */
   $: tipMeta = buildAnchorTooltip({
     title: bubble.title,
+    url: bubble.url,
     visitCount: bubble.visitCount,
     lastVisitTime: bubble.lastVisitTime,
     dateAdded: bubble.dateAdded,

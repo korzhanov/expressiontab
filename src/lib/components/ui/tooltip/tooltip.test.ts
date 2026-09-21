@@ -47,6 +47,9 @@ describe("tooltip ui module", () => {
     expect(bubble).toContain("closeOnScroll={false}");
     expect(bubble).toContain("{image}");
     expect(list).toContain("closeOnScroll={true}");
+    // Lined tip тоже с preview image
+    expect(list).toContain("{image}");
+    expect(list).toContain("export let image");
   });
 
   it("Tooltip supports optional preview image", () => {

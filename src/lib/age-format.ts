@@ -69,6 +69,8 @@ export function formatOpenDuration(
 
 export type AnchorTooltipInput = {
   title?: string;
+  /** Полный URL — как в bubble tip */
+  url?: string;
   visitCount?: number;
   lastVisitTime?: number | null;
   dateAdded?: number | null;
@@ -88,11 +90,13 @@ export type AnchorTooltipResult = {
   aged: boolean;
 };
 
-/** Единый текст тултипа bubble/lined */
+/** Единый текст тултипа bubble/lined: title · url · visits · dates */
 export function buildAnchorTooltip(input: AnchorTooltipInput): AnchorTooltipResult {
   const now = input.now ?? Date.now();
   const parts: string[] = [];
   if (input.title) parts.push(input.title);
+  // Ссылка отдельной строкой смысла, если не совпадает с title
+  if (input.url && input.url !== input.title) parts.push(input.url);
 
   const visits = input.visitCount ?? 0;
   if (visits > 0 && !input.isSession) {

@@ -3,8 +3,9 @@
   import globe from "../assets/Globe.svg";
   import { fly, fade } from "svelte/transition";
   import { onDestroy, onMount } from "svelte";
-  import { favicons } from "./stores";
+  import { favicons, tipImages, covers } from "./stores";
   import { resolveFaviconSrc } from "./bookmarks";
+  import { resolveTipImageSrc } from "./cover-icons";
   import { ensureIconsForAnchor } from "./icon-ensure";
   import * as Tooltip from "./components/ui/tooltip";
   import BubblePop from "./BubblePop.svelte";
@@ -25,10 +26,11 @@
   $: visitCount = anchor?.visitCount || 1;
   $: hostVisitCount = anchor?.hostVisitCount || 0;
   $: host = anchor?.host || "localhost";
-  // Тултип: last visit / added / open duration
+  // Тултип как у bubble: title · url · visits · dates (+ tip image)
   $: tipMeta = buildAnchorTooltip({
-    title: nested ? url : title || host,
-    visitCount: unfold ? visitCount : hostVisitCount || visitCount,
+    title: title || host,
+    url,
+    visitCount: unfold || titleVisible ? visitCount : hostVisitCount || visitCount,
     lastVisitTime: anchor?.lastVisitTime,
     dateAdded: anchor?.dateAdded,
     isBookmark,
@@ -36,6 +38,8 @@
     openedAt: anchor?.openedAt ?? anchor?.lastVisitTime,
   });
   $: tipContent = tipMeta.text || title || host || url;
+  // twitter → cover fallback (как BubbleDot)
+  $: tipImageSrc = resolveTipImageSrc(host, $tipImages, $covers, "");
   // Строка titleVisible: title | visits | last visit
   $: lastVisitLabel = formatDateShort(anchor?.lastVisitTime || 0);
   $: showTitleLine = [
@@ -65,13 +69,15 @@
   // miss/нет кэша → page → host → img_data/Globe
   $: src = resolveFaviconSrc(host, $favicons, anchor?.img_data || globe, url);
 
-  // Лениво: ряд VirtualScroll виден → idle-очередь (cover только bubble)
+  // Лениво: favicon всегда; tip (twitter/og) и в lined для tooltip
   $: if (url) {
     ensureIconsForAnchor({
       url,
       radius: (weightVisitsRadius || 50) / 2,
       isBookmark,
+      // Cover-фон шара только вне lined; tip для tooltip — всегда
       skipCover: titleVisible,
+      wantTip: titleVisible,
     });
   }
 
@@ -200,10 +206,11 @@
 {#if !deleted && anchor && url && (url.startsWith("http://") || url.startsWith("https://"))}
   <Tooltip.List
     content={tipContent}
+    image={tipImageSrc}
     side="bottom"
     delayDuration={450}
     block={titleVisible}
-    disabled={titleVisible && !nested}
+    disabled={multiButton || popping || listRemoving}
   >
     <anchor
       bind:this={anchorEl}
