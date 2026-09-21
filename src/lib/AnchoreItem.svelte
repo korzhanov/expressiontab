@@ -3,8 +3,8 @@
   import globe from "../assets/Globe.svg";
   import { fly, fade } from "svelte/transition";
   import { onDestroy, onMount } from "svelte";
-  import { favicons, tipImages, covers } from "./stores";
-  import { resolveFaviconSrc } from "./bookmarks";
+  import { favicons, tipImages, covers, nodesList } from "./stores";
+  import { resolveFaviconSrc, clearUrlsInNodesList } from "./bookmarks";
   import { resolveTipImageSrc } from "./cover-icons";
   import { ensureIconsForAnchor } from "./icon-ensure";
   import * as Tooltip from "./components/ui/tooltip";
@@ -157,12 +157,16 @@
 
   async function deleteAnchore() {
     if (popping || listRemoving || deleted) return;
+    const goneUrl = url;
+    // Сразу гасим url — HostItem.liveNodeIndexes пересчитает groupToggleCount
+    // (до await chrome — иначе счётчик ждёт сеть)
+    nodesList.update((list) => clearUrlsInNodesList(list, goneUrl));
     // Bookmark + history (и дубли закладок по URL) — иначе снова в индексе
     try {
       if (typeof chrome !== "undefined") {
         await deleteDialUrl({
           chromeApi: chrome,
-          url,
+          url: goneUrl,
           bookmarkId: isBookmark ? id : null,
         });
       }

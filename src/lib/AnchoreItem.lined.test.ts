@@ -16,6 +16,11 @@ describe("AnchoreItem lined title + delete", () => {
     expect(src).toContain("chromeApi: chrome");
   });
 
+  it("delete clears url in nodesList so groupToggleCount updates", () => {
+    expect(src).toContain("clearUrlsInNodesList");
+    expect(src).toContain("nodesList.update");
+  });
+
   it("lined reserves space and overlays action buttons", () => {
     expect(src).toContain("padding: 6px 6.75rem 6px 8px");
     expect(src).toContain(".multiButton.lined");

@@ -5,6 +5,8 @@ import {
   buildBookmarkIndex,
   getUnfoldSlice,
   UNFOLD_PAGE_SIZE,
+  liveNodeIndexes,
+  clearUrlsInNodesList,
   faviconSourceUrls,
   chromeFaviconUrl,
   resolveFaviconSrc,
@@ -245,5 +247,32 @@ describe("favicon quiet load", () => {
     } finally {
       (globalThis as { chrome?: unknown }).chrome = prev;
     }
+  });
+});
+
+describe("liveNodeIndexes / clearUrlsInNodesList", () => {
+  it("liveNodeIndexes drops indexes without http url", () => {
+    const nodes = [
+      { url: "https://a.test/" },
+      { url: "" },
+      { url: "https://c.test/" },
+      { url: "chrome://newtab" },
+    ];
+    expect(liveNodeIndexes([0, 1, 2, 3], nodes)).toEqual([0, 2]);
+  });
+
+  it("clearUrlsInNodesList blanks matching urls for group count", () => {
+    const nodes = [
+      { url: "https://a.test/x", title: "A" },
+      { url: "https://b.test/", title: "B" },
+      { url: "https://a.test/x", title: "A2" },
+    ];
+    const next = clearUrlsInNodesList(nodes, "https://a.test/x");
+    expect(next[0].url).toBe("");
+    expect(next[1].url).toBe("https://b.test/");
+    expect(next[2].url).toBe("");
+    expect(liveNodeIndexes([0, 1, 2], next)).toEqual([1]);
+    // Тот же массив, если URL не найден
+    expect(clearUrlsInNodesList(nodes, "https://missing.test/")).toBe(nodes);
   });
 });
