@@ -7,6 +7,7 @@
   import { resolveFaviconSrc } from "./bookmarks";
   import { ensureIconsForAnchor } from "./icon-ensure";
   import * as Tooltip from "./components/ui/tooltip";
+  import { closeActiveTooltip } from "./components/ui/tooltip/portal";
   import BubblePop from "./BubblePop.svelte";
   import { buildAnchorTooltip, formatDateShort } from "./age-format";
   import { deleteDialUrl } from "./delete-dial-url";
@@ -80,6 +81,8 @@
       clearTimeout(closeTimer);
       closeTimer = null;
     }
+    // Снять tip с portal до destroy кнопок — иначе Delete pill зависает
+    closeActiveTooltip();
     multiButton = false;
   }
 
@@ -109,7 +112,7 @@
     if (closeTimer) clearTimeout(closeTimer);
     // Небольшая задержка — успеть доехать курсором до кнопок меню
     closeTimer = setTimeout(() => {
-      multiButton = false;
+      closeMenu();
     }, 280);
   }
 

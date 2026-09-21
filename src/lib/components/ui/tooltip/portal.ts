@@ -31,6 +31,13 @@ export function releaseActiveTooltip(token: number): void {
   }
 }
 
+/** Закрыть текущий активный tip (меню действий / unmount ряда). */
+export function closeActiveTooltip(): void {
+  const prev = activeClose;
+  activeClose = null;
+  if (prev) prev();
+}
+
 /** Сброс singleton (тесты). */
 export function resetActiveTooltip(): void {
   activeClose = null;

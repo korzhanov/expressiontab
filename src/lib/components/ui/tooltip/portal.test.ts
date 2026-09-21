@@ -4,6 +4,7 @@ import { join } from "path";
 import {
   claimActiveTooltip,
   clampTooltipPos,
+  closeActiveTooltip,
   placeTooltip,
   releaseActiveTooltip,
   resetActiveTooltip,
@@ -86,6 +87,19 @@ describe("claimActiveTooltip singleton", () => {
     releaseActiveTooltip(t1);
     claimActiveTooltip(() => {});
     expect(closed).toBe(0);
+  });
+
+  it("closeActiveTooltip invokes and clears the active closer", () => {
+    resetActiveTooltip();
+    let closed = 0;
+    claimActiveTooltip(() => {
+      closed += 1;
+    });
+    closeActiveTooltip();
+    expect(closed).toBe(1);
+    // Повторный вызов — no-op
+    closeActiveTooltip();
+    expect(closed).toBe(1);
   });
 });
 
