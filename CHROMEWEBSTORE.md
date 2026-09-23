@@ -1,7 +1,7 @@
 # Expression Tab — Chrome Web Store Listing
 
 > Last Updated: 2026-09-23
-> Branch: 110-cws-readiness-fixes (issue #110)
+> Branch: 112-cws-check-followups (issue #112)
 
 ## Store Listing
 
@@ -18,15 +18,15 @@ Key features:
 - Search across your browsing history and bookmarks from a single search bar.
 - Bookmarks are automatically grouped by host for easy navigation.
 - Clean, distraction-free design that puts your data front and center.
-- Supports custom background images with proper attribution (copyright set via loadBackgroundMeta).
+- Optional custom or daily wallpaper backgrounds with attribution when available.
 
 How to use it:
-1. Install the extension or load unpacked from builds/expressiontab.
+1. Install Expression Tab from the Chrome Web Store.
 2. Open a new tab — Expression Tab loads automatically.
 3. Type in the search bar to find history or bookmarks.
 4. Click any host group to see its items, or use the star icon to create a new bookmark.
 
-Privacy note: Expression Tab reads your browsing history and bookmarks locally within your browser. No data is transmitted to external servers without your explicit action. Your data stays on your device.
+Privacy note: History and bookmarks stay in your browser. The extension may fetch site icons and (if you use wallpaper features) background images from the web; it does not upload your history or bookmarks to Expression Tab servers. See the privacy policy for details.
 
 **Category** [REQUIRED]
 Productivity
@@ -46,33 +46,35 @@ English
 | Screenshot 1 [REQUIRED] | 1280×800 | ✅ Created | store-assets/screenshot-1-newtab-1280x800.png |
 | Screenshot 2 [RECOMMENDED] | 1280×800 | ⬜ Optional follow-up | — |
 | Screenshot 3 [RECOMMENDED] | 1280×800 | ⬜ Optional follow-up | — |
+| CWS ZIP | — | ✅ Script | `bun run package:cws` → store-assets/expressiontab-v*.zip |
 
-> Icons referenced in manifest (`assets/icon*.png`) ship from `src/assets/` into the build. Verified sizes: 16×16, 32×32, 48×48, 128×128.
+> Icons referenced in manifest (`assets/icon*.png`) ship from `src/assets/` into the build. Verified sizes: 16×16, 32×32, 48×48, 128×128. Lato fonts are self-hosted under `src/assets/fonts/`.
 
 ## Permissions Justification
 
 | Permission | Type | Justification |
 |------------|------|---------------|
-| `bookmarks` | permissions | Used by extension to read, search, create, remove bookmarks (Anchores.svelte, AnchoreItem.svelte, BubbleField.svelte). |
-| `storage` | permissions | Used by chrome.storage.local to persist background URL and metadata (background-persist.ts). |
-| `history` | permissions | Used by chrome.history.search to retrieve browsing history for display and search (Anchores.svelte, history-range.ts). |
-| `favicon` | permissions | Used to load site icons via Chrome Favicon API (`chrome-extension://ID/_favicon/…` in bookmarks.ts `chromeFaviconUrl`). |
-| `<all_urls>` | host_permissions | Required so favicon/cover fetches and history/bookmark URLs across arbitrary hosts work for the dial. |
+| `bookmarks` | permissions | Read, search, create, and remove bookmarks shown on the new tab dial. |
+| `storage` | permissions | Persist background URL and related metadata in chrome.storage.local. |
+| `history` | permissions | Search browsing history to populate and filter the dial. |
+| `favicon` | permissions | Load site icons via Chrome’s Favicon API (`/_favicon/`) for dial tiles. |
+| `<all_urls>` | host_permissions | Fetch favicons, cover images, and optional wallpaper images from arbitrary https origins so every host on the dial can show its icon and backgrounds can load. Not used to inject scripts into web pages. |
 
-> Removed unused `sessions` (no `chrome.sessions` calls in source) in #110.
+> Removed unused `sessions` (no `chrome.sessions` calls) in #110. Fonts no longer loaded from Google CDN (#112).
 
 ## Privacy & Data Use
 
 ### Data Collection
 
-**Does the extension collect user data?** Yes — locally only, no external transmission.
+**Does the extension collect user data?** Yes — history/bookmarks/settings locally. Limited outbound fetches for icons/wallpapers (no upload of history/bookmark lists to Expression Tab).
 
 | Data Type | Collected? | Transmitted Off-Device? | Purpose | Shared with Third Parties? |
 |-----------|-----------|------------------------|---------|---------------------------|
-| Web history | Yes | No | Display in new tab search | No |
-| Bookmarks | Yes | No | Display and manage in new tab | No |
-| User activity | Yes | No | UI tracking for display (which items shown/clicked) | No |
-| Background image URL | Yes | No | Persist custom background via chrome.storage.local | No |
+| Web history | Yes | No (not uploaded) | Display in new tab search | No |
+| Bookmarks | Yes | No (not uploaded) | Display and manage in new tab | No |
+| User activity (UI) | Yes | No | Which items shown/clicked in UI | No |
+| Background image URL | Yes | Stored locally; image bytes may be fetched from wallpaper hosts | Custom / daily wallpaper | Image hosts see HTTP request only |
+| Favicon / cover image requests | Yes (URLs of sites on dial) | Request to site/CDN for the image file | Show icons on dial | Favicon/CDN hosts see HTTP request only |
 
 ### Data Use Certification
 - [x] Data is NOT sold to third parties
@@ -84,7 +86,7 @@ English
 **Privacy Policy URL** [REQUIRED]
 https://github.com/korzhanov/expressiontab/blob/main/PRIVACY.md
 
-> PRIVACY.md is in the repo. After merge to `main`, the URL above is public and suitable for the CWS privacy policy field.
+> PRIVACY.md is public on `main` after merge.
 
 ## Distribution
 
@@ -111,23 +113,26 @@ https://github.com/korzhanov/expressiontab
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
-| 0.1.0 | 2026-09-23 | CWS readiness (#110): drop unused `sessions`, keep `favicon`, confirm icons, add store screenshot 1280×800, contact email, PRIVACY.md. | Draft |
-| 0.1.0 / was 1.0 | 2026-09-23 | Initial release prep: new-tab history/bookmarks search, video preview, background image attribution, README cleanup, CHROMEWEBSTORE.md created. Merged PR #109. | Draft |
+| 0.1.0 | 2026-09-23 | CWS check follow-ups (#112): accurate privacy, self-hosted Lato, listing copy, `package:cws`, screenshot without preview badge. | Draft |
+| 0.1.0 | 2026-09-23 | CWS readiness (#110): drop unused `sessions`, keep `favicon`, icons, screenshot, contact email, PRIVACY.md. Merged #111. | Draft |
 
 ## Review Notes
 
 ### Known Issues / Limitations
 
-1. ~~**Icon files missing**~~ — ✅ Icons present under `src/assets/` at correct sizes.
-2. ~~**Unused permissions**~~ — ✅ Removed `sessions`. Kept `favicon` (used by `_favicon` API).
-3. ~~**No screenshots**~~ — ✅ `store-assets/screenshot-1-newtab-1280x800.png` (1280×800). Optional screenshots 2–3 still recommended.
-4. ~~**No privacy policy URL**~~ — ✅ PRIVACY.md; live after merge to `main` at the URL above.
-5. ~~**No contact email**~~ — ✅ korzhanov.oleg@gmail.com (listing + PRIVACY.md).
+1. ~~**Icon files missing**~~ — ✅ Icons present under `src/assets/`.
+2. ~~**Unused permissions**~~ — ✅ Removed `sessions`; kept `favicon`.
+3. ~~**No screenshots**~~ — ✅ `store-assets/screenshot-1-newtab-1280x800.png`.
+4. ~~**Privacy policy inaccurate / incomplete**~~ — ✅ Rewritten in #112 (local data + icon/wallpaper fetches).
+5. ~~**Contact email**~~ — ✅ korzhanov.oleg@gmail.com.
 6. ~~**Version mismatch**~~ — ✅ Both `0.1.0`.
+7. ~~**Remote Google Fonts**~~ — ✅ Self-hosted Lato woff2 (#112).
+8. ~~**Listing implementation details**~~ — ✅ User-facing copy only (#112).
+9. ~~**No ZIP packaging script**~~ — ✅ `bun run package:cws` (#112).
 
 ### Optional before submit
 - Add 1–2 more screenshots (list/lined view, search results).
-- Upload ZIP of `builds/expressiontab` (exclude `.git/`, `node_modules/`, `.env`, `CHROMEWEBSTORE.md`).
+- Run `bun run package:cws` and upload the zip from `store-assets/`.
 
 ### Rejection History
 <!-- If applicable -->
