@@ -6,8 +6,8 @@ Chrome extension that provides a new tab for managing browsing history and bookm
 Clear design, usefull functions, and more.
 
 ![Logo XpressionTab](https://github.com/drugz/expressiontab/raw/main/readme.files/logo_xpressiontab.png)
- 
-https://private-user-images.githubusercontent.com/2235783/656956261-4a8d0ba1-0a1f-4eab-bb93-60a218dc9abc.mp4 
+
+https://private-user-images.githubusercontent.com/2235783/656958392-25ced091-980b-4dda-a1ae-5619d0fdfbfb.mp4
 
 ## Features
 
