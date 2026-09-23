@@ -4,7 +4,7 @@
 ## Поток задачи
 
 ```text
-idea / баг
+idea / bug
   → gh issue create (+ Project #9)
   → ветка NNN-short-slug от main
   → код + bun test
