@@ -1,33 +1,32 @@
 {
-     "name": "Expression Tab",
-     "version": "1.0",
-     "manifest_version": 3,
-     "description": "Expression Tab",
-     "host_permissions": [
-          "<all_urls>"
-     ],
-     "permissions": [
-          "bookmarks",
-          "storage",
-          "sessions",
-          "history",
-          "favicon"
-     ],
-     "chrome_url_overrides": {
-          "newtab": "newtab/index.html"
-     },
-     "action": {
-          "default_icon": {
-               "16": "assets/icon16.png",
-               "32": "assets/icon32.png",
-               "48": "assets/icon48.png",
-               "128": "assets/icon128.png"
-          }
-     },
-     "icons": {
-          "16": "assets/icon16.png",
-          "32": "assets/icon32.png",
-          "48": "assets/icon48.png",
-          "128": "assets/icon128.png"
-     }
+  "name": "Expression Tab",
+  "version": "0.1.0",
+  "manifest_version": 3,
+  "description": "Expression Tab - Your Bubble Expression - A Speed Dial Extension for Chrome",
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "permissions": [
+    "bookmarks",
+    "storage",
+    "history",
+    "favicon"
+  ],
+  "chrome_url_overrides": {
+    "newtab": "newtab/index.html"
+  },
+  "action": {
+    "default_icon": {
+      "16": "assets/icon16.png",
+      "32": "assets/icon32.png",
+      "48": "assets/icon48.png",
+      "128": "assets/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "assets/icon16.png",
+    "32": "assets/icon32.png",
+    "48": "assets/icon48.png",
+    "128": "assets/icon128.png"
+  }
 }
