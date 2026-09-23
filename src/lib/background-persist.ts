@@ -3,6 +3,7 @@
  * Пишем в chrome.storage.local (квота больше), store — только in-memory.
  */
 import { writable, type Writable } from "svelte/store";
+import { wallpaperDayKey } from "./wallpaper-sources";
 
 const LS_KEY = "background";
 const CHROME_KEY = "background";
@@ -27,12 +28,21 @@ export type BackgroundMeta = {
   source: string;
   /** Пользователь поставил через drop — не перезаписывать daily */
   userLocked?: boolean;
-  /** Копирайт / автор (Bing, Peapix, Picsum) */
+  /** Копирайт базового изображения (XFactorial.com) */
   copyright?: string;
   /** Ссылка на источник / автора */
   creditUrl?: string;
   title?: string;
 };
+
+// Копирайт базового изображения из репо
+export const DEFAULT_BG_COPYRIGHT = "Oleg Korzhanov, 2010"; // копирайт изображения из репо
+export const DEFAULT_BG_CREDIT_URL = "https://XFactorial.com";
+
+// Функция для получения ключа дня — не зависит от wallpaper-sources
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 function storageGet(
   api: BackgroundStorage | undefined,
@@ -158,7 +168,17 @@ export async function loadBackgroundMeta(
 ): Promise<BackgroundMeta | null> {
   const api = defaultApi(chromeApi);
   const raw = await storageGetRaw(api, META_KEY);
-  if (!raw || typeof raw !== "object") return null;
+  if (!raw || typeof raw !== "object") {
+    // Если мета не сохранена — возвращаем копирайт базового изображения
+    return {
+      dayKey: wallpaperDayKey(),
+      source: "user",
+      userLocked: false,
+      copyright: DEFAULT_BG_COPYRIGHT,
+      creditUrl: DEFAULT_BG_CREDIT_URL,
+      title: "Default background",
+    };
+  }
   const m = raw as BackgroundMeta;
   if (!m.dayKey || !m.source) return null;
   return m;
