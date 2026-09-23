@@ -6,11 +6,11 @@ Clear design, usefull functions, and more.
 
 ![Logo XpressionTab](https://github.com/drugz/expressiontab/raw/main/readme.files/logo_xpressiontab.png)
 
-![Main cover 1](https://github.com/drugz/expressiontab/raw/main/readme.files/screenshot_1.jpg)
-#
-![Main cover 2](https://github.com/drugz/expressiontab/raw/main/readme.files/screenshot_2.jpg)
-#
-![Main cover 3](https://github.com/drugz/expressiontab/raw/main/readme.files/screenshot_3.jpg)
+<video width="100%" controls>
+  <source src="readme.files/expression_tabs_preview.mp4" type="video/mp4">
+  Ваш браузер не поддерживает видео тег.
+</video>
+
 #
 @todo:
 
@@ -22,13 +22,13 @@ Clear design, usefull functions, and more.
 
 [V] update readme.md
 
-[ ] fix bugs with keydown in searchbar
+[V] fix bugs with keydown in searchbar
 
 [ ] fix style of context menu for left anchores
 
 [ ] fix style for lined view
 
-[ ] add VirtualList
+[V] add VirtualList
 
 [ ] fix bugs, add new
 
