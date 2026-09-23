@@ -1,6 +1,6 @@
 {
      "name": "Expression Tab",
-     "version": "1.0",
+     "version": "0.1.0",
      "manifest_version": 3,
      "description": "Expression Tab",
      "host_permissions": [
@@ -9,7 +9,6 @@
      "permissions": [
           "bookmarks",
           "storage",
-          "sessions",
           "history",
           "favicon"
      ],
