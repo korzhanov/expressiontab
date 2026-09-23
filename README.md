@@ -6,14 +6,8 @@ Chrome extension that provides a new tab for managing browsing history and bookm
 Clear design, usefull functions, and more.
 
 ![Logo XpressionTab](https://github.com/drugz/expressiontab/raw/main/readme.files/logo_xpressiontab.png)
-
-
-<video width="100%" controls>
-  <source src="readme.files/expression_tabs_preview.mp4" type="video/mp4">
-  !!! Your browser does not support the video tag. [Link for short video](https://github.com/korzhanov/expressiontab/blob/main/readme.files/expression_tabs_preview.mp4)
-  ![XpressionTab Screenshot](https://github.com/drugz/expressiontab/raw/main/readme.files/screenshot_1.jpg)  
-</video>
-
+ 
+https://private-user-images.githubusercontent.com/2235783/656956261-4a8d0ba1-0a1f-4eab-bb93-60a218dc9abc.mp4 
 
 ## Features
 
