@@ -452,15 +452,6 @@
 
 <filterBar class="text-white">
   <div class="filterRow searchRow">
-    {#if previewMock}
-      <Tooltip.Root
-        content="No chrome.history — mock data"
-        side="bottom"
-        delayDuration={300}
-      >
-        <span class="previewBanner">Preview · mock data</span>
-      </Tooltip.Root>
-    {/if}
       <input
         class="text-white"
         type="search"
