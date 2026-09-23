@@ -2,6 +2,9 @@
 import { installChromeMockIfNeeded } from "../lib/chrome-mock";
 installChromeMockIfNeeded();
 
+// Self-hosted Lato (woff2) — Vite кладёт файлы в пакет расширения
+import "./fonts.css";
+
 import App from "./App.svelte";
 
 const appEl = document.getElementById("app");

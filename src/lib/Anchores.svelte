@@ -458,7 +458,7 @@
         side="bottom"
         delayDuration={300}
       >
-        <!-- <span class="previewBanner">Preview · mock data</span> -->
+        <span class="previewBanner">Preview · mock data</span>
       </Tooltip.Root>
     {/if}
       <input

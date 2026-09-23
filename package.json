@@ -10,6 +10,7 @@
     "dev": "bun scripts/ensure-deps.mjs && bun scripts/watch-build.mjs",
     "preview": "bun scripts/ensure-deps.mjs && vite build && bunx --bun serve builds/expressiontab -l 4173",
     "build": "vite build",
+    "package:cws": "bun scripts/package-cws.mjs",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "lint": "eslint \"src/**/*.{js,ts}\" \"vite.config.js\"",
     "test": "bun test"
