@@ -38,4 +38,4 @@ Third parties that host those images or icons may see a standard HTTP request (I
 
 ## Contact
 
-For privacy concerns, contact: korzhanov.oleg@gmail.com
+For privacy concerns, contact: art@xfactorial.com

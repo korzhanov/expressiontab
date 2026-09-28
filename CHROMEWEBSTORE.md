@@ -99,7 +99,7 @@ https://github.com/korzhanov/expressiontab/blob/main/PRIVACY.md
 Oleg Korzhanov
 
 **Contact Email** [REQUIRED — must be valid and public]
-korzhanov.oleg@gmail.com
+art@xfactorial.com
 
 **Support URL / Email** [RECOMMENDED]
 https://github.com/korzhanov/expressiontab/issues
@@ -124,7 +124,7 @@ https://github.com/korzhanov/expressiontab
 2. ~~**Unused permissions**~~ — ✅ Removed `sessions`; kept `favicon`.
 3. ~~**No screenshots**~~ — ✅ `store-assets/screenshot-1-newtab-1280x800.png`.
 4. ~~**Privacy policy inaccurate / incomplete**~~ — ✅ Rewritten in #112 (local data + icon/wallpaper fetches).
-5. ~~**Contact email**~~ — ✅ korzhanov.oleg@gmail.com.
+5. ~~**Contact email**~~ — ✅ art@xfactorial.com.
 6. ~~**Version mismatch**~~ — ✅ Both `0.1.0`.
 7. ~~**Remote Google Fonts**~~ — ✅ Self-hosted Lato woff2 (#112).
 8. ~~**Listing implementation details**~~ — ✅ User-facing copy only (#112).
