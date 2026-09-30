@@ -5,6 +5,9 @@ Expression New Tab for Google Chrome.
 Chrome extension that provides a new tab for managing browsing history and bookmarks, organized by host.
 Clear design, usefull functions, and more.
 
+
+[Chrome Web Store](https://chromewebstore.google.com/detail/expression-tab/bjhdhdnblbjadnnlgfkkagcmhlandlho?pli=1)
+
 ![Logo XpressionTab](https://github.com/drugz/expressiontab/raw/main/readme.files/logo_xpressiontab.png)
 
 https://private-user-images.githubusercontent.com/2235783/656958392-25ced091-980b-4dda-a1ae-5619d0fdfbfb.mp4
